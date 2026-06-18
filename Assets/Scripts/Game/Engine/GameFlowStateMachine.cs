@@ -66,8 +66,10 @@ namespace MetaDeck.Engine
             var state = _engine.State;
             var responder = state.OpponentOf(state.ActivePlayer);
 
-            // Only open a response window if the OPPONENT can actually react with a Quick card.
-            if (HasQuickInHand(state, responder))
+            // Only open a response window if the OPPONENT can actually PLAY a Quick card right now.
+            // Merely holding one is not enough — an uncastable Quick card would open a window that the
+            // opponent can only close by manually passing, stalling the attacker out of Main phase.
+            if (HasPlayableQuickResponse(state, responder))
             {
                 OpenChainWindow();       // priority starts with the active player...
                 PassPriority(out _);     // ...but they declared this action, so auto-pass -> responder gets priority
@@ -78,10 +80,17 @@ namespace MetaDeck.Engine
             }
         }
 
-        private static bool HasQuickInHand(GameState state, PlayerId pid)
+        // A Quick response is only legal if the card is Quick-speed AND affordable under the response
+        // cost policy enforced by RespondQuickFromHandCommand (CurrentCost <= 1 and enough Bandwidth).
+        // Keep this in sync with that command (and the client's ChainPromptMB.HasQuickResponse).
+        private static bool HasPlayableQuickResponse(GameState state, PlayerId pid)
         {
-            foreach (var c in state.GetPlayer(pid).Hand.Cards)
-                if (c.Def.speedWindow == SpeedWindow.Quick) return true;
+            var p = state.GetPlayer(pid);
+            foreach (var c in p.Hand.Cards)
+                if (c.Def.speedWindow == SpeedWindow.Quick
+                    && c.CurrentCost <= 1
+                    && p.Bandwidth >= c.CurrentCost)
+                    return true;
             return false;
         }
 

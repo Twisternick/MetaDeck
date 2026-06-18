@@ -57,6 +57,10 @@ namespace MetaDeck.Core
 
         public int SummonedTurn { get; set; } = -1; // for tracking summon sickness, etc.
 
+        // How many times this monster has attacked during the current turn (reset each turn in
+        // EndTurnCommand). A monster may attack once per turn unless a keyword raises the limit.
+        public int AttacksUsedThisTurn { get; set; } = 0;
+
         public CardInstance(string instanceId, CardDef def, PlayerId owner)
         {
             InstanceId = instanceId;

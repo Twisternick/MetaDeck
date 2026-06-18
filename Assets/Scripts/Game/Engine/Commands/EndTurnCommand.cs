@@ -31,6 +31,7 @@ namespace MetaDeck.Engine.Commands
                 m.StatModifiers.RemoveAll(mod => mod.Duration == ModifierDuration.UntilEndOfTurn
                                               || mod.Duration == ModifierDuration.UntilEndOfCombat);
                 m.ClearTempKeywordsEndOfTurn();
+                m.AttacksUsedThisTurn = 0; // refresh the once-per-turn attack allowance
 
                 // Haunt: a cursed monster takes its pending haunt damage at the end of its controller's turn.
                 if (m.Owner == active

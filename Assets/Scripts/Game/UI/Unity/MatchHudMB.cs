@@ -21,6 +21,8 @@ namespace MetaDeck.Unity
         [SerializeField] private TMP_Text turnText;       // e.g. "Your turn (Turn 4)"
         [SerializeField] private TMP_Text manaText;       // e.g. "3 / 5"
         [SerializeField] private TMP_Text opponentManaText; // optional
+        [SerializeField] private TMP_Text hpText;           // your HP, e.g. "27"
+        [SerializeField] private TMP_Text opponentHpText;   // opponent HP, e.g. "30"
         [SerializeField] private Button endTurnButton;
 
         private void Awake()
@@ -65,6 +67,12 @@ namespace MetaDeck.Unity
 
             if (opponentManaText != null && opp != null)
                 opponentManaText.text = $"{opp.Bandwidth} / {opp.MaxBandwidth}";
+
+            if (hpText != null && me != null)
+                hpText.text = me.Hp.ToString();
+
+            if (opponentHpText != null && opp != null)
+                opponentHpText.text = opp.Hp.ToString();
 
             // Only let the player end the turn when it's actually theirs (the server also enforces this).
             if (endTurnButton != null)

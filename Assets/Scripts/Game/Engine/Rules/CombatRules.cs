@@ -36,8 +36,23 @@ namespace MetaDeck.Engine
             if (attacker.IsDestroyed) { reason = "Attacker is destroyed."; return false; }
             if (HasSummoningSickness(state, attacker)) { reason = "Attacker has summoning sickness."; return false; }
             if (IsSuppressed(state, attacker)) { reason = "Suppressed — cannot attack this turn."; return false; }
+            if (attacker.AttacksUsedThisTurn >= AttacksAllowedThisTurn(attacker))
+            {
+                reason = "This monster has already attacked this turn.";
+                return false;
+            }
             reason = "";
             return true;
+        }
+
+        /// <summary>
+        /// How many times a monster may attack per turn. One by default; raise this for any keyword that
+        /// grants extra attacks (e.g. a future "attack twice" keyword) — both the engine enforcement and
+        /// the UI's valid-attacker highlights go through here.
+        /// </summary>
+        public static int AttacksAllowedThisTurn(CardInstance attacker)
+        {
+            return 1;
         }
 
         /// <summary>Can <paramref name="attacker"/> legally attack the enemy monster <paramref name="defender"/>?</summary>

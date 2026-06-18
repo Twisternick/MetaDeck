@@ -75,6 +75,7 @@ namespace MetaDeck.Engine
             attacker.Keywords.Remove(Keyword.Stealth);
             attacker.RemoveKeywordThisTurn(Keyword.Stealth);
             attacker.Counters[CombatRules.DoubleJumpTurnKey] = state.TurnNumber;
+            attacker.AttacksUsedThisTurn++;                    // once-per-turn attack limit
             state.GetPlayer(attacker.Owner).AttacksThisTurn++; // Momentum
         }
 

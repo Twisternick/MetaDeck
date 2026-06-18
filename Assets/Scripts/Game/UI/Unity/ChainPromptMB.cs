@@ -28,6 +28,13 @@ namespace MetaDeck.Unity
         {
             if (netClient == null) netClient = FindFirstObjectByType<MetaDeckNetClientMB>();
             if (commandFacade == null) commandFacade = FindFirstObjectByType<GameCommandFacadeMB>();
+
+            // Without these, this client can never pass priority — any chain window it owns will hang,
+            // blocking the opponent from attacking again ("Cannot start an attack outside Main phase").
+            if (netClient == null || commandFacade == null)
+                Debug.LogWarning("[ChainPromptMB] Not fully wired (netClient/commandFacade missing). " +
+                    "Chain-response windows can't auto-pass on this client and will stall combat. " +
+                    "Add this component to the scene and assign its references.");
         }
 
         private void OnEnable()
@@ -79,8 +86,12 @@ namespace MetaDeck.Unity
             if (me?.Hand == null) return false;
             foreach (var c in me.Hand)
             {
+                // Mirror the server's affordability gate (GameFlowStateMachine.HasPlayableQuickResponse /
+                // RespondQuickFromHandCommand): Quick-speed, CurrentCost <= 1, and enough Bandwidth.
                 var def = CardLibrary.Get(c.CardId);
-                if (def != null && def.speedWindow == SpeedWindow.Quick) return true;
+                if (def != null && def.speedWindow == SpeedWindow.Quick
+                    && c.CurrentCost <= 1 && me.Bandwidth >= c.CurrentCost)
+                    return true;
             }
             return false;
         }

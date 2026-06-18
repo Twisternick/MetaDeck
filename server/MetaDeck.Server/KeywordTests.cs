@@ -275,8 +275,51 @@ namespace MetaDeck.Server
                     host.GetAttack() == 4 && host.GetMaxHealth() == 4 && host.HasKeyword(Keyword.Rush));
             }
 
+            // --- Once-per-turn attack limit ---
+            {
+                var z = new Arena();
+                var atk = z.Place(PlayerId.P1, 0, 2, 5);
+                Check("a monster can attack on its turn", CombatRules.CanAttack(z.State, atk, out _));
+                z.Combat.ResolveFaceAttack(z.State, atk, PlayerId.P2, z.Bus);
+                Check("a monster cannot attack twice in one turn", !CombatRules.CanAttack(z.State, atk, out _));
+                new EndTurnCommand(z.Zones).Execute(z.State, z.Bus);
+                Check("attack allowance refreshes at end of turn", atk.AttacksUsedThisTurn == 0);
+            }
+
+            // --- Attack chain-window gate (regression: "outside Main phase" stall) ---
+            {
+                // Opponent holds a Quick card it CANNOT pay for -> no window, combat resolves to Main.
+                var z = new Arena();
+                var atk = z.Place(PlayerId.P1, 0, 2, 5);
+                var engine = new GameEngine(z.State, z.Bus);
+                var flow = new GameFlowStateMachine(engine, z.Bus);
+                var quick = z.MakeCard(PlayerId.P2, QuickSpellDef(cost: 1));
+                z.State.GetPlayer(PlayerId.P2).Hand.Add(quick);
+                quick.Zone = Zone.Hand;
+                z.State.GetPlayer(PlayerId.P2).Bandwidth = 0; // can't afford the response
+                flow.DeclareFaceAttack(atk);
+                Check("attack resolves to Main when opponent can't afford a Quick response",
+                    flow.Phase == GamePhase.Main, $"phase={flow.Phase}");
+            }
+            {
+                // Opponent holds an AFFORDABLE Quick card -> a response window legitimately opens.
+                var z = new Arena();
+                var atk = z.Place(PlayerId.P1, 0, 2, 5);
+                var engine = new GameEngine(z.State, z.Bus);
+                var flow = new GameFlowStateMachine(engine, z.Bus);
+                var quick = z.MakeCard(PlayerId.P2, QuickSpellDef(cost: 1));
+                z.State.GetPlayer(PlayerId.P2).Hand.Add(quick);
+                quick.Zone = Zone.Hand;
+                z.State.GetPlayer(PlayerId.P2).Bandwidth = 1; // can afford it
+                flow.DeclareFaceAttack(atk);
+                Check("response window opens (priority to responder) when a Quick response is playable",
+                    flow.Phase == GamePhase.ChainResponse && flow.PriorityPlayer == PlayerId.P2,
+                    $"phase={flow.Phase} prio={flow.PriorityPlayer}");
+            }
+
             // --- Scripted mock battle combining keywords ---
-            failures += MockBattle(Check);
+            // (MockBattle reports through the shared Check, which already tallies into `failures`.)
+            MockBattle(Check);
 
             return failures;
         }
@@ -286,7 +329,7 @@ namespace MetaDeck.Server
         /// Guard wall; P2 attacks into the wall and trades; a Checkpoint defender refuses to die.
         /// Verifies that several keywords interact correctly through the real combat/cleanup path.
         /// </summary>
-        private static int MockBattle(Action<string, bool, string> check)
+        private static void MockBattle(Action<string, bool, string> check)
         {
             Console.WriteLine("  -- mock battle --");
             var z = new Arena();
@@ -328,11 +371,11 @@ namespace MetaDeck.Server
             // Racer survived combat (survivor had only 2 atk vs 3 hp) -> Overtake granted Nitro.
             check("battle: Overtake racer earned Nitro by surviving", z.State.GetPlayer(PlayerId.P1).Nitro >= 1, null);
 
-            // Now the lane is open: racer can swing face next turn.
-            check("battle: face is reachable once Guards are gone", CombatRules.CanAttackFace(z.State, racer, out _), null);
-
-            int fails = 0; // MockBattle reports through the shared checker; nothing extra to tally here.
-            return fails;
+            // The lane is open now that the Guard is gone: a fresh attacker can swing at the face.
+            // (The racer itself already attacked this turn, so it can't — that's the once-per-turn rule.)
+            var reinforcement = z.Place(PlayerId.P1, 0, 2, 2); // slot 0 freed when the wall died
+            check("battle: face is reachable once Guards are gone", CombatRules.CanAttackFace(z.State, reinforcement, out _), null);
+            check("battle: a monster that already attacked can't swing again", !CombatRules.CanAttack(z.State, racer, out _), null);
         }
 
         // ---- helpers ----
@@ -395,6 +438,17 @@ namespace MetaDeck.Server
             displayName = "Test Spell",
             type = CardType.Spell,
             cost = cost,
+            keywords = Array.Empty<Keyword>(),
+            effects = Array.Empty<EffectDefinition>()
+        };
+
+        private static CardDef QuickSpellDef(int cost) => new CardDef
+        {
+            cardId = "test_quick",
+            displayName = "Test Quick",
+            type = CardType.Spell,
+            cost = cost,
+            speedWindow = SpeedWindow.Quick,
             keywords = Array.Empty<Keyword>(),
             effects = Array.Empty<EffectDefinition>()
         };
