@@ -1,21 +1,20 @@
 using MetaDeck.Core;
-using MetaDeck.Events;
 using MetaDeck.Presentation;
+using MetaDeck.Protocol;
 using MetaDeck.Rules;
 using MetaDeck.UI;
 using MetaDeck.Unity;
 using UnityEngine;
 
 /// <summary>
-/// UI composition coordinator (NO INPUT).
-/// Subscribes to engine events and delegates rendering to focused helpers
-/// (ViewRegistry / HandRenderer / BoardRenderer / HighlightController).
-/// Holds all scene-wired references; the helpers are plain objects it constructs.
+/// UI composition coordinator (NO INPUT). Driven by the authoritative server: each SnapshotDto is
+/// rebuilt into a GameState (ClientStateBuilder) and rendered from the LOCAL player's perspective via
+/// the focused helpers (ViewRegistry / HandRenderer / BoardRenderer / HighlightController).
 /// </summary>
 public sealed class GameUIBinderMB : MonoBehaviour
 {
     [Header("Refs")]
-    [SerializeField] private GameHostMB controller;
+    [SerializeField] private MetaDeckNetClientMB netClient;
     [SerializeField] private GameCommandFacadeMB commandFacade;
     [SerializeField] private UISelectionController selection;
 
@@ -46,18 +45,30 @@ public sealed class GameUIBinderMB : MonoBehaviour
     private BoardRenderer _boardRenderer;
     private HighlightController _highlights;
 
+    // Client-side view rebuilt from the latest server snapshot.
+    private readonly ClientStateBuilder _builder = new ClientStateBuilder();
+    private GameState _state;
+    private PlayerId _viewer;
+
     private void Awake()
     {
-        if (controller == null) controller = FindFirstObjectByType<GameHostMB>();
+        if (netClient == null) netClient = FindFirstObjectByType<MetaDeckNetClientMB>();
         if (selection == null) selection = FindFirstObjectByType<UISelectionController>();
-
-        if (handLayout == null && handParent != null)
-            handLayout = handParent.GetComponent<HandLayout3D>();
+        if (handLayout == null && handParent != null) handLayout = handParent.GetComponent<HandLayout3D>();
     }
 
     private void OnEnable()
     {
-        SubscribeToEvents();
+        if (netClient == null) return;
+        netClient.OnSnapshot += HandleSnapshot;
+        netClient.OnEvent += HandleEvent;
+    }
+
+    private void OnDisable()
+    {
+        if (netClient == null) return;
+        netClient.OnSnapshot -= HandleSnapshot;
+        netClient.OnEvent -= HandleEvent;
     }
 
     private void Start()
@@ -65,11 +76,6 @@ public sealed class GameUIBinderMB : MonoBehaviour
         WireBoardSlots();
         BuildRenderers();
         FullRefresh();
-    }
-
-    private void OnDisable()
-    {
-        UnsubscribeFromEvents();
     }
 
     private void BuildRenderers()
@@ -81,74 +87,33 @@ public sealed class GameUIBinderMB : MonoBehaviour
     }
 
     // --------------------------
-    // Event wiring
+    // Server-driven updates
     // --------------------------
 
-    private void SubscribeToEvents()
+    private void HandleSnapshot(SnapshotDto snap)
     {
-        if (controller == null || controller.Bus == null) return;
-
-        controller.Bus.Subscribe<CardMoved>(OnAnyStateChange);
-        controller.Bus.Subscribe<CardPlayed>(OnAnyStateChange);
-        controller.Bus.Subscribe<MonsterSummoned>(OnAnyStateChange);
-        controller.Bus.Subscribe<DamageDealt>(OnAnyStateChange);
-        controller.Bus.Subscribe<MonsterDestroyed>(OnAnyStateChange);
-        controller.Bus.Subscribe<TurnStarted>(OnAnyStateChange);
-        controller.Bus.Subscribe<TurnEnded>(OnAnyStateChange);
-        controller.Bus.Subscribe<ChainOpened>(OnAnyStateChange);
-        controller.Bus.Subscribe<ChainResolved>(OnAnyStateChange);
-        controller.Bus.Subscribe<CardModifiersChanged>(OnAnyStateChange);
-        controller.Bus.Subscribe<PlayerDamaged>(OnAnyStateChange);
-        controller.Bus.Subscribe<GameOver>(OnGameOver);
-    }
-
-    private void UnsubscribeFromEvents()
-    {
-        if (controller == null || controller.Bus == null) return;
-
-        controller.Bus.Unsubscribe<CardMoved>(OnAnyStateChange);
-        controller.Bus.Unsubscribe<CardPlayed>(OnAnyStateChange);
-        controller.Bus.Unsubscribe<MonsterSummoned>(OnAnyStateChange);
-        controller.Bus.Unsubscribe<DamageDealt>(OnAnyStateChange);
-        controller.Bus.Unsubscribe<MonsterDestroyed>(OnAnyStateChange);
-        controller.Bus.Unsubscribe<TurnStarted>(OnAnyStateChange);
-        controller.Bus.Unsubscribe<TurnEnded>(OnAnyStateChange);
-        controller.Bus.Unsubscribe<ChainOpened>(OnAnyStateChange);
-        controller.Bus.Unsubscribe<ChainResolved>(OnAnyStateChange);
-        controller.Bus.Unsubscribe<CardModifiersChanged>(OnAnyStateChange);
-        controller.Bus.Unsubscribe<PlayerDamaged>(OnAnyStateChange);
-        controller.Bus.Unsubscribe<GameOver>(OnGameOver);
-    }
-
-    // All relevant events trigger the same full refresh (behavior preserved).
-    private void OnAnyStateChange(CardMoved e) => FullRefresh();
-    private void OnAnyStateChange(CardPlayed e) => FullRefresh();
-    private void OnAnyStateChange(MonsterSummoned e) => FullRefresh();
-    private void OnAnyStateChange(DamageDealt e) => FullRefresh();
-    private void OnAnyStateChange(MonsterDestroyed e) => FullRefresh();
-    private void OnAnyStateChange(TurnStarted e) => FullRefresh();
-    private void OnAnyStateChange(TurnEnded e) => FullRefresh();
-    private void OnAnyStateChange(ChainOpened e) => FullRefresh();
-    private void OnAnyStateChange(ChainResolved e) => FullRefresh();
-    private void OnAnyStateChange(CardModifiersChanged e) => FullRefresh();
-    private void OnAnyStateChange(PlayerDamaged e) => FullRefresh();
-
-    private void OnGameOver(GameOver e)
-    {
-        Debug.Log($"[GameUIBinder] Game over — {e.Reason}");
-        if (gameOverBanner != null) gameOverBanner.SetActive(true);
+        if (snap == null) return;
+        _viewer = netClient.LocalPlayer;
+        _state = _builder.Build(snap);
         FullRefresh();
+    }
+
+    private void HandleEvent(EventDto e)
+    {
+        if (e != null && e.Kind == EventKind.GameOver)
+            Debug.Log($"[GameUIBinder] Game over — {e.Reason}");
+        // Visual updates are driven by the snapshot that accompanies each event burst.
     }
 
     private void FullRefresh()
     {
-        if (controller == null || controller.Engine == null) return;
-        if (_handRenderer == null) return; // before Start/BuildRenderers
+        if (_state == null || _handRenderer == null) return;
 
-        var state = controller.State;
-        _handRenderer.Render(state);
-        _boardRenderer.Render(state);
-        _highlights.UpdateHighlights(state);
+        _handRenderer.Render(_state, _viewer);
+        _boardRenderer.Render(_state, _viewer);
+        _highlights.UpdateHighlights(_state, _viewer);
+
+        if (gameOverBanner != null) gameOverBanner.SetActive(_state.IsOver);
     }
 
     private void WireBoardSlots()
@@ -158,7 +123,6 @@ public sealed class GameUIBinderMB : MonoBehaviour
             Debug.LogWarning("Board slots not assigned in GameUIBinderMB.");
             return;
         }
-
         WireSlotSide(playerSlots, isPlayerSide: true);
         WireSlotSide(enemySlots, isPlayerSide: false);
     }
@@ -168,20 +132,18 @@ public sealed class GameUIBinderMB : MonoBehaviour
         for (int i = 0; i < slots.Length; i++)
         {
             if (slots[i] == null) continue;
-
             var slot = slots[i].GetComponent<BoardSlot>();
             if (slot == null)
             {
                 Debug.LogError($"BoardSlot component missing on {(isPlayerSide ? "player" : "enemy")} slot index {i}");
                 continue;
             }
-
             slot.Init(i, isPlayerSide);
         }
     }
 
     // --------------------------
-    // UI Buttons (UI -> controller, not pointer input)
+    // UI Buttons (route to the server via the command facade)
     // --------------------------
 
     public void OnClickAttackButton()
@@ -194,19 +156,18 @@ public sealed class GameUIBinderMB : MonoBehaviour
     {
         commandFacade.TryPassPriority(out _);
         selection.Clear();
-        FullRefresh();
     }
 
     public void OnClickOpenGraveyardActive()
     {
-        if (graveyardPanel == null) return;
-        graveyardPanel.Show(controller.State, controller.State.ActivePlayer);
+        if (graveyardPanel == null || _state == null) return;
+        graveyardPanel.Show(_state, _viewer);
     }
 
     public void OnClickOpenGraveyardOpponent()
     {
-        if (graveyardPanel == null) return;
-        graveyardPanel.Show(controller.State, controller.State.OpponentOf(controller.State.ActivePlayer));
+        if (graveyardPanel == null || _state == null) return;
+        graveyardPanel.Show(_state, _state.OpponentOf(_viewer));
     }
 
     public void OnClickCloseGraveyard()

@@ -26,7 +26,7 @@ public sealed class HighlightController
         _selection = selection;
     }
 
-    public void UpdateHighlights(GameState state)
+    public void UpdateHighlights(GameState state, PlayerId viewer)
     {
         for (int i = 0; i < _playerSlots.Length; i++)
         {
@@ -36,7 +36,7 @@ public sealed class HighlightController
 
         if (_selection == null) return;
 
-        var ap = state.ActivePlayer;
+        var ap = viewer;
 
         switch (_selection.CurrentIntent)
         {

@@ -33,17 +33,16 @@ public sealed class BoardRenderer
         _coroutineHost = coroutineHost;
     }
 
-    public void Render(GameState state)
+    public void Render(GameState state, PlayerId viewer)
     {
-        var ap = state.ActivePlayer;
         for (int i = 0; i < _playerSlots.Length; i++)
         {
-            var card = state.Board.GetAt(ap, i);
+            var card = state.Board.GetAt(viewer, i);
             if (card != null)
                 PlaceOnBoard(card, i, ownerIsPlayer: true);
         }
 
-        var opponent = state.OpponentOf(ap);
+        var opponent = state.OpponentOf(viewer);
         for (int i = 0; i < _enemySlots.Length; i++)
         {
             var card = state.Board.GetAt(opponent, i);

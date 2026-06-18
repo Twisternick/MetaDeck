@@ -23,10 +23,9 @@ public sealed class HandRenderer
         _handLayout = handLayout;
     }
 
-    public void Render(GameState state)
+    public void Render(GameState state, PlayerId viewer)
     {
-        var ap = state.ActivePlayer;
-        var handCards = state.GetPlayer(ap).Hand.Cards;
+        var handCards = state.GetPlayer(viewer).Hand.Cards;
 
         for (int i = 0; i < handCards.Count; i++)
         {
