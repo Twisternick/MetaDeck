@@ -13,23 +13,28 @@ namespace MetaDeck.Unity
 {
     /// <summary>
     /// WebSocket client for the authoritative server. Receives on a background task, marshals messages
-    /// onto the Unity main thread in Update(), and exposes the latest snapshot plus event/error
-    /// callbacks. Sending is fire-and-forget (optimistic) — the server validates and may reply Error.
+    /// onto the Unity main thread in Update(), and exposes the latest snapshot plus event/error/lobby
+    /// callbacks. After connecting you must enter the lobby (QuickMatch / CreateRoom / JoinRoom) to be
+    /// paired into a match; Welcome marks the match start.
     ///
-    /// NOTE: System.Net.WebSockets.ClientWebSocket is unsupported on WebGL; this is desktop/editor only
-    /// for now. A WebGL transport would swap in the browser WebSocket via jslib later.
+    /// NOTE: ClientWebSocket is unsupported on WebGL; desktop/editor only for now.
     /// </summary>
     public sealed class MetaDeckNetClientMB : MonoBehaviour
     {
         [Header("Connection")]
         [SerializeField] private string serverUrl = "ws://localhost:8123/";
         [SerializeField] private bool connectOnStart = true;
+        [Tooltip("Automatically Quick Match after connecting (off if you use a lobby UI for rooms).")]
+        [SerializeField] private bool autoQuickMatch = true;
 
-        /// <summary>Which side the server assigned this client (valid after OnWelcome).</summary>
         public PlayerId LocalPlayer { get; private set; }
         public SnapshotDto LatestSnapshot { get; private set; }
         public bool IsConnected => _ws != null && _ws.State == WebSocketState.Open;
 
+        // Lobby
+        public event Action<string> OnRoomCreated; // join code
+        public event Action OnWaiting;              // queued for a match
+        // Match
         public event Action OnWelcome;
         public event Action<SnapshotDto> OnSnapshot;
         public event Action<EventDto> OnEvent;
@@ -55,6 +60,7 @@ namespace MetaDeck.Unity
                 await _ws.ConnectAsync(new Uri(serverUrl), _cts.Token);
                 _ = ReceiveLoop(_cts.Token);
                 Debug.Log($"[Net] Connected to {serverUrl}");
+                if (autoQuickMatch) QuickMatch();
             }
             catch (Exception ex)
             {
@@ -63,17 +69,21 @@ namespace MetaDeck.Unity
             }
         }
 
-        /// <summary>Send a command to the server (fire-and-forget; server is authoritative).</summary>
-        public async void Send(CommandDto dto)
-        {
-            if (!IsConnected) { Debug.LogWarning("[Net] Not connected; command dropped."); return; }
+        // ---- Lobby ----
+        public void QuickMatch() => SendJson(ProtocolJson.Serialize(new LobbyRequest { Kind = LobbyRequestKind.QuickMatch }));
+        public void CreateRoom() => SendJson(ProtocolJson.Serialize(new LobbyRequest { Kind = LobbyRequestKind.CreateRoom }));
+        public void JoinRoom(string code) => SendJson(ProtocolJson.Serialize(new LobbyRequest { Kind = LobbyRequestKind.JoinRoom, RoomCode = code }));
+        public void CancelLobby() => SendJson(ProtocolJson.Serialize(new LobbyRequest { Kind = LobbyRequestKind.Cancel }));
 
-            var bytes = Encoding.UTF8.GetBytes(ProtocolJson.Serialize(dto));
+        // ---- In-match commands ----
+        public void Send(CommandDto dto) => SendJson(ProtocolJson.Serialize(dto));
+
+        private async void SendJson(string json)
+        {
+            if (!IsConnected) { Debug.LogWarning("[Net] Not connected; message dropped."); return; }
+            var bytes = Encoding.UTF8.GetBytes(json);
             await _sendLock.WaitAsync();
-            try
-            {
-                await _ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, _cts.Token);
-            }
+            try { await _ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, _cts.Token); }
             catch (Exception ex) { Debug.LogWarning($"[Net] Send failed: {ex.Message}"); }
             finally { _sendLock.Release(); }
         }
@@ -97,7 +107,7 @@ namespace MetaDeck.Unity
 
                     var json = Encoding.UTF8.GetString(ms.GetBuffer(), 0, (int)ms.Length);
                     var msg = ProtocolJson.Deserialize<ServerMessage>(json);
-                    if (msg != null) _inbox.Enqueue(msg); // dispatched on main thread in Update()
+                    if (msg != null) _inbox.Enqueue(msg);
                 }
             }
             catch (OperationCanceledException) { }
@@ -114,6 +124,12 @@ namespace MetaDeck.Unity
         {
             switch (msg.Kind)
             {
+                case ServerMessageKind.RoomCreated:
+                    OnRoomCreated?.Invoke(msg.RoomCode);
+                    break;
+                case ServerMessageKind.Waiting:
+                    OnWaiting?.Invoke();
+                    break;
                 case ServerMessageKind.Welcome:
                     LocalPlayer = msg.AssignedPlayer;
                     LatestSnapshot = msg.Snapshot;
@@ -129,7 +145,7 @@ namespace MetaDeck.Unity
                     break;
                 case ServerMessageKind.Error:
                     OnError?.Invoke(msg.Error);
-                    Debug.LogWarning($"[Net] Server rejected command: {msg.Error}");
+                    Debug.LogWarning($"[Net] Server: {msg.Error}");
                     break;
             }
         }

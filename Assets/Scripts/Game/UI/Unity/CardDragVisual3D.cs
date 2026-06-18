@@ -62,6 +62,16 @@ namespace MetaDeck.Presentation
             )); */
         }
 
+        /// <summary>
+        /// Stop a post-drop snap-back animation so a renderer can authoritatively reposition this card
+        /// (e.g. the server snapshot placing a summoned card on the board). Never disturbs an active drag.
+        /// </summary>
+        public void Interrupt()
+        {
+            if (IsDragging) return;
+            if (_snapRoutine != null) { StopCoroutine(_snapRoutine); _snapRoutine = null; }
+        }
+
         public void CancelDrag()
         {
             if (_snapRoutine != null) StopCoroutine(_snapRoutine);

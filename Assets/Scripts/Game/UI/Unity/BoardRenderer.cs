@@ -63,6 +63,14 @@ public sealed class BoardRenderer
     {
         var view = _registry.GetOrCreate(card);
 
+        // If this card was just dragged (summoned), stop its snap-back-to-hand animation so it doesn't
+        // fight (and win against) the authoritative board placement below.
+        var dragVisual = view.GetComponent<MetaDeck.Presentation.CardDragVisual3D>();
+        if (dragVisual != null) dragVisual.Interrupt();
+
+        // Mark as placed so HandLayout3D stops managing it (it only lays out non-placed cards).
+        view.IsPlaced = true;
+
         BoardSlotViewMB targetSlot = ownerIsPlayer ? _playerSlots[slotIndex] : _enemySlots[slotIndex];
 
         // Prefer a dedicated "SnapAnchor" child if present, else the slot transform.

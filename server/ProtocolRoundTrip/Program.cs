@@ -91,6 +91,16 @@ Check("GameOver mapped", over.Kind == EventKind.GameOver && over.Winner == Playe
 var draw = ProtocolJson.Deserialize<EventDto>(ProtocolJson.Serialize(EventMapper.Map(new GameOver(null, "Draw."))));
 Check("GameOver draw (null winner)", draw.Winner == null);
 
+// --- 4) Immediate combat: an attack resolves now and the phase stays Main ---
+Console.WriteLine("Combat:");
+onBoard.SummonedTurn = 0; // not summoning-sick this turn (turn 1)
+int hpBefore = p2.Hp;
+var attack = new BeginAttackCommand(flow, onBoard); // face attack
+bool attackOk = engine.Submit(attack, out var attackReason);
+Check("attack accepted", attackOk, attackReason);
+Check("opponent took face damage", p2.Hp < hpBefore);
+Check("phase stays Main (no chain window)", flow.Phase == GamePhase.Main);
+
 Console.WriteLine();
 Console.WriteLine(failures == 0 ? "ALL CHECKS PASSED" : $"{failures} CHECK(S) FAILED");
 return failures == 0 ? 0 : 1;

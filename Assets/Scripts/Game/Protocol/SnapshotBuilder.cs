@@ -1,4 +1,5 @@
 using MetaDeck.Core;
+using MetaDeck.Engine;
 using MetaDeck.Rules;
 
 namespace MetaDeck.Protocol
@@ -10,7 +11,8 @@ namespace MetaDeck.Protocol
     /// </summary>
     public static class SnapshotBuilder
     {
-        public static SnapshotDto Build(GameState state, PlayerId viewer)
+        public static SnapshotDto Build(GameState state, PlayerId viewer,
+                                        GamePhase phase = GamePhase.Main, PlayerId priorityPlayer = PlayerId.P1)
         {
             return new SnapshotDto
             {
@@ -19,6 +21,8 @@ namespace MetaDeck.Protocol
                 ActivePlayer = state.ActivePlayer,
                 IsOver = state.IsOver,
                 Winner = state.Winner,
+                Phase = phase,
+                PriorityPlayer = priorityPlayer,
                 ChainDepth = state.Chain.Count,
                 Players = new[]
                 {

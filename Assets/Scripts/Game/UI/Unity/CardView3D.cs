@@ -46,7 +46,6 @@ public sealed class CardView3D : MonoBehaviour
 
     public void SetAffordable(bool affordable)
     {
-        print(affordable ? "Card is now affordable" : "Card is now unaffordable");
-        IsDraggable = affordable; // simple example: only allow dragging if affordable (could be separate)
+        IsDraggable = affordable;
     }
 }

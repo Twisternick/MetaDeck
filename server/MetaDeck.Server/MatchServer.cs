@@ -11,19 +11,22 @@ using MetaDeck.Rules;
 namespace MetaDeck.Server
 {
     /// <summary>
-    /// WebSocket host. Pairs the first two connections into an authoritative <see cref="ServerMatch"/>,
-    /// assigns them P1/P2, and runs the command->validate->submit->broadcast loop. Per-match command
-    /// execution is serialized by a gate so the (single-threaded) engine is never touched concurrently.
+    /// WebSocket host with a lobby. A connection starts in the lobby and sends a <see cref="LobbyRequest"/>
+    /// (Quick Match / Create Room / Join Room); the server pairs two players into an authoritative
+    /// <see cref="ServerMatch"/>, then switches that connection to reading <see cref="CommandDto"/>s.
+    /// Per-match command execution is serialized by a gate (the engine is single-threaded).
     /// </summary>
     public sealed class MatchServer
     {
         private readonly HttpListener _listener = new();
         private readonly IReadOnlyList<CardDef> _catalog;
         private readonly int _deckSize, _hp, _hand, _bandwidth;
+        private readonly Random _rng = new();
 
-        private readonly object _pairLock = new();
-        private PlayerConn _waiting;
-        private TaskCompletionSource<Match> _waitingMatch;
+        // Lobby state (guarded by _lobbyLock).
+        private readonly object _lobbyLock = new();
+        private readonly Dictionary<string, PlayerConn> _rooms = new(StringComparer.OrdinalIgnoreCase);
+        private PlayerConn _quickWaiting;
 
         public MatchServer(string httpPrefix, IReadOnlyList<CardDef> catalog,
                            int deckSize = 20, int hp = 30, int openingHand = 3, int startingBandwidth = 1)
@@ -42,139 +45,196 @@ namespace MetaDeck.Server
             {
                 HttpListenerContext ctx;
                 try { ctx = await _listener.GetContextAsync(); }
-                catch { break; } // listener stopped
+                catch { break; }
 
-                if (!ctx.Request.IsWebSocketRequest)
-                {
-                    ctx.Response.StatusCode = 400;
-                    ctx.Response.Close();
-                    continue;
-                }
+                if (!ctx.Request.IsWebSocketRequest) { ctx.Response.StatusCode = 400; ctx.Response.Close(); continue; }
 
                 var wsCtx = await ctx.AcceptWebSocketAsync(null);
-                _ = OnConnection(wsCtx.WebSocket, ct);
+                _ = HandleConnection(wsCtx.WebSocket, ct);
             }
         }
 
-        private async Task OnConnection(WebSocket ws, CancellationToken ct)
+        private async Task HandleConnection(WebSocket ws, CancellationToken ct)
         {
             var conn = new PlayerConn(ws);
-            Match match;
-            bool iCreated = false;
-            TaskCompletionSource<Match> wait = null;
-
-            lock (_pairLock)
-            {
-                if (_waiting == null)
-                {
-                    _waiting = conn;
-                    _waitingMatch = new TaskCompletionSource<Match>(TaskCreationOptions.RunContinuationsAsynchronously);
-                    wait = _waitingMatch;
-                    match = null;
-                }
-                else
-                {
-                    var p1 = _waiting; var p2 = conn;
-                    var pendingTcs = _waitingMatch;
-                    _waiting = null; _waitingMatch = null;
-
-                    match = CreateMatch(p1, p2);
-                    iCreated = true;
-                    pendingTcs.SetResult(match); // wake the waiting (P1) connection
-                }
-            }
-
-            if (match == null) match = await wait.Task; // P1 waits to be paired
-
             try
             {
-                if (iCreated) await SendWelcome(match, ct); // P2 greets both players once paired
-                await RunReceiveLoop(match, conn, ct);
+                while (!ct.IsCancellationRequested && ws.State == WebSocketState.Open)
+                {
+                    var text = await WsUtil.ReceiveText(ws, ct);
+                    if (text == null) break;
+
+                    if (conn.Match == null) await HandleLobby(conn, text, ct);  // not yet matched
+                    else await HandleCommand(conn, text, ct);                    // in a match
+                }
             }
             catch (OperationCanceledException) { }
             finally
             {
+                ForgetInLobby(conn);
                 try { await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "bye", CancellationToken.None); } catch { }
             }
         }
 
-        private Match CreateMatch(PlayerConn p1, PlayerConn p2)
+        // ----------------------------- Lobby -----------------------------
+
+        private async Task HandleLobby(PlayerConn conn, string text, CancellationToken ct)
+        {
+            LobbyRequest req;
+            try { req = ProtocolJson.Deserialize<LobbyRequest>(text); }
+            catch { await conn.Send(ServerMessage.OfError("Malformed lobby request."), ct); return; }
+            if (req == null) return;
+
+            PlayerConn pairWith = null;
+            string reply = null;     // serialized non-pairing reply, sent after the lock
+            ServerMessage replyMsg = null;
+
+            lock (_lobbyLock)
+            {
+                switch (req.Kind)
+                {
+                    case LobbyRequestKind.QuickMatch:
+                        if (_quickWaiting != null && _quickWaiting != conn)
+                        {
+                            pairWith = _quickWaiting;
+                            _quickWaiting = null;
+                        }
+                        else
+                        {
+                            _quickWaiting = conn;
+                            replyMsg = ServerMessage.WaitingMsg();
+                        }
+                        break;
+
+                    case LobbyRequestKind.CreateRoom:
+                    {
+                        var code = NewRoomCode();
+                        _rooms[code] = conn;
+                        conn.RoomCode = code;
+                        replyMsg = ServerMessage.RoomCreatedMsg(code);
+                        break;
+                    }
+
+                    case LobbyRequestKind.JoinRoom:
+                        if (!string.IsNullOrEmpty(req.RoomCode) &&
+                            _rooms.TryGetValue(req.RoomCode, out var creator) && creator != conn)
+                        {
+                            _rooms.Remove(req.RoomCode);
+                            pairWith = creator;
+                        }
+                        else
+                        {
+                            replyMsg = ServerMessage.OfError("No such room.");
+                        }
+                        break;
+
+                    case LobbyRequestKind.Cancel:
+                        ForgetInLobbyLocked(conn);
+                        break;
+                }
+            }
+
+            if (pairWith != null) await StartMatch(pairWith, conn, ct); // creator/waiter is P1
+            else if (replyMsg != null) await conn.Send(replyMsg, ct);
+        }
+
+        private async Task StartMatch(PlayerConn p1, PlayerConn p2, CancellationToken ct)
         {
             p1.Player = PlayerId.P1;
             p2.Player = PlayerId.P2;
+
             var game = new ServerMatch(
                 CardCatalog.BuildDeck(_catalog, _deckSize),
                 CardCatalog.BuildDeck(_catalog, _deckSize),
-                _hp, _hand, _bandwidth, new Random());
-            return new Match { Game = game, Conns = new[] { p1, p2 } };
-        }
+                _hp, _hand, _bandwidth, _rng);
 
-        private static async Task SendWelcome(Match match, CancellationToken ct)
-        {
+            var match = new Match { Game = game, Conns = new[] { p1, p2 } };
+            p1.Match = match;
+            p2.Match = match;
+
             foreach (var c in match.Conns)
-                await c.Send(ServerMessage.Welcome(c.Player, match.Game.BuildSnapshot(c.Player)), ct);
+                await c.Send(ServerMessage.Welcome(c.Player, game.BuildSnapshot(c.Player)), ct);
         }
 
-        private static async Task RunReceiveLoop(Match match, PlayerConn conn, CancellationToken ct)
+        private string NewRoomCode()
         {
-            while (!ct.IsCancellationRequested && conn.Ws.State == WebSocketState.Open)
+            const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no ambiguous chars
+            string code;
+            do
             {
-                var text = await WsUtil.ReceiveText(conn.Ws, ct);
-                if (text == null) break;
+                var chars = new char[4];
+                for (int i = 0; i < chars.Length; i++) chars[i] = alphabet[_rng.Next(alphabet.Length)];
+                code = new string(chars);
+            } while (_rooms.ContainsKey(code));
+            return code;
+        }
 
-                CommandDto dto;
-                try { dto = ProtocolJson.Deserialize<CommandDto>(text); }
-                catch { await conn.Send(ServerMessage.OfError("Malformed command."), ct); continue; }
-                if (dto == null) continue;
+        private void ForgetInLobby(PlayerConn conn)
+        {
+            lock (_lobbyLock) ForgetInLobbyLocked(conn);
+        }
 
-                List<EventDto> events;
-                string error;
-                bool ok;
-                SnapshotDto snapP1 = null, snapP2 = null;
+        private void ForgetInLobbyLocked(PlayerConn conn)
+        {
+            if (_quickWaiting == conn) _quickWaiting = null;
+            if (conn.RoomCode != null) { _rooms.Remove(conn.RoomCode); conn.RoomCode = null; }
+        }
 
-                await match.Gate.WaitAsync(ct);
-                try
+        // ----------------------------- Match -----------------------------
+
+        private async Task HandleCommand(PlayerConn conn, string text, CancellationToken ct)
+        {
+            CommandDto dto;
+            try { dto = ProtocolJson.Deserialize<CommandDto>(text); }
+            catch { await conn.Send(ServerMessage.OfError("Malformed command."), ct); return; }
+            if (dto == null) return;
+
+            var match = conn.Match;
+            List<EventDto> events;
+            string error;
+            bool ok;
+            SnapshotDto snapP1 = null, snapP2 = null;
+
+            await match.Gate.WaitAsync(ct);
+            try
+            {
+                ok = match.Game.Submit(conn.Player, dto, out events, out error);
+                if (ok)
                 {
-                    ok = match.Game.Submit(conn.Player, dto, out events, out error);
-                    if (ok)
-                    {
-                        snapP1 = match.Game.BuildSnapshot(PlayerId.P1);
-                        snapP2 = match.Game.BuildSnapshot(PlayerId.P2);
-                    }
+                    snapP1 = match.Game.BuildSnapshot(PlayerId.P1);
+                    snapP2 = match.Game.BuildSnapshot(PlayerId.P2);
                 }
-                finally { match.Gate.Release(); }
+            }
+            finally { match.Gate.Release(); }
 
-                if (!ok)
-                {
-                    await conn.Send(ServerMessage.OfError(error), ct);
-                    continue;
-                }
+            if (!ok) { await conn.Send(ServerMessage.OfError(error), ct); return; }
 
-                foreach (var c in match.Conns)
+            foreach (var c in match.Conns)
+            {
+                foreach (var e in events)
                 {
-                    foreach (var e in events)
-                    {
-                        var filtered = FilterForRecipient(e, c.Player);
-                        if (filtered != null) await c.Send(ServerMessage.OfEvent(filtered), ct);
-                    }
-                    await c.Send(ServerMessage.OfSnapshot(c.Player == PlayerId.P1 ? snapP1 : snapP2), ct);
+                    var filtered = FilterForRecipient(e, c.Player);
+                    if (filtered != null) await c.Send(ServerMessage.OfEvent(filtered), ct);
                 }
+                await c.Send(ServerMessage.OfSnapshot(c.Player == PlayerId.P1 ? snapP1 : snapP2), ct);
             }
         }
 
-        /// <summary>Redact information the recipient shouldn't see (e.g., which card the opponent drew).</summary>
         private static EventDto FilterForRecipient(EventDto e, PlayerId recipient)
         {
             if (e.Kind == EventKind.CardDrawn && e.Player != recipient)
-                return new EventDto { Kind = EventKind.CardDrawn, Player = e.Player }; // count only, id hidden
+                return new EventDto { Kind = EventKind.CardDrawn, Player = e.Player };
             return e;
         }
 
-        // --- helper types ---
+        // ----------------------------- Types -----------------------------
+
         private sealed class PlayerConn
         {
             public readonly WebSocket Ws;
             public PlayerId Player;
+            public Match Match;
+            public string RoomCode;
             private readonly SemaphoreSlim _sendLock = new(1, 1);
 
             public PlayerConn(WebSocket ws) => Ws = ws;

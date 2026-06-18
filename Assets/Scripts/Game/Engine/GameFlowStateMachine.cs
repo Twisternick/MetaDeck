@@ -82,6 +82,23 @@ namespace MetaDeck.Engine
         }
 
         // ----------------------------
+        // Immediate combat (no chain window). Used by BeginAttackCommand so attacks resolve on
+        // declaration and the phase stays Main. The chain-window methods above remain available if a
+        // response/hand-trap system is enabled later. Validity is checked in the command's CanExecute.
+        // ----------------------------
+
+        public void ResolveAttackNow(CardInstance attacker, CardInstance defender)
+        {
+            _engine.Combat.ResolveAttack(_engine.State, attacker, defender, _bus);
+        }
+
+        public void ResolveFaceAttackNow(CardInstance attacker)
+        {
+            var face = _engine.State.OpponentOf(attacker.Owner);
+            _engine.Combat.ResolveFaceAttack(_engine.State, attacker, face, _bus);
+        }
+
+        // ----------------------------
         // Chain window actions
         // ----------------------------
 

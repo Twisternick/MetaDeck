@@ -63,7 +63,8 @@ namespace MetaDeck.Server
 
         public CardInstance Resolve(string id) => id != null && _index.TryGetValue(id, out var c) ? c : null;
 
-        public SnapshotDto BuildSnapshot(PlayerId viewer) => SnapshotBuilder.Build(State, viewer);
+        public SnapshotDto BuildSnapshot(PlayerId viewer)
+            => SnapshotBuilder.Build(State, viewer, Flow.Phase, Flow.PriorityPlayer);
 
         /// <summary>Validate the sender, build the command, submit it, and capture resulting events.</summary>
         public bool Submit(PlayerId sender, CommandDto dto, out List<EventDto> events, out string error)

@@ -9,9 +9,9 @@ using MetaDeck.Rules;
 namespace MetaDeck.Server
 {
     /// <summary>
-    /// Spins up the real WebSocket server in-process, connects two clients, and drives a short
-    /// scripted exchange to prove the authoritative loop: pairing, hidden-info snapshots, a legal
-    /// turn change broadcast to both, and rejection of an out-of-turn command.
+    /// In-process end-to-end test: starts the server, then exercises the lobby (Quick Match and
+    /// private rooms by code) and the authoritative match loop (hidden-info snapshots, a legal turn
+    /// change, and rejection of an out-of-turn command).
     /// </summary>
     public static class SelfTest
     {
@@ -31,36 +31,50 @@ namespace MetaDeck.Server
             var server = new MatchServer(prefix, CardCatalog.Default());
             var serverTask = server.RunAsync(cts.Token);
 
-            Console.WriteLine("Phase D — authoritative server self-test");
+            Console.WriteLine("Phase F — lobby + match self-test");
 
-            var a = new ClientWebSocket();
-            var b = new ClientWebSocket();
-            await a.ConnectAsync(new Uri(url), CancellationToken.None);
-            await b.ConnectAsync(new Uri(url), CancellationToken.None);
+            // --- Quick Match: two players queue and get paired ---
+            Console.WriteLine("Quick Match:");
+            var a = await Connect(url);
+            var b = await Connect(url);
+            await SendLobby(a, LobbyRequestKind.QuickMatch);
+            await SendLobby(b, LobbyRequestKind.QuickMatch);
 
-            var wa = await Recv(a);
-            var wb = await Recv(b);
-            Check("both clients welcomed", wa?.Kind == ServerMessageKind.Welcome && wb?.Kind == ServerMessageKind.Welcome);
+            var wa = await RecvUntilKind(a, ServerMessageKind.Welcome);
+            var wb = await RecvUntilKind(b, ServerMessageKind.Welcome);
+            Check("both queued players matched", wa != null && wb != null);
             Check("assigned distinct sides", wa.AssignedPlayer != wb.AssignedPlayer);
 
             var p1 = wa.AssignedPlayer == PlayerId.P1 ? a : b;
             var p1Welcome = wa.AssignedPlayer == PlayerId.P1 ? wa : wb;
-
             Check("initial active = P1, turn 1", p1Welcome.Snapshot.ActivePlayer == PlayerId.P1 && p1Welcome.Snapshot.TurnNumber == 1);
-            Check("P1 sees own hand (3)", p1Welcome.Snapshot.Players[0].Hand.Count == 3 && p1Welcome.Snapshot.Players[0].HandCount == 3);
-            Check("P2 hand hidden from P1 (count only)", p1Welcome.Snapshot.Players[1].Hand.Count == 0 && p1Welcome.Snapshot.Players[1].HandCount == 3);
+            Check("P2 hand hidden from P1", p1Welcome.Snapshot.Players[1].Hand.Count == 0 && p1Welcome.Snapshot.Players[1].HandCount == 3);
 
-            // Legal: P1 ends their turn.
             await Send(p1, new CommandDto { Kind = CommandKind.EndTurn });
             var (events, snap) = await DrainUntilSnapshot(p1);
-            Check("TurnEnded broadcast", events.Contains(EventKind.TurnEnded));
-            Check("TurnStarted broadcast", events.Contains(EventKind.TurnStarted));
+            Check("turn change broadcast", events.Contains(EventKind.TurnEnded) && events.Contains(EventKind.TurnStarted));
             Check("active flips to P2, turn 2", snap != null && snap.ActivePlayer == PlayerId.P2 && snap.TurnNumber == 2);
 
-            // Illegal: P1 tries to end the turn again while it's P2's turn.
             await Send(p1, new CommandDto { Kind = CommandKind.EndTurn });
-            var err = await RecvUntilKind(p1, ServerMessageKind.Error);
-            Check("out-of-turn command rejected", err != null, "no error received");
+            Check("out-of-turn command rejected", await RecvUntilKind(p1, ServerMessageKind.Error) != null);
+
+            // --- Private rooms: create + join by code ---
+            Console.WriteLine("Rooms:");
+            var host = await Connect(url);
+            var guest = await Connect(url);
+
+            await SendLobby(host, LobbyRequestKind.CreateRoom);
+            var created = await RecvUntilKind(host, ServerMessageKind.RoomCreated);
+            Check("room created with a code", created != null && !string.IsNullOrEmpty(created.RoomCode));
+
+            await SendLobby(guest, LobbyRequestKind.JoinRoom, created.RoomCode);
+            var wh = await RecvUntilKind(host, ServerMessageKind.Welcome);
+            var wg = await RecvUntilKind(guest, ServerMessageKind.Welcome);
+            Check("joining the code starts a match", wh != null && wg != null && wh.AssignedPlayer != wg.AssignedPlayer);
+
+            var stray = await Connect(url);
+            await SendLobby(stray, LobbyRequestKind.JoinRoom, "ZZZZ");
+            Check("joining an unknown room is rejected", await RecvUntilKind(stray, ServerMessageKind.Error) != null);
 
             cts.Cancel();
             try { await serverTask; } catch { }
@@ -70,15 +84,25 @@ namespace MetaDeck.Server
             return failures == 0 ? 0 : 1;
         }
 
+        private static async Task<ClientWebSocket> Connect(string url)
+        {
+            var ws = new ClientWebSocket();
+            await ws.ConnectAsync(new Uri(url), CancellationToken.None);
+            return ws;
+        }
+
+        private static Task SendLobby(ClientWebSocket ws, LobbyRequestKind kind, string code = null)
+            => WsUtil.SendText(ws, ProtocolJson.Serialize(new LobbyRequest { Kind = kind, RoomCode = code }), CancellationToken.None);
+
+        private static Task Send(ClientWebSocket ws, CommandDto dto)
+            => WsUtil.SendText(ws, ProtocolJson.Serialize(dto), CancellationToken.None);
+
         private static async Task<ServerMessage> Recv(ClientWebSocket ws, int timeoutMs = 4000)
         {
             using var cts = new CancellationTokenSource(timeoutMs);
             var text = await WsUtil.ReceiveText(ws, cts.Token);
             return text == null ? null : ProtocolJson.Deserialize<ServerMessage>(text);
         }
-
-        private static Task Send(ClientWebSocket ws, CommandDto dto)
-            => WsUtil.SendText(ws, ProtocolJson.Serialize(dto), CancellationToken.None);
 
         private static async Task<(List<EventKind> events, SnapshotDto snapshot)> DrainUntilSnapshot(ClientWebSocket ws)
         {

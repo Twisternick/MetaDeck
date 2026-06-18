@@ -30,14 +30,22 @@ namespace MetaDeck.Engine.Commands
 
         public bool CanExecute(GameState state, out string reason)
         {
+            if (_flow.Phase != GamePhase.Main)
+            {
+                reason = "Cannot start an attack outside Main phase.";
+                return false;
+            }
+
             return _face
-                ? _flow.BeginAttackFace(_attacker, out reason)
-                : _flow.BeginAttack(_attacker, _defender, out reason);
+                ? CombatRules.CanAttackFace(state, _attacker, out reason)
+                : CombatRules.CanAttackMonster(state, _attacker, _defender, out reason);
         }
 
         public void Execute(GameState state, IEventBus bus)
         {
-            // BeginAttack already opened chain and stored pending action
+            // Resolve immediately (no chain window); phase stays Main so the player can keep acting.
+            if (_face) _flow.ResolveFaceAttackNow(_attacker);
+            else _flow.ResolveAttackNow(_attacker, _defender);
         }
     }
 }

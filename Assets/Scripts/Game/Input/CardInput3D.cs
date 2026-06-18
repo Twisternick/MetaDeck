@@ -21,6 +21,8 @@ public sealed class CardInput3D : MonoBehaviour
     [SerializeField] private Vector3 planeNormal = default; // if zero -> Vector3.up
 
     [SerializeField] private GameCommandFacadeMB commandFacade;
+    [SerializeField] private MetaDeckNetClientMB netClient;
+    [Tooltip("Fallback local player id if no net client is present.")]
     [SerializeField] private PlayerId localPlayerId;
 
     private CardView3D _dragCard;
@@ -28,27 +30,25 @@ public sealed class CardInput3D : MonoBehaviour
     private bool _attacking; // true when the current drag is a board monster declaring an attack
 
     private Plane _dragPlane;
-    private Vector3 _grabOffset; // keeps grab point stable
-    private Quaternion _dragFacingRot; // rotation we want while dragging (e.g. keep current)
+    private Vector3 _grabOffset;
+    private Quaternion _dragFacingRot;
 
     private void Awake()
     {
         if (cam == null) cam = Camera.main;
         if (planeNormal == default) planeNormal = Vector3.up;
         if (commandFacade == null) commandFacade = FindFirstObjectByType<GameCommandFacadeMB>();
+        if (netClient == null) netClient = FindFirstObjectByType<MetaDeckNetClientMB>();
     }
 
     private void OnEnable()
     {
-        Debug.Log("[CardInput3D] OnEnable");
-
         if (point == null || point.action == null)
         {
             Debug.LogError("[CardInput3D] 'point' InputActionReference is not assigned.");
             enabled = false;
             return;
         }
-
         if (click == null || click.action == null)
         {
             Debug.LogError("[CardInput3D] 'click' InputActionReference is not assigned.");
@@ -67,7 +67,6 @@ public sealed class CardInput3D : MonoBehaviour
     {
         click.action.performed -= OnClickChanged;
         click.action.canceled -= OnRelease;
-
         click.action.Disable();
         point.action.Disable();
     }
@@ -75,36 +74,25 @@ public sealed class CardInput3D : MonoBehaviour
     private void Update()
     {
         if (_dragCard == null) return;
-
         if (TryGetPointerOnPlane(out var planePoint))
-        {
-            // Maintain the original grab point offset
-            var desiredPos = planePoint + _grabOffset;
-            _dragVisual.SetDragTarget(desiredPos, _dragFacingRot);
-        }
+            _dragVisual.SetDragTarget(planePoint + _grabOffset, _dragFacingRot);
     }
 
-    // The 'Click' action is PassThrough, so 'performed' fires on BOTH press and release
-    // (and 'canceled' only fires on focus-loss/disable, not on normal mouse-up). Branch on the
-    // current button value: pressed -> pick up the card, released -> attempt the drop.
+    // The 'Click' action is PassThrough: 'performed' fires on BOTH press and release.
     private void OnClickChanged(InputAction.CallbackContext ctx)
     {
-        if (ctx.ReadValueAsButton())
-            TryPick();
-        else
-            TryDrop();
+        if (ctx.ReadValueAsButton()) TryPick();
+        else TryDrop();
     }
 
-    private void OnRelease(InputAction.CallbackContext _)
-    {
-        TryDrop();
-    }
+    private void OnRelease(InputAction.CallbackContext _) => TryDrop();
+
+    private PlayerId LocalPlayer => netClient != null ? netClient.LocalPlayer : localPlayerId;
 
     private void TryPick()
     {
         var ray = cam.ScreenPointToRay(point.action.ReadValue<Vector2>());
-        if (!Physics.Raycast(ray, out var hit, 200f, cardMask))
-            return;
+        if (!Physics.Raycast(ray, out var hit, 200f, cardMask)) return;
 
         var card = hit.collider.GetComponentInParent<CardView3D>();
         if (card == null) return;
@@ -112,10 +100,9 @@ public sealed class CardInput3D : MonoBehaviour
         var visual = card.GetComponent<CardDragVisual3D>();
         if (visual == null) return;
 
-        // A friendly monster on the board is dragged to declare an ATTACK (drop on enemy monster/face).
-        // A hand card is dragged to summon/play (existing path).
+        // A friendly board monster is dragged to declare an ATTACK; a hand card to summon/play.
         bool isFriendlyBoardMonster =
-            card.Instance != null && card.Owner == localPlayerId && card.Instance.Zone == Zone.Board;
+            card.Instance != null && card.Owner == LocalPlayer && card.Instance.Zone == Zone.Board;
 
         if (isFriendlyBoardMonster)
         {
@@ -130,146 +117,78 @@ public sealed class CardInput3D : MonoBehaviour
         _dragCard = card;
         _dragVisual = visual;
 
-        // Plane through the card position
         _dragPlane = new Plane(planeNormal, _dragCard.transform.position);
-
-        // compute offset so we don't snap card center to pointer
-        if (TryGetPointerOnPlane(out var planePoint))
-            _grabOffset = _dragCard.transform.position - planePoint;
-        else
-            _grabOffset = Vector3.zero;
-
+        _grabOffset = TryGetPointerOnPlane(out var planePoint) ? _dragCard.transform.position - planePoint : Vector3.zero;
         _dragFacingRot = _dragCard.transform.rotation;
 
         _dragCard.IsDragging = true;
         _dragVisual.BeginDrag();
-
-        // optional: bring to front so it draws above others
-        //_dragCard.transform.SetParent(null, true);
     }
 
+    // Optimistic online: a drop only SENDS a command. The card always snaps back; the authoritative
+    // snapshot from the server then re-renders it in its true position (or leaves it, if rejected).
     private void TryDrop()
     {
         if (_dragCard == null) return;
-        print("Trying to drop card...");
 
         var ray = cam.ScreenPointToRay(point.action.ReadValue<Vector2>());
 
-        DropZone3D zone = null;
-        if (Physics.Raycast(ray, out var hit, 250f, zoneMask))
-            zone = hit.collider.GetComponentInParent<DropZone3D>();
+        if (_attacking) HandleAttackDrop(ray);
+        else HandleSummonOrPlayDrop(ray);
 
-        // ATTACK drag: a board monster dropped onto an enemy monster slot or the enemy face.
-        if (_attacking)
-        {
-            string aReason = "Not a valid attack target.";
-            bool ok = false;
-            if (commandFacade != null && _dragCard.Instance != null)
-            {
-                if (zone is BoardSlotDropZone3D bs && !bs.IsPlayerSide)
-                    ok = commandFacade.TryAttackEnemySlot(_dragCard.Instance, bs.SlotIndex, out aReason);
-                else if (zone is FaceDropZone3D)
-                    ok = commandFacade.TryBeginAttackFace(_dragCard.Instance, out aReason);
-            }
-
-            if (!ok) Debug.LogWarning("Attack rejected: " + aReason);
-
-            // The attacker never leaves its slot; snap the visual back. Board re-renders from events.
-            _dragVisual.CancelDrag();
-            _dragCard.IsDragging = false;
-            _dragCard = null;
-            _dragVisual = null;
-            _attacking = false;
-            return;
-        }
-
-        // Default: reject
-        bool accepted = false;
-
-        if (zone != null && zone.CanDrop(_dragCard))
-        {
-            // 1) Build & submit an engine command FIRST
-            //    (Only if it succeeds do we finalize the visual placement)
-            if (commandFacade == null)
-            {
-                Debug.LogWarning("CardInput3D: No GameCommandFacadeMB assigned.");
-                accepted = false;
-            }
-            else if (_dragCard.Instance == null)
-            {
-                Debug.LogWarning("CardInput3D: Dragged card has no bound CardInstance.");
-                accepted = false;
-            }
-            else
-            {
-                var instance = _dragCard.Instance;
-
-                // Example: only allow local player to play their own cards
-                // (Optional, but recommended UX gate)
-                if (instance.Owner != localPlayerId)
-                {
-                    accepted = false;
-                }
-                else
-                {
-                    // If dropped onto a board slot, attempt summon/play based on type
-                    if (zone is BoardSlotDropZone3D boardSlot)
-                    {
-                        // You need a slot index. Best is to store it on the zone.
-                        // Add: [SerializeField] private int slotIndex; public int SlotIndex => slotIndex;
-                        int slotIndex = boardSlot.SlotIndex;
-                        bool playerSide = boardSlot.IsPlayerSide;
-
-                        string reason;
-                        if (instance.Def.type == CardType.Monster)
-                        {
-                            accepted = commandFacade.TrySummonMonster(instance, Zone.Hand, slotIndex, out reason);
-                        }
-                        else
-                        {
-                            // For now target = None (or make a target from zone/slot)
-                            var target = TargetSpec.None();
-                            accepted = commandFacade.TryPlayCard(instance, Zone.Hand, target, asChainItem: false, out reason);
-                        }
-
-                        if (!accepted)
-                            Debug.LogWarning("Play rejected: " + reason);
-                    }
-                    else
-                    {
-                        // Dropped onto some other zone: by default reject (or support later)
-                        accepted = false;
-                    }
-                }
-            }
-
-            // 2) If engine accepted, finalize placement visually
-            if (accepted)
-            {
-                // zone sets parent/local pose + occupancy
-                zone.OnDrop(_dragCard);
-
-                _dragCard.IsPlaced = true;
-
-                // Snap animation to slot anchor if available
-                if (zone is BoardSlotDropZone3D bs && bs.SnapAnchor != null)
-                    _dragVisual.EndDragSnapTo(bs.SnapAnchor, reparent: false);
-                else
-                    _dragVisual.EndDragSnapTo(_dragCard.transform, reparent: false);
-            }
-        }
-
-        // 3) If not accepted, rollback
-        if (!accepted)
-        {
-            _dragCard.IsPlaced = false;
-            _dragVisual.CancelDrag();
-        }
-
+        _dragVisual.CancelDrag();
         _dragCard.IsDragging = false;
         _dragCard = null;
         _dragVisual = null;
         _attacking = false;
+    }
+
+    private void HandleAttackDrop(Ray ray)
+    {
+        var attacker = _dragCard.Instance;
+        if (commandFacade == null || attacker == null) return;
+
+        // Prefer the nearest enemy monster under the cursor. Use RaycastAll and skip the dragged
+        // attacker itself (it follows the cursor and would otherwise occlude the ray).
+        var hits = Physics.RaycastAll(ray, 250f, cardMask);
+        CardView3D defender = null;
+        float best = float.MaxValue;
+        foreach (var h in hits)
+        {
+            var v = h.collider.GetComponentInParent<CardView3D>();
+            if (v == null || v == _dragCard || v.Instance == null) continue;
+            if (v.Instance.Owner == LocalPlayer) continue;
+            if (h.distance < best) { best = h.distance; defender = v; }
+        }
+
+        if (defender != null)
+        {
+            commandFacade.TryBeginAttack(attacker, defender.Instance, out _);
+            return;
+        }
+
+        // Otherwise, the enemy face.
+        if (Physics.Raycast(ray, out var zoneHit, 250f, zoneMask) &&
+            zoneHit.collider.GetComponentInParent<FaceDropZone3D>() != null)
+        {
+            commandFacade.TryBeginAttackFace(attacker, out _);
+        }
+    }
+
+    private void HandleSummonOrPlayDrop(Ray ray)
+    {
+        var instance = _dragCard.Instance;
+        if (commandFacade == null || instance == null || instance.Owner != LocalPlayer) return;
+
+        if (!Physics.Raycast(ray, out var hit, 250f, zoneMask)) return;
+
+        var slot = hit.collider.GetComponentInParent<BoardSlotDropZone3D>();
+        if (slot == null || !slot.IsPlayerSide) return;
+
+        if (instance.Def.type == CardType.Monster)
+            commandFacade.TrySummonMonster(instance, Zone.Hand, slot.SlotIndex, out _);
+        else
+            commandFacade.TryPlayCard(instance, Zone.Hand, TargetSpec.None(), asChainItem: false, out _);
     }
 
     private bool TryGetPointerOnPlane(out Vector3 worldPoint)
@@ -280,7 +199,6 @@ public sealed class CardInput3D : MonoBehaviour
             worldPoint = ray.GetPoint(enter);
             return true;
         }
-
         worldPoint = default;
         return false;
     }

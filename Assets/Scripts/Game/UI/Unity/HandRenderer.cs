@@ -35,6 +35,10 @@ public sealed class HandRenderer
             view.transform.SetParent(_handParent, false);
             view.Bind(card);
             view.transform.SetSiblingIndex(i);
+
+            // In hand: managed by HandLayout3D and draggable (the server validates plays).
+            view.IsPlaced = false;
+            view.SetAffordable(true);
         }
 
         // Prune views whose card claims Zone.Hand but is no longer in the hand list.

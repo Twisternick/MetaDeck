@@ -1,3 +1,4 @@
+using MetaDeck.Engine;
 using MetaDeck.Rules;
 
 namespace MetaDeck.Protocol
@@ -122,13 +123,35 @@ namespace MetaDeck.Protocol
         public PlayerId ActivePlayer { get; set; }
         public bool IsOver { get; set; }
         public PlayerId? Winner { get; set; }
+
+        // Phase / priority — drives the chain-response (respond-or-pass) UI.
+        public GamePhase Phase { get; set; }
+        public PlayerId PriorityPlayer { get; set; }
         public int ChainDepth { get; set; }
+
         public PlayerViewDto[] Players { get; set; }   // [P1 view, P2 view]
+    }
+
+    // ---------- Lobby (client -> server, before a match starts) ----------
+
+    public enum LobbyRequestKind
+    {
+        QuickMatch,   // join the matchmaking queue; paired with the next quick-matcher
+        CreateRoom,   // create a private room; server replies with a join code
+        JoinRoom,     // join a private room by code
+        Cancel        // leave the queue / cancel a created room
+    }
+
+    public sealed class LobbyRequest
+    {
+        public LobbyRequestKind Kind { get; set; }
+        public string RoomCode { get; set; }    // JoinRoom
+        public string PlayerName { get; set; }  // optional display name
     }
 
     // ---------- Server -> client envelope ----------
 
-    public enum ServerMessageKind { Welcome, Snapshot, Event, Error }
+    public enum ServerMessageKind { Welcome, Snapshot, Event, Error, RoomCreated, Waiting }
 
     /// <summary>Everything the server sends a client is wrapped in this; only the relevant field is set.</summary>
     public sealed class ServerMessage
@@ -137,11 +160,14 @@ namespace MetaDeck.Protocol
         public PlayerId AssignedPlayer { get; set; }   // Welcome: which side this client controls
         public SnapshotDto Snapshot { get; set; }      // Welcome / Snapshot
         public EventDto Event { get; set; }            // Event
-        public string Error { get; set; }              // Error (e.g., rejected command)
+        public string Error { get; set; }              // Error (e.g., rejected command / bad room code)
+        public string RoomCode { get; set; }           // RoomCreated
 
         public static ServerMessage Welcome(PlayerId p, SnapshotDto s) => new ServerMessage { Kind = ServerMessageKind.Welcome, AssignedPlayer = p, Snapshot = s };
         public static ServerMessage OfSnapshot(SnapshotDto s) => new ServerMessage { Kind = ServerMessageKind.Snapshot, Snapshot = s };
         public static ServerMessage OfEvent(EventDto e) => new ServerMessage { Kind = ServerMessageKind.Event, Event = e };
         public static ServerMessage OfError(string msg) => new ServerMessage { Kind = ServerMessageKind.Error, Error = msg };
+        public static ServerMessage RoomCreatedMsg(string code) => new ServerMessage { Kind = ServerMessageKind.RoomCreated, RoomCode = code };
+        public static ServerMessage WaitingMsg() => new ServerMessage { Kind = ServerMessageKind.Waiting };
     }
 }
