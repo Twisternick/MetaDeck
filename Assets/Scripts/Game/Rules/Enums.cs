@@ -74,6 +74,8 @@ namespace MetaDeck.Rules
         RevealOpponentHand,
 
         GainNitro,
+        SpendNitroForBuff,
+        GainXPCounter,
         Heal,
         BuffAllFriendlyMonsters,
         DiscardRandom,

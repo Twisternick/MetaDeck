@@ -2,6 +2,8 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using MetaDeck.Presentation;
 using System;
+using MetaDeck.Engine;
+using MetaDeck.Protocol;
 using MetaDeck.Unity;
 using MetaDeck.Rules;
 using MetaDeck.Events;
@@ -180,15 +182,56 @@ public sealed class CardInput3D : MonoBehaviour
         var instance = _dragCard.Instance;
         if (commandFacade == null || instance == null || instance.Owner != LocalPlayer) return;
 
-        if (!Physics.Raycast(ray, out var hit, 250f, zoneMask)) return;
-
-        var slot = hit.collider.GetComponentInParent<BoardSlotDropZone3D>();
-        if (slot == null || !slot.IsPlayerSide) return;
-
+        // Monsters summon onto a friendly board slot.
         if (instance.Def.type == CardType.Monster)
-            commandFacade.TrySummonMonster(instance, Zone.Hand, slot.SlotIndex, out _);
+        {
+            if (Physics.Raycast(ray, out var zhit, 250f, zoneMask))
+            {
+                var slot = zhit.collider.GetComponentInParent<BoardSlotDropZone3D>();
+                if (slot != null && slot.IsPlayerSide)
+                    commandFacade.TrySummonMonster(instance, Zone.Hand, slot.SlotIndex, out _);
+            }
+            return;
+        }
+
+        // Spells/traps: target is whatever was dropped on (a monster or a face); none otherwise.
+        var target = ResolveSpellTarget(ray);
+
+        // A Quick card dropped while it's your priority in a chain window is a CHAIN RESPONSE.
+        var snap = netClient != null ? netClient.LatestSnapshot : null;
+        bool inResponseWindow = snap != null
+                                && snap.Phase == GamePhase.ChainResponse
+                                && snap.PriorityPlayer == LocalPlayer;
+
+        if (inResponseWindow && instance.Def.speedWindow == SpeedWindow.Quick)
+            commandFacade.TryRespondQuickFromHand(instance, target, out _);
         else
-            commandFacade.TryPlayCard(instance, Zone.Hand, TargetSpec.None(), asChainItem: false, out _);
+            commandFacade.TryPlayCard(instance, Zone.Hand, target, asChainItem: false, out _);
+    }
+
+    /// <summary>Resolve a spell's target from the drop: a monster under the cursor, a face, or none.</summary>
+    private TargetSpec ResolveSpellTarget(Ray ray)
+    {
+        // Nearest monster under the cursor (either side), excluding the dragged card itself.
+        var hits = Physics.RaycastAll(ray, 250f, cardMask);
+        CardView3D best = null;
+        float bestDist = float.MaxValue;
+        foreach (var h in hits)
+        {
+            var v = h.collider.GetComponentInParent<CardView3D>();
+            if (v == null || v == _dragCard || v.Instance == null) continue;
+            if (h.distance < bestDist) { bestDist = h.distance; best = v; }
+        }
+        if (best != null) return new TargetSpec(best.Instance);
+
+        // Otherwise a player's face, if dropped on one.
+        if (Physics.Raycast(ray, out var zhit, 250f, zoneMask))
+        {
+            var face = zhit.collider.GetComponentInParent<FaceDropZone3D>();
+            if (face != null) return new TargetSpec(face.FacePlayer);
+        }
+
+        return TargetSpec.None();
     }
 
     private bool TryGetPointerOnPlane(out Vector3 worldPoint)

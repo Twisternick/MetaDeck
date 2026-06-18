@@ -33,9 +33,11 @@ namespace MetaDeck.Effects
 
             foreach (var def in defs)
             {
-                // If you don't have condition evaluation yet, remove this.
-                //if (!_rules.CheckCondition(state, source, def.condition))
-                //continue;
+                // Silently skip effects whose game-state condition is not satisfied.
+                // Per-effect conditions (TargetMustBeDamaged) pass through here and are
+                // enforced inside each effect's own CanActivate instead.
+                if (!_rules.CheckCondition(state, source, def.condition))
+                    continue;
 
                 // Choose target: explicit (player-selected) if provided, else build from def.targeting
                 TargetSpec target;

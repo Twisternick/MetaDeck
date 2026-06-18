@@ -85,6 +85,10 @@ namespace MetaDeck.Server
             catch { await conn.Send(ServerMessage.OfError("Malformed lobby request."), ct); return; }
             if (req == null) return;
 
+            // Remember this player's requested deck for when the match starts.
+            conn.DeckCardIds = req.DeckCardIds;
+            conn.Archetype = req.Archetype;
+
             PlayerConn pairWith = null;
             string reply = null;     // serialized non-pairing reply, sent after the lock
             ServerMessage replyMsg = null;
@@ -144,8 +148,8 @@ namespace MetaDeck.Server
             p2.Player = PlayerId.P2;
 
             var game = new ServerMatch(
-                CardCatalog.BuildDeck(_catalog, _deckSize),
-                CardCatalog.BuildDeck(_catalog, _deckSize),
+                DeckService.Build(_catalog, p1.DeckCardIds, p1.Archetype, _deckSize, _rng),
+                DeckService.Build(_catalog, p2.DeckCardIds, p2.Archetype, _deckSize, _rng),
                 _hp, _hand, _bandwidth, _rng);
 
             var match = new Match { Game = game, Conns = new[] { p1, p2 } };
@@ -235,6 +239,8 @@ namespace MetaDeck.Server
             public PlayerId Player;
             public Match Match;
             public string RoomCode;
+            public string[] DeckCardIds;
+            public string Archetype;
             private readonly SemaphoreSlim _sendLock = new(1, 1);
 
             public PlayerConn(WebSocket ws) => Ws = ws;

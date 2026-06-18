@@ -27,7 +27,10 @@ public sealed class HandLayout3D : MonoBehaviour
     {
         cards.Clear();
         for (int i = 0; i < transform.childCount; i++)
-            cards.Add(transform.GetChild(i).GetComponent<CardView3D>());
+        {
+            var cv = transform.GetChild(i).GetComponent<CardView3D>();
+            if (cv != null) cards.Add(cv);
+        }
     }
 
     public void SetCards(List<CardView3D> cardViews)
@@ -76,7 +79,8 @@ public sealed class HandLayout3D : MonoBehaviour
         // If you want virtualization, only place a window and pool the rest.
         for (int i = 0; i < count; i++)
         {
-            if (cards[i].IsDragging || cards[i].IsPlaced) continue; // skip if user is dragging this card   
+            if (cards[i] == null) continue;                          // view destroyed (card left the hand)
+            if (cards[i].IsDragging || cards[i].IsPlaced) continue;   // skip if user is dragging this card
             // position relative to startIndex (like ScrollRect content position)
             float localI = i - startIndex;
 

@@ -78,6 +78,7 @@ namespace MetaDeck.Engine.Commands
             p.Bandwidth -= _monster.CurrentCost;
             p.CardsPlayedThisTurn++;
             if (_from == Zone.Graveyard) p.GraveyardPlaysThisTurn++;
+            if (_monster.Def.startingNitro > 0) p.Nitro += _monster.Def.startingNitro;
 
             _zones.SummonMonsterToSlot(state, _monster, _from, _slot, bus);
 

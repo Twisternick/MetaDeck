@@ -49,7 +49,10 @@ namespace MetaDeck.Engine
             if (defender.Owner != defenderOwner) { reason = "Must attack an enemy monster."; return false; }
 
             // Guard/taunt: if the defending side has a Guard, only Guards are legal targets.
-            if (HasGuard(state, defenderOwner) && !defender.HasKeyword(Keyword.Guard))
+            // DoubleJump attackers can bypass Guard once — they may attack any target.
+            if (HasGuard(state, defenderOwner)
+                && !defender.HasKeyword(Keyword.Guard)
+                && !attacker.HasKeyword(Keyword.DoubleJump))
             {
                 reason = "Must attack a Guard monster first.";
                 return false;
@@ -65,7 +68,8 @@ namespace MetaDeck.Engine
             if (!CanAttack(state, attacker, out reason)) return false;
 
             var defenderOwner = state.OpponentOf(attacker.Owner);
-            if (HasGuard(state, defenderOwner))
+            // DoubleJump can attack face even through Guard.
+            if (HasGuard(state, defenderOwner) && !attacker.HasKeyword(Keyword.DoubleJump))
             {
                 reason = "Must attack a Guard monster first.";
                 return false;

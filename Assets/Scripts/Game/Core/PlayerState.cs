@@ -29,6 +29,9 @@ namespace MetaDeck.Core
         public ZoneList Graveyard { get; } = new(Zone.Graveyard);
         public ZoneList Exile { get; } = new(Zone.Void);
 
+        // Racing archetype resource, gained from GainNitro effects and startingNitro on summoned cards.
+        public int Nitro { get; set; } = 0;
+
         public int CardsPlayedThisTurn { get; set; } = 0;
 
         // Graveyard limiter (anti-degeneracy)

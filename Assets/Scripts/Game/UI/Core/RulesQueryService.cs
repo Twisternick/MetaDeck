@@ -182,5 +182,69 @@ namespace MetaDeck.UI
                     outList.Add(c);
             }
         }
+
+        /// <summary>
+        /// Returns true if the game-state condition is satisfied for the given source card.
+        /// Effects whose condition is NOT satisfied are silently skipped by EffectRunner.
+        /// Conditions handled per-effect (TargetMustBeDamaged) always return true here.
+        /// </summary>
+        public bool CheckCondition(GameState state, CardInstance source, SimpleCondition condition)
+        {
+            return condition switch
+            {
+                SimpleCondition.None => true,
+                SimpleCondition.TargetMustBeDamaged => true,    // enforced inside DealDamageEffect.CanActivate
+                SimpleCondition.AttackedThreeTimesThisTurn => true, // legacy, handled per-effect
+                SimpleCondition.CardsPlayedAtLeast1ThisTurn => state.GetPlayer(source.Owner).CardsPlayedThisTurn >= 1,
+                SimpleCondition.CardsPlayedAtLeast3ThisTurn => state.GetPlayer(source.Owner).CardsPlayedThisTurn >= 3,
+                SimpleCondition.HasNitroAtLeast1 => state.GetPlayer(source.Owner).Nitro >= 1,
+                SimpleCondition.ControlsDistrict => ControlsKeyword(state, source.Owner, Keyword.District),
+                SimpleCondition.ControlsStructure => ControlsKeyword(state, source.Owner, Keyword.Structure),
+                SimpleCondition.FriendlyBoardAtLeast3 => FriendlyBoardCount(state, source.Owner) >= 3,
+                SimpleCondition.FriendlyHasXPCounter => FriendlyHasCounter(state, source.Owner, "XP"),
+                SimpleCondition.HealthLessThanOpponent => HealthLessThanOpponent(state, source.Owner),
+                _ => true
+            };
+        }
+
+        private bool ControlsKeyword(GameState state, PlayerId owner, Keyword kw)
+        {
+            for (int i = 0; i < 5; i++)
+            {
+                var m = state.Board.GetAt(owner, i);
+                if (m != null && !m.IsDestroyed && m.HasKeyword(kw))
+                    return true;
+            }
+            return false;
+        }
+
+        private int FriendlyBoardCount(GameState state, PlayerId owner)
+        {
+            int count = 0;
+            for (int i = 0; i < 5; i++)
+            {
+                var m = state.Board.GetAt(owner, i);
+                if (m != null && !m.IsDestroyed) count++;
+            }
+            return count;
+        }
+
+        private bool HealthLessThanOpponent(GameState state, PlayerId owner)
+        {
+            var p = state.GetPlayer(owner);
+            var opp = state.GetPlayer(state.OpponentOf(owner));
+            return p.Hp < opp.Hp;
+        }
+
+        private bool FriendlyHasCounter(GameState state, PlayerId owner, string key)
+        {
+            for (int i = 0; i < 5; i++)
+            {
+                var m = state.Board.GetAt(owner, i);
+                if (m != null && !m.IsDestroyed && m.Counters.TryGetValue(key, out int v) && v > 0)
+                    return true;
+            }
+            return false;
+        }
     }
 }

@@ -145,8 +145,15 @@ namespace MetaDeck.Protocol
     public sealed class LobbyRequest
     {
         public LobbyRequestKind Kind { get; set; }
-        public string RoomCode { get; set; }    // JoinRoom
-        public string PlayerName { get; set; }  // optional display name
+        public string RoomCode { get; set; }      // JoinRoom
+        public string PlayerName { get; set; }    // optional display name
+
+        // Deck selection (server-validated):
+        //  - DeckCardIds: an explicit player-built deck (card ids).
+        //  - Archetype:   build a random selection from this archetype.
+        //  - neither:     the server picks a random archetype.
+        public string[] DeckCardIds { get; set; }
+        public string Archetype { get; set; }
     }
 
     // ---------- Server -> client envelope ----------

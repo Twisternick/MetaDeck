@@ -41,61 +41,48 @@ namespace MetaDeck.Engine
         // Entry points that open chain
         // ----------------------------
 
-        /// <summary>
-        /// Begin an attack: opens chain window before combat resolves.
-        /// </summary>
-        public bool BeginAttack(CardInstance attacker, CardInstance defender, out string reason)
+        // ----------------------------
+        // Declaring an attack. Opens a chain-response window so the opponent can react with a Quick
+        // card — BUT only if a player actually holds a Quick card; otherwise combat resolves
+        // immediately (so ordinary attacks stay instant). Validity is checked in the command's
+        // CanExecute (Phase + CombatRules).
+        // ----------------------------
+
+        public void DeclareAttack(CardInstance attacker, CardInstance defender)
         {
-            if (Phase != GamePhase.Main)
-            {
-                reason = "Cannot start an attack outside Main phase.";
-                return false;
-            }
-
-            // Attacker validity + Guard/taunt legality enforced centrally.
-            if (!CombatRules.CanAttackMonster(_engine.State, attacker, defender, out reason))
-                return false;
-
             _pending = PendingAction.Attack(attacker, defender);
-            OpenChainWindow();
-            reason = "";
-            return true;
+            OpenOrResolve();
         }
 
-        /// <summary>Declare an attack against the opponent player directly (face).</summary>
-        public bool BeginAttackFace(CardInstance attacker, out string reason)
+        public void DeclareFaceAttack(CardInstance attacker)
         {
-            if (Phase != GamePhase.Main)
-            {
-                reason = "Cannot start an attack outside Main phase.";
-                return false;
-            }
-
-            if (!CombatRules.CanAttackFace(_engine.State, attacker, out reason))
-                return false;
-
             var face = _engine.State.OpponentOf(attacker.Owner);
             _pending = PendingAction.AttackFace(attacker, face);
-            OpenChainWindow();
-            reason = "";
-            return true;
+            OpenOrResolve();
         }
 
-        // ----------------------------
-        // Immediate combat (no chain window). Used by BeginAttackCommand so attacks resolve on
-        // declaration and the phase stays Main. The chain-window methods above remain available if a
-        // response/hand-trap system is enabled later. Validity is checked in the command's CanExecute.
-        // ----------------------------
-
-        public void ResolveAttackNow(CardInstance attacker, CardInstance defender)
+        private void OpenOrResolve()
         {
-            _engine.Combat.ResolveAttack(_engine.State, attacker, defender, _bus);
+            var state = _engine.State;
+            var responder = state.OpponentOf(state.ActivePlayer);
+
+            // Only open a response window if the OPPONENT can actually react with a Quick card.
+            if (HasQuickInHand(state, responder))
+            {
+                OpenChainWindow();       // priority starts with the active player...
+                PassPriority(out _);     // ...but they declared this action, so auto-pass -> responder gets priority
+            }
+            else
+            {
+                ResolveAll();            // nobody can respond -> resolve immediately, phase returns to Main
+            }
         }
 
-        public void ResolveFaceAttackNow(CardInstance attacker)
+        private static bool HasQuickInHand(GameState state, PlayerId pid)
         {
-            var face = _engine.State.OpponentOf(attacker.Owner);
-            _engine.Combat.ResolveFaceAttack(_engine.State, attacker, face, _bus);
+            foreach (var c in state.GetPlayer(pid).Hand.Cards)
+                if (c.Def.speedWindow == SpeedWindow.Quick) return true;
+            return false;
         }
 
         // ----------------------------

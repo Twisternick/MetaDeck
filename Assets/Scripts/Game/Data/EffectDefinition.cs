@@ -24,6 +24,18 @@ namespace MetaDeck.Data
         TargetMustBeDamaged,
         AttackedThreeTimesThisTurn,
         CardsPlayedAtLeast1ThisTurn,
-        CardsPlayedAtLeast3ThisTurn
+        CardsPlayedAtLeast3ThisTurn,
+
+        // Resource conditions
+        HasNitroAtLeast1,
+
+        // Board-state conditions
+        ControlsDistrict,       // owner has a District keyword monster on board
+        ControlsStructure,      // owner has a Structure keyword monster on board
+        FriendlyBoardAtLeast3,  // owner has 3+ monsters on board
+        FriendlyHasXPCounter,   // owner has a monster with at least 1 XP counter
+
+        // Health conditions
+        HealthLessThanOpponent, // owner HP < opponent HP
     }
 }

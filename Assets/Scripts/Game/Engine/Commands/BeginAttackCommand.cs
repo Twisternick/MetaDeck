@@ -43,9 +43,9 @@ namespace MetaDeck.Engine.Commands
 
         public void Execute(GameState state, IEventBus bus)
         {
-            // Resolve immediately (no chain window); phase stays Main so the player can keep acting.
-            if (_face) _flow.ResolveFaceAttackNow(_attacker);
-            else _flow.ResolveAttackNow(_attacker, _defender);
+            // Declare the attack: opens a response window if a Quick card exists, else resolves now.
+            if (_face) _flow.DeclareFaceAttack(_attacker);
+            else _flow.DeclareAttack(_attacker, _defender);
         }
     }
 }

@@ -76,6 +76,29 @@ namespace MetaDeck.Server
             await SendLobby(stray, LobbyRequestKind.JoinRoom, "ZZZZ");
             Check("joining an unknown room is rejected", await RecvUntilKind(stray, ServerMessageKind.Error) != null);
 
+            // --- Deck selection ---
+            Console.WriteLine("Decks:");
+
+            // Custom player-built deck (all 'sniper') -> opening hand is all sniper.
+            var customDeck = new string[20];
+            for (int i = 0; i < customDeck.Length; i++) customDeck[i] = "sniper";
+            var cd1 = await Connect(url);
+            var cd2 = await Connect(url);
+            await SendLobby(cd1, LobbyRequestKind.QuickMatch, deck: customDeck);
+            await SendLobby(cd2, LobbyRequestKind.QuickMatch);
+            var custHand = LocalView(await RecvUntilKind(cd1, ServerMessageKind.Welcome)).Hand;
+            Check("custom deck used (opening hand all 'sniper')",
+                custHand.Count == 3 && custHand.TrueForAll(c => c.CardId == "sniper"));
+
+            // Random selection from the 'Control' archetype -> only bruiser/sniper.
+            var ca1 = await Connect(url);
+            var ca2 = await Connect(url);
+            await SendLobby(ca1, LobbyRequestKind.QuickMatch, archetype: "Control");
+            await SendLobby(ca2, LobbyRequestKind.QuickMatch);
+            var archHand = LocalView(await RecvUntilKind(ca1, ServerMessageKind.Welcome)).Hand;
+            Check("archetype deck used (hand within Control set)",
+                archHand.Count == 3 && archHand.TrueForAll(c => c.CardId == "bruiser" || c.CardId == "sniper"));
+
             cts.Cancel();
             try { await serverTask; } catch { }
 
@@ -91,8 +114,19 @@ namespace MetaDeck.Server
             return ws;
         }
 
-        private static Task SendLobby(ClientWebSocket ws, LobbyRequestKind kind, string code = null)
-            => WsUtil.SendText(ws, ProtocolJson.Serialize(new LobbyRequest { Kind = kind, RoomCode = code }), CancellationToken.None);
+        private static Task SendLobby(ClientWebSocket ws, LobbyRequestKind kind, string code = null,
+                                      string[] deck = null, string archetype = null)
+            => WsUtil.SendText(ws, ProtocolJson.Serialize(new LobbyRequest
+            {
+                Kind = kind, RoomCode = code, DeckCardIds = deck, Archetype = archetype
+            }), CancellationToken.None);
+
+        private static PlayerViewDto LocalView(ServerMessage welcome)
+        {
+            foreach (var p in welcome.Snapshot.Players)
+                if (p.Id == welcome.AssignedPlayer) return p;
+            return null;
+        }
 
         private static Task Send(ClientWebSocket ws, CommandDto dto)
             => WsUtil.SendText(ws, ProtocolJson.Serialize(dto), CancellationToken.None);

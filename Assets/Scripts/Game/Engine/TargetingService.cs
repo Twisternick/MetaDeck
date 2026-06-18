@@ -22,6 +22,14 @@ namespace MetaDeck.Effects
                     target = new TargetSpec(source);
                     return true;
 
+                case SimpleTargeting.EnemyPlayer:
+                    target = new TargetSpec(state.OpponentOf(source.Owner));
+                    return true;
+
+                case SimpleTargeting.FriendlyPlayer:
+                    target = new TargetSpec(source.Owner);
+                    return true;
+
                 case SimpleTargeting.CardInYourGraveyard:
                     {
                         var gy = state.GetPlayer(source.Owner).Graveyard;

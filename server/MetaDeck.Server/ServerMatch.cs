@@ -76,6 +76,7 @@ namespace MetaDeck.Server
 
             _capture.BeginCapture(events);
             try { return Engine.Submit(command, out error); }
+            catch (Exception ex) { error = "Server error resolving command: " + ex.Message; return false; }
             finally { _capture.EndCapture(); }
         }
 

@@ -27,6 +27,12 @@ namespace MetaDeck.Unity
         [Tooltip("Automatically Quick Match after connecting (off if you use a lobby UI for rooms).")]
         [SerializeField] private bool autoQuickMatch = true;
 
+        [Header("Deck (set before matching)")]
+        [Tooltip("Card ids for a player-built deck. Empty -> server uses the archetype or picks one at random.")]
+        public string[] deckCardIds;
+        [Tooltip("Preferred archetype for a random deck. Empty -> server picks a random archetype.")]
+        public string deckArchetype;
+
         public PlayerId LocalPlayer { get; private set; }
         public SnapshotDto LatestSnapshot { get; private set; }
         public bool IsConnected => _ws != null && _ws.State == WebSocketState.Open;
@@ -69,11 +75,20 @@ namespace MetaDeck.Unity
             }
         }
 
-        // ---- Lobby ----
-        public void QuickMatch() => SendJson(ProtocolJson.Serialize(new LobbyRequest { Kind = LobbyRequestKind.QuickMatch }));
-        public void CreateRoom() => SendJson(ProtocolJson.Serialize(new LobbyRequest { Kind = LobbyRequestKind.CreateRoom }));
-        public void JoinRoom(string code) => SendJson(ProtocolJson.Serialize(new LobbyRequest { Kind = LobbyRequestKind.JoinRoom, RoomCode = code }));
+        // ---- Lobby ---- (each carries the currently-selected deck/archetype)
+        public void QuickMatch() => SendLobby(LobbyRequestKind.QuickMatch);
+        public void CreateRoom() => SendLobby(LobbyRequestKind.CreateRoom);
+        public void JoinRoom(string code) => SendLobby(LobbyRequestKind.JoinRoom, code);
         public void CancelLobby() => SendJson(ProtocolJson.Serialize(new LobbyRequest { Kind = LobbyRequestKind.Cancel }));
+
+        private void SendLobby(LobbyRequestKind kind, string code = null)
+            => SendJson(ProtocolJson.Serialize(new LobbyRequest
+            {
+                Kind = kind,
+                RoomCode = code,
+                DeckCardIds = (deckCardIds != null && deckCardIds.Length > 0) ? deckCardIds : null,
+                Archetype = string.IsNullOrEmpty(deckArchetype) ? null : deckArchetype
+            }));
 
         // ---- In-match commands ----
         public void Send(CommandDto dto) => SendJson(ProtocolJson.Serialize(dto));

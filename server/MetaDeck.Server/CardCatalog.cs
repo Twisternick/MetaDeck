@@ -24,10 +24,10 @@ namespace MetaDeck.Server
 
         public static List<CardDef> Default() => new()
         {
-            new CardDef { cardId = "grunt",   displayName = "Grunt",   type = CardType.Monster, cost = 1, baseAttack = 2, baseHealth = 1 },
-            new CardDef { cardId = "scout",   displayName = "Scout",   type = CardType.Monster, cost = 2, baseAttack = 2, baseHealth = 3, keywords = new[] { Keyword.Rush } },
-            new CardDef { cardId = "bruiser", displayName = "Bruiser", type = CardType.Monster, cost = 3, baseAttack = 3, baseHealth = 4, keywords = new[] { Keyword.Guard } },
-            new CardDef { cardId = "sniper",  displayName = "Sniper",  type = CardType.Monster, cost = 4, baseAttack = 5, baseHealth = 2 },
+            new CardDef { cardId = "grunt",   displayName = "Grunt",   type = CardType.Monster, cost = 1, baseAttack = 2, baseHealth = 1, archetypes = new[] { "Aggro" } },
+            new CardDef { cardId = "scout",   displayName = "Scout",   type = CardType.Monster, cost = 2, baseAttack = 2, baseHealth = 3, keywords = new[] { Keyword.Rush }, archetypes = new[] { "Aggro" } },
+            new CardDef { cardId = "bruiser", displayName = "Bruiser", type = CardType.Monster, cost = 3, baseAttack = 3, baseHealth = 4, keywords = new[] { Keyword.Guard }, archetypes = new[] { "Control" } },
+            new CardDef { cardId = "sniper",  displayName = "Sniper",  type = CardType.Monster, cost = 4, baseAttack = 5, baseHealth = 2, archetypes = new[] { "Control" } },
         };
 
         /// <summary>Build a deck of <paramref name="size"/> cards by cycling through the catalog.</summary>
