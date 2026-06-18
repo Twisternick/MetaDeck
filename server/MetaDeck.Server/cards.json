@@ -1,0 +1,6 @@
+[
+  { "cardId": "grunt",   "displayName": "Grunt",   "type": "Monster", "cost": 1, "baseAttack": 2, "baseHealth": 1 },
+  { "cardId": "scout",   "displayName": "Scout",   "type": "Monster", "cost": 2, "baseAttack": 2, "baseHealth": 3, "keywords": ["Rush"] },
+  { "cardId": "bruiser", "displayName": "Bruiser", "type": "Monster", "cost": 3, "baseAttack": 3, "baseHealth": 4, "keywords": ["Guard"] },
+  { "cardId": "sniper",  "displayName": "Sniper",  "type": "Monster", "cost": 4, "baseAttack": 5, "baseHealth": 2 }
+]

@@ -125,4 +125,23 @@ namespace MetaDeck.Protocol
         public int ChainDepth { get; set; }
         public PlayerViewDto[] Players { get; set; }   // [P1 view, P2 view]
     }
+
+    // ---------- Server -> client envelope ----------
+
+    public enum ServerMessageKind { Welcome, Snapshot, Event, Error }
+
+    /// <summary>Everything the server sends a client is wrapped in this; only the relevant field is set.</summary>
+    public sealed class ServerMessage
+    {
+        public ServerMessageKind Kind { get; set; }
+        public PlayerId AssignedPlayer { get; set; }   // Welcome: which side this client controls
+        public SnapshotDto Snapshot { get; set; }      // Welcome / Snapshot
+        public EventDto Event { get; set; }            // Event
+        public string Error { get; set; }              // Error (e.g., rejected command)
+
+        public static ServerMessage Welcome(PlayerId p, SnapshotDto s) => new ServerMessage { Kind = ServerMessageKind.Welcome, AssignedPlayer = p, Snapshot = s };
+        public static ServerMessage OfSnapshot(SnapshotDto s) => new ServerMessage { Kind = ServerMessageKind.Snapshot, Snapshot = s };
+        public static ServerMessage OfEvent(EventDto e) => new ServerMessage { Kind = ServerMessageKind.Event, Event = e };
+        public static ServerMessage OfError(string msg) => new ServerMessage { Kind = ServerMessageKind.Error, Error = msg };
+    }
 }

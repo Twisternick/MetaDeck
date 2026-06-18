@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Authoritative dedicated server: runs a GameEngine per match, speaks the wire protocol
+       over WebSocket. Reuses the pure engine + shared protocol. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>MetaDeck.Server</AssemblyName>
+    <RootNamespace>MetaDeck.Server</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MetaDeck.Engine\MetaDeck.Engine.csproj" />
+    <ProjectReference Include="..\MetaDeck.Protocol\MetaDeck.Protocol.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="cards.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
