@@ -26,6 +26,9 @@ namespace MetaDeck.Effects
             var monster = (CardInstance)ctx.Target.Target!;
             monster.Counters.TryGetValue("XP", out int current);
             monster.Counters["XP"] = current + _amount;
+
+            // XP changed — re-evaluate LevelUp (applies/removes the +2/+2 bonus).
+            MetaDeck.Engine.LevelUpRules.Refresh(monster);
         }
     }
 }

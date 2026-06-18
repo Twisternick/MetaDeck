@@ -1,4 +1,5 @@
 using MetaDeck.Data;
+using MetaDeck.Engine;
 using MetaDeck.Events;
 using MetaDeck.Rules;
 using MetaDeck.Core;
@@ -26,6 +27,12 @@ namespace MetaDeck.Effects
                 return false;
             }
 
+            if (ctx.Target.Target is CardInstance stealthCheck && CombatRules.IsUntargetableByEnemy(stealthCheck, ctx.Source.Owner))
+            {
+                reason = "Target has Stealth.";
+                return false;
+            }
+
             if (_condition == SimpleCondition.TargetMustBeDamaged && ctx.Target.Target is CardInstance ci)
             {
                 if (ci.Def.type != CardType.Monster || ci.GetHealth() >= ci.GetMaxHealth())
@@ -43,8 +50,7 @@ namespace MetaDeck.Effects
         {
             if (ctx.Target.Target is CardInstance monster)
             {
-                monster.Health -= _amount;
-                ctx.Bus.Publish(new DamageDealt(ctx.Source, monster, _amount));
+                CombatMath.DamageMonster(ctx.Source, monster, _amount, ctx.Bus); // applies Fortify/PoweredUp
             }
             else if (ctx.Target.Target is PlayerId pid)
             {

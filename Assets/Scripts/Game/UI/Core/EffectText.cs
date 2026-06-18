@@ -110,6 +110,28 @@ namespace MetaDeck.UI
                     $"Gain {Plural(e.amount, "Nitro")}."
                 },
 
+                { EffectType.Generate, (card, e) =>
+                    $"Generate {e.amount} Bandwidth this turn."
+                },
+
+                { EffectType.SpendNitroForBuff, (card, e) =>
+                    $"Give {Target(e.targeting, card)} +{e.amount}/+{e.amount} (spends 1 Nitro; +{System.Math.Max(1, e.amount / 2)}/+{System.Math.Max(1, e.amount / 2)} without Nitro)."
+                },
+
+                { EffectType.GainXPCounter, (card, e) =>
+                    $"Put {Plural(e.amount, "XP counter")} on {Target(e.targeting, card)}."
+                },
+
+                { EffectType.SummonToken, (card, e) =>
+                    $"Summon {Plural(System.Math.Max(1, e.amount), "1/1 Citizen")}."
+                },
+
+                { EffectType.Equip, (card, e) =>
+                    e.keyword == Keyword.None
+                        ? $"Equip {Target(e.targeting, card)} with +{e.amount}/+{e.amount}."
+                        : $"Equip {Target(e.targeting, card)} with +{e.amount}/+{e.amount} and {KeywordName(e.keyword)}."
+                },
+
                 // If you have SwapBoardPositions:
                 { EffectType.SwapBoardPositions, (card, e) =>
                     $"Swap two monsters' positions."
@@ -169,6 +191,8 @@ namespace MetaDeck.UI
                 SimpleCondition.AttackedThreeTimesThisTurn => " (if you attacked 3+ times this turn)",
                 SimpleCondition.CardsPlayedAtLeast1ThisTurn => " (if you played a card this turn)",
                 SimpleCondition.CardsPlayedAtLeast3ThisTurn => " (if you played 3+ cards this turn)",
+                SimpleCondition.HealthLessThanOpponent => " (if your HP is below your opponent's)",
+                SimpleCondition.FriendlyAttackedThisTurn => " (if you attacked this turn)",
                 _ => $" ({c})"
             };
         }

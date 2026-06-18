@@ -17,8 +17,11 @@ namespace MetaDeck.Effects
             EffectType.BuffAllFriendlyMonsters => new BuffAllFriendlyMonstersEffect(def.amount),
             EffectType.DiscardRandom => new DiscardRandomEffect(def.amount),
             EffectType.GainNitro => new GainNitroEffect(def.amount),
+            EffectType.Generate => new GenerateEffect(def.amount),
             EffectType.SpendNitroForBuff => new SpendNitroForBuffEffect(def.amount),
             EffectType.GainXPCounter => new GainXPCounterEffect(def.amount),
+            EffectType.SummonToken => new SummonTokenEffect(def.amount),
+            EffectType.Equip => new EquipEffect(def.amount, def.keyword),
 
             // Not yet implemented: don't crash the match — treat as a no-op and warn.
             _ => NoOp(def.effectType)

@@ -203,6 +203,7 @@ namespace MetaDeck.UI
                 SimpleCondition.FriendlyBoardAtLeast3 => FriendlyBoardCount(state, source.Owner) >= 3,
                 SimpleCondition.FriendlyHasXPCounter => FriendlyHasCounter(state, source.Owner, "XP"),
                 SimpleCondition.HealthLessThanOpponent => HealthLessThanOpponent(state, source.Owner),
+                SimpleCondition.FriendlyAttackedThisTurn => state.GetPlayer(source.Owner).AttacksThisTurn >= 1,
                 _ => true
             };
         }

@@ -10,6 +10,8 @@ namespace MetaDeck.Rules.Keywords.Registry
 
             // Register keyword handlers here
             reg.Register(new TopdeckKeywordHandler());
+            reg.Register(new SuppressionKeywordHandler());
+            reg.Register(new FearKeywordHandler());
 
             return reg;
         }

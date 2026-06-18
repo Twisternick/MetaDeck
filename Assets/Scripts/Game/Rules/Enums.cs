@@ -44,6 +44,7 @@ namespace MetaDeck.Rules
         District,
         Tax,
         Populate,
+        Overtake,       // Racing: gain Nitro on attacking & surviving
         Topdeck,
         Errata,
         Copy
@@ -74,8 +75,10 @@ namespace MetaDeck.Rules
         RevealOpponentHand,
 
         GainNitro,
+        Generate,            // gain temporary Bandwidth this turn
         SpendNitroForBuff,
         GainXPCounter,
+        Equip,               // permanently attach +X/+X and an optional keyword to a friendly monster
         Heal,
         BuffAllFriendlyMonsters,
         DiscardRandom,

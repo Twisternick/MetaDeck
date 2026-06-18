@@ -8,32 +8,48 @@ namespace MetaDeck.Engine
     {
         public void ResolveAttack(GameState state, CardInstance attacker, CardInstance defender, IEventBus bus)
         {
-            bus.Publish(new AttackDeclared(attacker, defender));
+            OnAttackDeclared(state, attacker);
+            bus.Publish(new AttackDeclared(attacker, defender)); // Fear etc. react here (before damage)
 
-            bool aFS = attacker.Keywords.Contains(Keyword.FirstStrike);
-            bool dFS = defender.Keywords.Contains(Keyword.FirstStrike);
-
-            if (aFS && !dFS)
+            // Headshot: executes an already-damaged enemy outright instead of trading blows.
+            if (attacker.HasKeyword(Keyword.Headshot) && IsDamaged(defender) && !defender.IsDestroyed)
             {
-                Deal(attacker, defender, attacker.GetAttack(), bus);
-                if (!defender.IsDestroyed) Deal(defender, attacker, defender.GetAttack(), bus);
-            }
-            else if (!aFS && dFS)
-            {
-                Deal(defender, attacker, defender.GetAttack(), bus);
-                if (!attacker.IsDestroyed) Deal(attacker, defender, attacker.GetAttack(), bus);
+                Kill(defender);
+                bus.Publish(new DamageDealt(attacker, defender, defender.GetMaxHealth()));
             }
             else
             {
-                // simultaneous
-                int aDmg = attacker.GetAttack();
-                int dDmg = defender.GetAttack();
+                bool aFS = attacker.HasKeyword(Keyword.FirstStrike);
+                bool dFS = defender.HasKeyword(Keyword.FirstStrike);
 
-                defender.Health -= aDmg;
-                attacker.Health -= dDmg;
+                if (aFS && !dFS)
+                {
+                    Deal(attacker, defender, attacker.GetAttack(), bus);
+                    if (!defender.IsDestroyed) Deal(defender, attacker, defender.GetAttack(), bus);
+                }
+                else if (!aFS && dFS)
+                {
+                    Deal(defender, attacker, defender.GetAttack(), bus);
+                    if (!attacker.IsDestroyed) Deal(attacker, defender, attacker.GetAttack(), bus);
+                }
+                else
+                {
+                    // Simultaneous: compute both from pre-combat stats, then apply both.
+                    int aDmg = attacker.GetAttack();
+                    int dDmg = defender.GetAttack();
+                    Deal(attacker, defender, aDmg, bus);
+                    Deal(defender, attacker, dDmg, bus);
+                }
+            }
 
-                bus.Publish(new DamageDealt(attacker, defender, aDmg));
-                bus.Publish(new DamageDealt(defender, attacker, dDmg));
+            // Combat-outcome keywords (from the attacker's perspective).
+            if (!attacker.IsDestroyed)
+            {
+                if (attacker.HasKeyword(Keyword.Devour) && defender.IsDestroyed)
+                    attacker.StatModifiers.Add(new StatModifier("Devour", 1, 1, ModifierDuration.Permanent, attacker.InstanceId));
+
+                if (attacker.HasKeyword(Keyword.Overtake)) // attacked and survived
+                    state.GetPlayer(attacker.Owner).Nitro += 1;
             }
         }
 
@@ -43,16 +59,31 @@ namespace MetaDeck.Engine
         /// </summary>
         public void ResolveFaceAttack(GameState state, CardInstance attacker, PlayerId defenderPlayer, IEventBus bus)
         {
+            OnAttackDeclared(state, attacker);
+
             int dmg = attacker.GetAttack();
-            var p = state.GetPlayer(defenderPlayer);
-            p.Hp -= dmg;
+            state.GetPlayer(defenderPlayer).Hp -= dmg;
             bus.Publish(new PlayerDamaged(attacker, defenderPlayer, dmg));
+
+            if (attacker.HasKeyword(Keyword.Overtake)) // attacked and survived (no retaliation from face)
+                state.GetPlayer(attacker.Owner).Nitro += 1;
         }
 
-        private static void Deal(CardInstance src, CardInstance tgt, int amount, IEventBus bus)
+        private static void OnAttackDeclared(GameState state, CardInstance attacker)
         {
-            tgt.Health -= amount;
-            bus.Publish(new DamageDealt(src, tgt, amount));
+            // Stealth drops once it attacks; record this turn's attack for DoubleJump's once-per-turn bypass.
+            attacker.Keywords.Remove(Keyword.Stealth);
+            attacker.RemoveKeywordThisTurn(Keyword.Stealth);
+            attacker.Counters[CombatRules.DoubleJumpTurnKey] = state.TurnNumber;
+            state.GetPlayer(attacker.Owner).AttacksThisTurn++; // Momentum
         }
+
+        private static bool IsDamaged(CardInstance c)
+            => c.Def.type == CardType.Monster && c.GetHealth() < c.GetMaxHealth();
+
+        private static void Kill(CardInstance c) => c.Health -= c.GetHealth(); // forces GetHealth() to 0 -> destroyed
+
+        private static void Deal(CardInstance src, CardInstance tgt, int amount, IEventBus bus)
+            => CombatMath.DamageMonster(src, tgt, amount, bus);
     }
 }

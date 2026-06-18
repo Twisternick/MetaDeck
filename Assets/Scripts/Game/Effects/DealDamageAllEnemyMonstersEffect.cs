@@ -23,8 +23,7 @@ namespace MetaDeck.Effects
             {
                 var monster = ctx.State.Board.GetAt(opponent, i);
                 if (monster == null) continue;
-                monster.Health -= _amount;
-                ctx.Bus.Publish(new DamageDealt(ctx.Source, monster, _amount));
+                MetaDeck.Engine.CombatMath.DamageMonster(ctx.Source, monster, _amount, ctx.Bus);
             }
         }
     }

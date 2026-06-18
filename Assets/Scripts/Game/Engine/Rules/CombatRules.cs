@@ -31,9 +31,11 @@ namespace MetaDeck.Engine
             if (attacker == null) { reason = "No attacker."; return false; }
             if (state.ActivePlayer != attacker.Owner) { reason = "Not your turn."; return false; }
             if (attacker.Def.type != CardType.Monster) { reason = "Only monsters can attack."; return false; }
+            if (attacker.HasKeyword(Keyword.Structure)) { reason = "Structures can't attack."; return false; }
             if (attacker.Zone != Zone.Board) { reason = "Attacker must be on board."; return false; }
             if (attacker.IsDestroyed) { reason = "Attacker is destroyed."; return false; }
             if (HasSummoningSickness(state, attacker)) { reason = "Attacker has summoning sickness."; return false; }
+            if (IsSuppressed(state, attacker)) { reason = "Suppressed — cannot attack this turn."; return false; }
             reason = "";
             return true;
         }
@@ -48,11 +50,14 @@ namespace MetaDeck.Engine
             var defenderOwner = state.OpponentOf(attacker.Owner);
             if (defender.Owner != defenderOwner) { reason = "Must attack an enemy monster."; return false; }
 
+            // Stealth: can't be attacked until it has attacked (Stealth is removed once it attacks).
+            if (defender.HasKeyword(Keyword.Stealth)) { reason = "Target has Stealth."; return false; }
+
             // Guard/taunt: if the defending side has a Guard, only Guards are legal targets.
             // DoubleJump attackers can bypass Guard once — they may attack any target.
             if (HasGuard(state, defenderOwner)
                 && !defender.HasKeyword(Keyword.Guard)
-                && !attacker.HasKeyword(Keyword.DoubleJump))
+                && !CanBypassGuard(state, attacker))
             {
                 reason = "Must attack a Guard monster first.";
                 return false;
@@ -69,7 +74,7 @@ namespace MetaDeck.Engine
 
             var defenderOwner = state.OpponentOf(attacker.Owner);
             // DoubleJump can attack face even through Guard.
-            if (HasGuard(state, defenderOwner) && !attacker.HasKeyword(Keyword.DoubleJump))
+            if (HasGuard(state, defenderOwner) && !CanBypassGuard(state, attacker))
             {
                 reason = "Must attack a Guard monster first.";
                 return false;
@@ -78,5 +83,23 @@ namespace MetaDeck.Engine
             reason = "";
             return true;
         }
+
+        // ---- Suppression (set by the Suppression keyword's damage hook) ----
+        public const string SuppressedUntilTurnKey = "SuppressedUntilTurn";
+
+        /// <summary>A suppressed monster can't attack through the end of its controller's next turn.</summary>
+        public static bool IsSuppressed(GameState state, CardInstance monster)
+            => monster.Counters.TryGetValue(SuppressedUntilTurnKey, out var until) && state.TurnNumber <= until;
+
+        // ---- Stealth (untargetable by enemy effects until it attacks) ----
+        public static bool IsUntargetableByEnemy(CardInstance target, PlayerId sourceOwner)
+            => target != null && target.Owner != sourceOwner && target.HasKeyword(Keyword.Stealth);
+
+        // ---- DoubleJump (ignore Guard the FIRST time it attacks each turn) ----
+        public const string DoubleJumpTurnKey = "DoubleJumpTurn";
+
+        public static bool CanBypassGuard(GameState state, CardInstance attacker)
+            => attacker.HasKeyword(Keyword.DoubleJump)
+               && (!attacker.Counters.TryGetValue(DoubleJumpTurnKey, out var t) || t != state.TurnNumber);
     }
 }

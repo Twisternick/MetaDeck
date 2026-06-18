@@ -24,6 +24,10 @@ namespace MetaDeck.Server
                 if (!ok) failures++;
             }
 
+            // Engine-level keyword/condition tests + scripted mock battle (no networking).
+            failures += KeywordTests.Run();
+            Console.WriteLine();
+
             const string prefix = "http://localhost:8123/";
             const string url = "ws://localhost:8123/";
 

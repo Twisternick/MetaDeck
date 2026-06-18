@@ -34,6 +34,9 @@ namespace MetaDeck.Core
 
         public int CardsPlayedThisTurn { get; set; } = 0;
 
+        // How many times this player's monsters have attacked this turn (Momentum).
+        public int AttacksThisTurn { get; set; } = 0;
+
         // Graveyard limiter (anti-degeneracy)
         public int GraveyardPlaysThisTurn { get; set; } = 0;
         public int GraveyardPlaysLimit { get; set; } = 1;

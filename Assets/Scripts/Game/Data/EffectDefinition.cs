@@ -36,6 +36,9 @@ namespace MetaDeck.Data
         FriendlyHasXPCounter,   // owner has a monster with at least 1 XP counter
 
         // Health conditions
-        HealthLessThanOpponent, // owner HP < opponent HP
+        HealthLessThanOpponent, // owner HP < opponent HP (Clutch)
+
+        // Combat conditions
+        FriendlyAttackedThisTurn, // a friendly monster has attacked this turn (Momentum)
     }
 }

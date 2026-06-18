@@ -69,8 +69,8 @@ namespace MetaDeck.Engine.Commands
             }
             else
             {
-                // normal play cost check
-                if (!player.CanAfford(_card.CurrentCost))
+                // normal play cost check (Tax: enemy Tax monsters raise the cost of our spells)
+                if (!player.CanAfford(EffectiveCost(state)))
                 {
                     reason = "Not enough Bandwidth.";
                     return false;
@@ -79,6 +79,27 @@ namespace MetaDeck.Engine.Commands
 
             reason = "";
             return true;
+        }
+
+        // Bandwidth actually charged: base CurrentCost plus +1 per enemy Tax monster (spells only).
+        private int EffectiveCost(GameState state)
+        {
+            int cost = _card.CurrentCost;
+            if (_card.Def.type == CardType.Spell)
+                cost += SpellTaxAgainst(state, _card.Owner);
+            return cost;
+        }
+
+        private static int SpellTaxAgainst(GameState state, PlayerId owner)
+        {
+            var enemy = state.OpponentOf(owner);
+            int tax = 0;
+            for (int slot = 0; slot < 5; slot++)
+            {
+                var m = state.Board.GetAt(enemy, slot);
+                if (m != null && !m.IsDestroyed && m.HasKeyword(Keyword.Tax)) tax++;
+            }
+            return tax;
         }
 
         public void Execute(GameState state, IEventBus bus)
@@ -90,8 +111,9 @@ namespace MetaDeck.Engine.Commands
 
             if (!_asChainItem)
             {
-                MetaDeck.Diagnostics.GameLog.Debug($"PlayCardCommand: Attempting to spend bandwidth for {_card.Def.displayName}, cost {_card.CurrentCost}, player bandwidth after spend: {player.Bandwidth}");
-                var spent = player.TrySpend(_card.CurrentCost);
+                int cost = EffectiveCost(state);
+                MetaDeck.Diagnostics.GameLog.Debug($"PlayCardCommand: Attempting to spend bandwidth for {_card.Def.displayName}, cost {cost}, player bandwidth after spend: {player.Bandwidth}");
+                var spent = player.TrySpend(cost);
 
                 if (!spent)
                 {

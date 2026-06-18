@@ -24,6 +24,23 @@ namespace MetaDeck.Engine.Commands
             var active = state.ActivePlayer;
             bus.Publish(new TurnEnded(active, state.TurnNumber));
 
+            // End-of-turn cleanup: expire "until end of turn/combat" modifiers (e.g. Fear's -1 ATK)
+            // and any granted-this-turn keywords, on all board monsters.
+            foreach (var m in state.Board.AllMonsters())
+            {
+                m.StatModifiers.RemoveAll(mod => mod.Duration == ModifierDuration.UntilEndOfTurn
+                                              || mod.Duration == ModifierDuration.UntilEndOfCombat);
+                m.ClearTempKeywordsEndOfTurn();
+
+                // Haunt: a cursed monster takes its pending haunt damage at the end of its controller's turn.
+                if (m.Owner == active
+                    && m.Counters.TryGetValue(CleanupResolver.HauntedCounterKey, out var haunt) && haunt > 0)
+                {
+                    m.Counters[CleanupResolver.HauntedCounterKey] = 0;
+                    CombatMath.DamageMonster(null, m, haunt, bus); // newly-dead monsters are swept by post-command cleanup
+                }
+            }
+
             // Switch player
             state.ActivePlayer = state.OpponentOf(active);
             state.TurnNumber++;
@@ -32,6 +49,7 @@ namespace MetaDeck.Engine.Commands
             foreach (var p in state.Players)
             {
                 p.CardsPlayedThisTurn = 0;
+                p.AttacksThisTurn = 0;
                 p.GraveyardPlaysThisTurn = 0;
                 p.HandTrapsUsedThisChain = 0;
             }
