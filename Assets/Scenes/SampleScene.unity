@@ -263,6 +263,7 @@ Transform:
   - {fileID: 1201659530}
   - {fileID: 2085426292}
   - {fileID: 406556917}
+  - {fileID: 1009621073}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &260639530
@@ -1680,6 +1681,67 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 867031356}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1009621072
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1009621073}
+  - component: {fileID: 1009621075}
+  - component: {fileID: 1009621074}
+  m_Layer: 0
+  m_Name: Client
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1009621073
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1009621072}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 51754279}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1009621074
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1009621072}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1a508c9b9c0a7b34ba4bd15c651b8d7b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MetaDeck.Unity.CardLibraryMB
+  cards: []
+  resourcesPath: 
+--- !u!114 &1009621075
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1009621072}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fdfc128bbc0a6ce4880cb5bfe51adbbd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MetaDeck.Unity.MetaDeckNetClientMB
+  serverUrl: ws://localhost:8123/
+  connectOnStart: 1
 --- !u!1 &1041049901
 GameObject:
   m_ObjectHideFlags: 0
@@ -2926,7 +2988,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cefb054b82f6e394893209fd184161f3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameUIBinderMB
-  controller: {fileID: 1201659533}
+  netClient: {fileID: 0}
   commandFacade: {fileID: 1201659531}
   selection: {fileID: 2085426295}
   cardPrefab: {fileID: 3383438093168069314, guid: a2a53ed2205e091499f30d71c7dd1340, type: 3}
@@ -2947,6 +3009,7 @@ MonoBehaviour:
   - {fileID: 510029242}
   graveyardPanel: {fileID: 0}
   tooltipPanel: {fileID: 0}
+  gameOverBanner: {fileID: 0}
 --- !u!114 &2085426295
 MonoBehaviour:
   m_ObjectHideFlags: 0
