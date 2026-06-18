@@ -1,0 +1,389 @@
+[
+  {
+    "cardId": "CTY_M01_TownArchitect",
+    "displayName": "Town Architect",
+    "type": "Monster",
+    "cost": 1,
+    "baseAttack": 1,
+    "baseHealth": 2,
+    "speedWindow": "None",
+    "keywords": ["District"],
+    "effects": [],
+    "archetypes": ["CityBuilder"]
+  },
+  {
+    "cardId": "CTY_M02_TaxClerk",
+    "displayName": "Tax Clerk",
+    "type": "Monster",
+    "cost": 1,
+    "baseAttack": 1,
+    "baseHealth": 1,
+    "speedWindow": "None",
+    "keywords": ["Tax"],
+    "effects": [],
+    "archetypes": ["CityBuilder"]
+  },
+
+  {
+    "cardId": "CTY_M03_UtilityEngineer",
+    "displayName": "Utility Engineer",
+    "type": "Monster",
+    "cost": 2,
+    "baseAttack": 2,
+    "baseHealth": 3,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [],
+    "archetypes": ["CityBuilder"]
+  },
+  {
+    "cardId": "CTY_M04_HousingPlanner",
+    "displayName": "Housing Planner",
+    "type": "Monster",
+    "cost": 2,
+    "baseAttack": 1,
+    "baseHealth": 4,
+    "speedWindow": "None",
+    "keywords": ["Population"],
+    "effects": [],
+    "archetypes": ["CityBuilder"]
+  },
+  {
+    "cardId": "CTY_M05_TradeMerchant",
+    "displayName": "Trade Merchant",
+    "type": "Monster",
+    "cost": 2,
+    "baseAttack": 2,
+    "baseHealth": 2,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "Draw",
+        "amount": 1,
+        "targeting": "None",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["CityBuilder"]
+  },
+  {
+    "cardId": "CTY_M06_DistrictInspector",
+    "displayName": "District Inspector",
+    "type": "Monster",
+    "cost": 2,
+    "baseAttack": 2,
+    "baseHealth": 3,
+    "speedWindow": "None",
+    "keywords": ["District"],
+    "effects": [],
+    "archetypes": ["CityBuilder"]
+  },
+
+  {
+    "cardId": "CTY_M07_InfrastructureOverseer",
+    "displayName": "Infrastructure Overseer",
+    "type": "Monster",
+    "cost": 3,
+    "baseAttack": 3,
+    "baseHealth": 4,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [],
+    "archetypes": ["CityBuilder"]
+  },
+  {
+    "cardId": "CTY_M08_PublicSafetyChief",
+    "displayName": "Public Safety Chief",
+    "type": "Monster",
+    "cost": 3,
+    "baseAttack": 2,
+    "baseHealth": 5,
+    "speedWindow": "None",
+    "keywords": ["Guard"],
+    "effects": [],
+    "archetypes": ["CityBuilder"]
+  },
+  {
+    "cardId": "CTY_M09_FestivalOrganizer",
+    "displayName": "Festival Organizer",
+    "type": "Monster",
+    "cost": 3,
+    "baseAttack": 3,
+    "baseHealth": 3,
+    "speedWindow": "None",
+    "keywords": ["Population"],
+    "effects": [],
+    "archetypes": ["CityBuilder"]
+  },
+  {
+    "cardId": "CTY_M10_ZoningOfficer",
+    "displayName": "Zoning Officer",
+    "type": "Monster",
+    "cost": 3,
+    "baseAttack": 2,
+    "baseHealth": 4,
+    "speedWindow": "None",
+    "keywords": ["Tax"],
+    "effects": [],
+    "archetypes": ["CityBuilder"]
+  },
+
+  {
+    "cardId": "CTY_M11_CityWallDistrict",
+    "displayName": "City Wall District",
+    "type": "Monster",
+    "cost": 4,
+    "baseAttack": 0,
+    "baseHealth": 9,
+    "speedWindow": "None",
+    "keywords": ["Guard", "District"],
+    "effects": [],
+    "archetypes": ["CityBuilder"]
+  },
+  {
+    "cardId": "CTY_M12_CityHallAdministrator",
+    "displayName": "City Hall Administrator",
+    "type": "Monster",
+    "cost": 4,
+    "baseAttack": 4,
+    "baseHealth": 5,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [],
+    "archetypes": ["CityBuilder"]
+  },
+  {
+    "cardId": "CTY_M13_MetropolisGuardian",
+    "displayName": "Metropolis Guardian",
+    "type": "Monster",
+    "cost": 4,
+    "baseAttack": 5,
+    "baseHealth": 5,
+    "speedWindow": "None",
+    "keywords": ["Guard"],
+    "effects": [],
+    "archetypes": ["CityBuilder"]
+  },
+
+  {
+    "cardId": "CTY_M14_LandmarkTitan",
+    "displayName": "Landmark Titan",
+    "type": "Monster",
+    "cost": 5,
+    "baseAttack": 6,
+    "baseHealth": 8,
+    "speedWindow": "None",
+    "keywords": ["District"],
+    "effects": [],
+    "archetypes": ["CityBuilder"]
+  },
+  {
+    "cardId": "CTY_M15_UrbanColossus",
+    "displayName": "Urban Colossus",
+    "type": "Monster",
+    "cost": 7,
+    "baseAttack": 9,
+    "baseHealth": 9,
+    "speedWindow": "None",
+    "keywords": ["Population"],
+    "effects": [],
+    "archetypes": ["CityBuilder"]
+  },
+
+  {
+    "cardId": "CTY_S01_ZoningLaw",
+    "displayName": "Zoning Law",
+    "type": "Spell",
+    "cost": 1,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "Quick",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "Silence",
+        "amount": 0,
+        "targeting": "EnemyMonster",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["CityBuilder"]
+  },
+  {
+    "cardId": "CTY_S02_TradeRoute",
+    "displayName": "Trade Route",
+    "type": "Spell",
+    "cost": 1,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "Draw",
+        "amount": 1,
+        "targeting": "None",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["CityBuilder"]
+  },
+
+  {
+    "cardId": "CTY_S03_ConstructDistrict",
+    "displayName": "Construct District",
+    "type": "Spell",
+    "cost": 2,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "SummonToken",
+        "amount": 0,
+        "targeting": "None",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["CityBuilder"]
+  },
+  {
+    "cardId": "CTY_S04_PublicWorks",
+    "displayName": "Public Works",
+    "type": "Spell",
+    "cost": 2,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "BuffAllFriendlyMonsters",
+        "amount": 1,
+        "targeting": "None",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["CityBuilder"]
+  },
+  {
+    "cardId": "CTY_S05_TaxHike",
+    "displayName": "Tax Hike",
+    "type": "Spell",
+    "cost": 2,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "DiscardRandom",
+        "amount": 1,
+        "targeting": "EnemyPlayer",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["CityBuilder"]
+  },
+
+  {
+    "cardId": "CTY_S06_EmergencyServices",
+    "displayName": "Emergency Services",
+    "type": "Spell",
+    "cost": 3,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "Heal",
+        "amount": 4,
+        "targeting": "FriendlyPlayer",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["CityBuilder"]
+  },
+  {
+    "cardId": "CTY_S07_UrbanExpansion",
+    "displayName": "Urban Expansion",
+    "type": "Spell",
+    "cost": 3,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "GainMaxBandwidthNextTurn",
+        "amount": 1,
+        "targeting": "FriendlyPlayer",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["CityBuilder"]
+  },
+
+  {
+    "cardId": "CTY_S08_IndustrialBoom",
+    "displayName": "Industrial Boom",
+    "type": "Spell",
+    "cost": 4,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "Draw",
+        "amount": 2,
+        "targeting": "None",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["CityBuilder"]
+  },
+
+  {
+    "cardId": "CTY_S09_GoldenAge",
+    "displayName": "Golden Age",
+    "type": "Spell",
+    "cost": 5,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "BuffAllFriendlyMonsters",
+        "amount": 2,
+        "targeting": "None",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["CityBuilder"]
+  },
+
+  {
+    "cardId": "CTY_S10_LandmarkConstruction",
+    "displayName": "Landmark Construction",
+    "type": "Spell",
+    "cost": 6,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "SummonToken",
+        "amount": 0,
+        "targeting": "None",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["CityBuilder"]
+  }
+]

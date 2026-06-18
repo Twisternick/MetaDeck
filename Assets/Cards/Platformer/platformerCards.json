@@ -1,0 +1,61 @@
+[
+  { "cardId":"PLA_M01_PixelJumper","displayName":"Pixel Jumper","type":"Monster","cost":1,"baseAttack":1,"baseHealth":2,"speedWindow":"None","keywords":["DoubleJump"],"effects":[],"archetypes":["Platformer"] },
+  { "cardId":"PLA_M02_CoinCollector","displayName":"Coin Collector","type":"Monster","cost":1,"baseAttack":2,"baseHealth":1,"speedWindow":"None","keywords":[],"effects":[],"archetypes":["Platformer"] },
+
+  { "cardId":"PLA_M03_WallKickSpecialist","displayName":"Wall-Kick Specialist","type":"Monster","cost":2,"baseAttack":2,"baseHealth":3,"speedWindow":"None","keywords":["DoubleJump"],"effects":[],"archetypes":["Platformer"] },
+  { "cardId":"PLA_M04_Speedrunner","displayName":"Speedrunner","type":"Monster","cost":2,"baseAttack":2,"baseHealth":2,"speedWindow":"None","keywords":["Rush"],"effects":[],"archetypes":["Platformer"] },
+  { "cardId":"PLA_M05_HiddenPathScout","displayName":"Hidden Path Scout","type":"Monster","cost":2,"baseAttack":2,"baseHealth":2,"speedWindow":"None","keywords":[],"effects":[
+      { "effectType":"Draw","amount":1,"targeting":"None","condition":"None" }
+    ],"archetypes":["Platformer"] },
+  { "cardId":"PLA_M06_PowerUpCarrier","displayName":"Power-Up Carrier","type":"Monster","cost":2,"baseAttack":2,"baseHealth":3,"speedWindow":"None","keywords":["PoweredUp"],"effects":[],"archetypes":["Platformer"] },
+  { "cardId":"PLA_M07_CheckpointGuardian","displayName":"Checkpoint Guardian","type":"Monster","cost":2,"baseAttack":1,"baseHealth":4,"speedWindow":"None","keywords":["Guard"],"effects":[],"archetypes":["Platformer"] },
+
+  { "cardId":"PLA_M08_AirborneAce","displayName":"Airborne Ace","type":"Monster","cost":3,"baseAttack":3,"baseHealth":3,"speedWindow":"None","keywords":["DoubleJump"],"effects":[],"archetypes":["Platformer"] },
+  { "cardId":"PLA_M09_BossDoorSentinel","displayName":"Boss Door Sentinel","type":"Monster","cost":3,"baseAttack":3,"baseHealth":4,"speedWindow":"None","keywords":["Guard"],"effects":[],"archetypes":["Platformer"] },
+  { "cardId":"PLA_M10_SpringboardTrickster","displayName":"Springboard Trickster","type":"Monster","cost":3,"baseAttack":4,"baseHealth":2,"speedWindow":"None","keywords":[],"effects":[],"archetypes":["Platformer"] },
+
+  { "cardId":"PLA_M11_InvincibleRunner","displayName":"Invincible Runner","type":"Monster","cost":4,"baseAttack":4,"baseHealth":4,"speedWindow":"None","keywords":["PoweredUp"],"effects":[],"archetypes":["Platformer"] },
+  { "cardId":"PLA_M12_WarpPipeHopper","displayName":"Warp Pipe Hopper","type":"Monster","cost":4,"baseAttack":4,"baseHealth":5,"speedWindow":"None","keywords":[],"effects":[],"archetypes":["Platformer"] },
+  { "cardId":"PLA_M13_SecretStageBeast","displayName":"Secret Stage Beast","type":"Monster","cost":4,"baseAttack":5,"baseHealth":3,"speedWindow":"None","keywords":[],"effects":[],"archetypes":["Platformer"] },
+
+  { "cardId":"PLA_M14_FinalLevelHero","displayName":"Final Level Hero","type":"Monster","cost":5,"baseAttack":6,"baseHealth":6,"speedWindow":"None","keywords":["Checkpoint"],"effects":[],"archetypes":["Platformer"] },
+  { "cardId":"PLA_M15_FinalBoss","displayName":"Final Boss","type":"Monster","cost":7,"baseAttack":8,"baseHealth":8,"speedWindow":"None","keywords":["Guard"],"effects":[],"archetypes":["Platformer"] },
+
+  { "cardId":"PLA_S01_DoubleJump","displayName":"Double Jump","type":"Spell","cost":1,"baseAttack":0,"baseHealth":0,"speedWindow":"Quick","keywords":[],"effects":[
+      { "effectType":"GrantKeywordThisTurn","amount":0,"keyword":"DoubleJump","targeting":"FriendlyMonster","condition":"None" }
+    ],"archetypes":["Platformer"] },
+  { "cardId":"PLA_S02_BouncePad","displayName":"Bounce Pad","type":"Spell","cost":1,"baseAttack":0,"baseHealth":0,"speedWindow":"Quick","keywords":[],"effects":[
+      { "effectType":"ReturnFromGraveyardToHand","amount":0,"targeting":"CardInYourGraveyard","condition":"None" }
+    ],"archetypes":["Platformer"] },
+
+  { "cardId":"PLA_S03_PowerUpMushroom","displayName":"Power-Up Mushroom","type":"Spell","cost":2,"baseAttack":0,"baseHealth":0,"speedWindow":"None","keywords":[],"effects":[
+      { "effectType":"GrantKeywordThisTurn","amount":0,"keyword":"PoweredUp","targeting":"FriendlyMonster","condition":"None" },
+      { "effectType":"BuffAttackThisTurn","amount":2,"targeting":"FriendlyMonster","condition":"None" }
+    ],"archetypes":["Platformer"] },
+  { "cardId":"PLA_S04_Checkpoint","displayName":"Checkpoint","type":"Spell","cost":2,"baseAttack":0,"baseHealth":0,"speedWindow":"None","keywords":[],"effects":[
+      { "effectType":"GrantKeywordThisTurn","amount":0,"keyword":"Checkpoint","targeting":"FriendlyMonster","condition":"None" }
+    ],"archetypes":["Platformer"] },
+  { "cardId":"PLA_S05_SecretArea","displayName":"Secret Area","type":"Spell","cost":2,"baseAttack":0,"baseHealth":0,"speedWindow":"None","keywords":[],"effects":[
+      { "effectType":"Draw","amount":2,"targeting":"None","condition":"None" }
+    ],"archetypes":["Platformer"] },
+
+  { "cardId":"PLA_S06_WarpPipe","displayName":"Warp Pipe","type":"Spell","cost":3,"baseAttack":0,"baseHealth":0,"speedWindow":"None","keywords":[],"effects":[
+      { "effectType":"SwapBoardPositions","amount":0,"targeting":"AnyMonster","condition":"None" }
+    ],"archetypes":["Platformer"] },
+  { "cardId":"PLA_S07_Springboard","displayName":"Springboard","type":"Spell","cost":3,"baseAttack":0,"baseHealth":0,"speedWindow":"None","keywords":[],"effects":[
+      { "effectType":"BuffAttackThisTurn","amount":3,"targeting":"FriendlyMonster","condition":"None" }
+    ],"archetypes":["Platformer"] },
+
+  { "cardId":"PLA_S08_InvincibilityStar","displayName":"Invincibility Star","type":"Spell","cost":4,"baseAttack":0,"baseHealth":0,"speedWindow":"Quick","keywords":[],"effects":[
+      { "effectType":"PreventCombatDamageThisCombat","amount":0,"targeting":"FriendlyMonster","condition":"None" }
+    ],"archetypes":["Platformer"] },
+
+  { "cardId":"PLA_S09_OneUp","displayName":"One-Up","type":"Spell","cost":5,"baseAttack":0,"baseHealth":0,"speedWindow":"None","keywords":[],"effects":[
+      { "effectType":"ReviveFromGraveyard","amount":0,"targeting":"CardInYourGraveyard","condition":"None" }
+    ],"archetypes":["Platformer"] },
+
+  { "cardId":"PLA_S10_BossKey","displayName":"Boss Key","type":"Spell","cost":6,"baseAttack":0,"baseHealth":0,"speedWindow":"None","keywords":[],"effects":[
+      { "effectType":"Silence","amount":0,"targeting":"EnemyMonster","condition":"None" },
+      { "effectType":"DealDamage","amount":4,"targeting":"EnemyMonster","condition":"None" }
+    ],"archetypes":["Platformer"] }
+]

@@ -1,0 +1,479 @@
+[
+  {
+    "cardId": "FPS_M01_SidearmSpecialist",
+    "displayName": "Sidearm Specialist",
+    "type": "Monster",
+    "cost": 1,
+    "baseAttack": 2,
+    "baseHealth": 1,
+    "speedWindow": "None",
+    "keywords": ["Rush"],
+    "effects": [],
+    "archetypes": ["FPS"]
+  },
+  {
+    "cardId": "FPS_M02_ReconRookie",
+    "displayName": "Recon Rookie",
+    "type": "Monster",
+    "cost": 1,
+    "baseAttack": 1,
+    "baseHealth": 2,
+    "speedWindow": "None",
+    "keywords": ["Stealth"],
+    "effects": [],
+    "archetypes": ["FPS"]
+  },
+  {
+    "cardId": "FPS_M03_SmokeRunner",
+    "displayName": "Smoke Runner",
+    "type": "Monster",
+    "cost": 1,
+    "baseAttack": 1,
+    "baseHealth": 3,
+    "speedWindow": "None",
+    "keywords": ["Stealth"],
+    "effects": [],
+    "archetypes": ["FPS"]
+  },
+  {
+    "cardId": "FPS_M04_TrainingBot",
+    "displayName": "Training Bot",
+    "type": "Monster",
+    "cost": 1,
+    "baseAttack": 1,
+    "baseHealth": 1,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [],
+    "archetypes": ["FPS"]
+  },
+
+  {
+    "cardId": "FPS_M05_ShotgunEnforcer",
+    "displayName": "Shotgun Enforcer",
+    "type": "Monster",
+    "cost": 2,
+    "baseAttack": 3,
+    "baseHealth": 2,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [],
+    "archetypes": ["FPS"]
+  },
+  {
+    "cardId": "FPS_M06_CombatMedic",
+    "displayName": "Combat Medic",
+    "type": "Monster",
+    "cost": 2,
+    "baseAttack": 2,
+    "baseHealth": 3,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "Buff",
+        "amount": 1,
+        "targeting": "FriendlyMonster",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["FPS"]
+  },
+  {
+    "cardId": "FPS_M07_CoverEngineer",
+    "displayName": "Cover Engineer",
+    "type": "Monster",
+    "cost": 2,
+    "baseAttack": 1,
+    "baseHealth": 4,
+    "speedWindow": "None",
+    "keywords": ["Guard"],
+    "effects": [],
+    "archetypes": ["FPS"]
+  },
+  {
+    "cardId": "FPS_M08_DroneSpotter",
+    "displayName": "Drone Spotter",
+    "type": "Monster",
+    "cost": 2,
+    "baseAttack": 2,
+    "baseHealth": 2,
+    "speedWindow": "None",
+    "keywords": ["Drone"],
+    "effects": [
+      {
+        "effectType": "RevealOpponentHand",
+        "amount": 1,
+        "targeting": "None",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["FPS"]
+  },
+  {
+    "cardId": "FPS_M09_TacticalBreacher",
+    "displayName": "Tactical Breacher",
+    "type": "Monster",
+    "cost": 2,
+    "baseAttack": 2,
+    "baseHealth": 3,
+    "speedWindow": "None",
+    "keywords": ["Rush"],
+    "effects": [],
+    "archetypes": ["FPS"]
+  },
+
+  {
+    "cardId": "FPS_M10_SniperOperative",
+    "displayName": "Sniper Operative",
+    "type": "Monster",
+    "cost": 3,
+    "baseAttack": 3,
+    "baseHealth": 3,
+    "speedWindow": "None",
+    "keywords": ["FirstStrike"],
+    "effects": [],
+    "archetypes": ["FPS"]
+  },
+  {
+    "cardId": "FPS_M11_SuppressionGunner",
+    "displayName": "Suppression Gunner",
+    "type": "Monster",
+    "cost": 3,
+    "baseAttack": 3,
+    "baseHealth": 4,
+    "speedWindow": "None",
+    "keywords": ["Suppression"],
+    "effects": [],
+    "archetypes": ["FPS"]
+  },
+  {
+    "cardId": "FPS_M12_RespawnSpecialist",
+    "displayName": "Respawn Specialist",
+    "type": "Monster",
+    "cost": 3,
+    "baseAttack": 2,
+    "baseHealth": 4,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "Draw",
+        "amount": 1,
+        "targeting": "None",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["FPS"]
+  },
+  {
+    "cardId": "FPS_M13_DemolitionExpert",
+    "displayName": "Demolition Expert",
+    "type": "Monster",
+    "cost": 3,
+    "baseAttack": 4,
+    "baseHealth": 2,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [],
+    "archetypes": ["FPS"]
+  },
+
+  {
+    "cardId": "FPS_M14_EliteOperator",
+    "displayName": "Elite Operator",
+    "type": "Monster",
+    "cost": 4,
+    "baseAttack": 4,
+    "baseHealth": 4,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [],
+    "archetypes": ["FPS"]
+  },
+  {
+    "cardId": "FPS_M15_HeavyGunner",
+    "displayName": "Heavy Gunner",
+    "type": "Monster",
+    "cost": 4,
+    "baseAttack": 4,
+    "baseHealth": 5,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [],
+    "archetypes": ["FPS"]
+  },
+  {
+    "cardId": "FPS_M16_ShieldBearerUnit",
+    "displayName": "Shield-Bearer Unit",
+    "type": "Monster",
+    "cost": 4,
+    "baseAttack": 3,
+    "baseHealth": 6,
+    "speedWindow": "None",
+    "keywords": ["Guard"],
+    "effects": [],
+    "archetypes": ["FPS"]
+  },
+
+  {
+    "cardId": "FPS_M17_KillstreakAce",
+    "displayName": "Killstreak Ace",
+    "type": "Monster",
+    "cost": 5,
+    "baseAttack": 5,
+    "baseHealth": 4,
+    "speedWindow": "None",
+    "keywords": ["Rush"],
+    "effects": [],
+    "archetypes": ["FPS"]
+  },
+  {
+    "cardId": "FPS_M18_DroneCommander",
+    "displayName": "Drone Commander",
+    "type": "Monster",
+    "cost": 5,
+    "baseAttack": 4,
+    "baseHealth": 6,
+    "speedWindow": "None",
+    "keywords": ["Drone"],
+    "effects": [
+      {
+        "effectType": "Draw",
+        "amount": 1,
+        "targeting": "None",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["FPS"]
+  },
+
+  {
+    "cardId": "FPS_M19_JuggernautExoSuit",
+    "displayName": "Juggernaut Exo-Suit",
+    "type": "Monster",
+    "cost": 6,
+    "baseAttack": 6,
+    "baseHealth": 7,
+    "speedWindow": "None",
+    "keywords": ["Guard"],
+    "effects": [],
+    "archetypes": ["FPS"]
+  },
+  {
+    "cardId": "FPS_M20_TitanOperator",
+    "displayName": "Titan Operator",
+    "type": "Monster",
+    "cost": 7,
+    "baseAttack": 7,
+    "baseHealth": 7,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [],
+    "archetypes": ["FPS"]
+  },
+
+  {
+    "cardId": "FPS_S01_TacticalReload",
+    "displayName": "Tactical Reload",
+    "type": "Spell",
+    "cost": 1,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "Draw",
+        "amount": 1,
+        "targeting": "None",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["FPS"]
+  },
+  {
+    "cardId": "FPS_S02_SmokeScreen",
+    "displayName": "Smoke Screen",
+    "type": "Spell",
+    "cost": 1,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "Quick",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "GrantKeywordThisTurn",
+        "amount": 0,
+        "keyword": "Stealth",
+        "targeting": "FriendlyMonster",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["FPS"]
+  },
+
+  {
+    "cardId": "FPS_S03_Flashbang",
+    "displayName": "Flashbang",
+    "type": "Spell",
+    "cost": 2,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "Silence",
+        "amount": 0,
+        "targeting": "EnemyMonster",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["FPS"]
+  },
+  {
+    "cardId": "FPS_S04_FragGrenade",
+    "displayName": "Frag Grenade",
+    "type": "Spell",
+    "cost": 2,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "DealDamageAllEnemyMonsters",
+        "amount": 1,
+        "targeting": "None",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["FPS"]
+  },
+  {
+    "cardId": "FPS_S05_ArmorPlates",
+    "displayName": "Armor Plates",
+    "type": "Spell",
+    "cost": 2,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "Buff",
+        "amount": 1,
+        "targeting": "FriendlyMonster",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["FPS"]
+  },
+
+  {
+    "cardId": "FPS_S06_Headshot",
+    "displayName": "Headshot",
+    "type": "Spell",
+    "cost": 3,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "DestroyDamaged",
+        "amount": 0,
+        "targeting": "EnemyMonster",
+        "condition": "TargetMustBeDamaged"
+      }
+    ],
+    "archetypes": ["FPS"]
+  },
+  {
+    "cardId": "FPS_S07_SuppressingFire",
+    "displayName": "Suppressing Fire",
+    "type": "Spell",
+    "cost": 3,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "Quick",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "RemoveKeywordThisTurn",
+        "amount": 0,
+        "keyword": "FirstStrike",
+        "targeting": "EnemyMonster",
+        "condition": "None"
+      },
+      {
+        "effectType": "DebuffAttackThisCombat",
+        "amount": 2,
+        "targeting": "EnemyMonster",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["FPS"]
+  },
+
+  {
+    "cardId": "FPS_S08_Killstreak",
+    "displayName": "Killstreak",
+    "type": "Spell",
+    "cost": 4,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "Draw",
+        "amount": 2,
+        "targeting": "None",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["FPS"]
+  },
+
+  {
+    "cardId": "FPS_S09_UAVScan",
+    "displayName": "UAV Scan",
+    "type": "Spell",
+    "cost": 5,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "RevealOpponentHand",
+        "amount": 3,
+        "targeting": "None",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["FPS"]
+  },
+
+  {
+    "cardId": "FPS_S10_RespawnTimer",
+    "displayName": "Respawn Timer",
+    "type": "Spell",
+    "cost": 6,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "ReviveFromGraveyard",
+        "amount": 0,
+        "targeting": "CardInYourGraveyard",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["FPS"]
+  }
+]

@@ -1,0 +1,386 @@
+[
+  {
+    "cardId": "RAC_M01_StreetRacer",
+    "displayName": "Street Racer",
+    "type": "Monster",
+    "cost": 1,
+    "baseAttack": 2,
+    "baseHealth": 1,
+    "speedWindow": "None",
+    "keywords": ["Rush"],
+    "startingNitro": 0,
+    "effects": [],
+    "archetypes": ["Racing"]
+  },
+  {
+    "cardId": "RAC_M02_PitCrewIntern",
+    "displayName": "Pit Crew Intern",
+    "type": "Monster",
+    "cost": 1,
+    "baseAttack": 1,
+    "baseHealth": 3,
+    "speedWindow": "None",
+    "keywords": [],
+    "startingNitro": 0,
+    "effects": [
+      {
+        "effectType": "Buff",
+        "amount": 1,
+        "targeting": "FriendlyMonster",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["Racing"]
+  },
+  {
+    "cardId": "RAC_M03_DriftTechnician",
+    "displayName": "Drift Technician",
+    "type": "Monster",
+    "cost": 2,
+    "baseAttack": 2,
+    "baseHealth": 3,
+    "speedWindow": "None",
+    "keywords": ["Slipstream"],
+    "startingNitro": 0,
+    "effects": [],
+    "archetypes": ["Racing"]
+  },
+  {
+    "cardId": "RAC_M04_NitroScout",
+    "displayName": "Nitro Scout",
+    "type": "Monster",
+    "cost": 2,
+    "baseAttack": 2,
+    "baseHealth": 2,
+    "speedWindow": "None",
+    "keywords": [],
+    "startingNitro": 0,
+    "effects": [
+      {
+        "effectType": "GainNitro",
+        "amount": 1,
+        "targeting": "None",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["Racing"]
+  },
+  {
+    "cardId": "RAC_M05_DraftingSpecialist",
+    "displayName": "Drafting Specialist",
+    "type": "Monster",
+    "cost": 2,
+    "baseAttack": 3,
+    "baseHealth": 2,
+    "speedWindow": "None",
+    "keywords": ["Slipstream"],
+    "startingNitro": 0,
+    "effects": [],
+    "archetypes": ["Racing"]
+  },
+  {
+    "cardId": "RAC_M06_SlipstreamDriver",
+    "displayName": "Slipstream Driver",
+    "type": "Monster",
+    "cost": 3,
+    "baseAttack": 3,
+    "baseHealth": 3,
+    "speedWindow": "None",
+    "keywords": ["Slipstream"],
+    "startingNitro": 0,
+    "effects": [],
+    "archetypes": ["Racing"]
+  },
+  {
+    "cardId": "RAC_M07_ShortcutSaboteur",
+    "displayName": "Shortcut Saboteur",
+    "type": "Monster",
+    "cost": 3,
+    "baseAttack": 3,
+    "baseHealth": 4,
+    "speedWindow": "None",
+    "keywords": [],
+    "startingNitro": 0,
+    "effects": [
+      {
+        "effectType": "Silence",
+        "amount": 0,
+        "targeting": "EnemyMonster",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["Racing"]
+  },
+  {
+    "cardId": "RAC_M08_OvertakeChampion",
+    "displayName": "Overtake Champion",
+    "type": "Monster",
+    "cost": 4,
+    "baseAttack": 4,
+    "baseHealth": 4,
+    "speedWindow": "None",
+    "keywords": ["Overtake"],
+    "startingNitro": 0,
+    "effects": [],
+    "archetypes": ["Racing"]
+  },
+  {
+    "cardId": "RAC_M09_NitroVeteran",
+    "displayName": "Nitro Veteran",
+    "type": "Monster",
+    "cost": 5,
+    "baseAttack": 5,
+    "baseHealth": 5,
+    "speedWindow": "None",
+    "keywords": ["Nitro"],
+    "startingNitro": 1,
+    "effects": [
+      {
+        "effectType": "GainNitro",
+        "amount": 1,
+        "targeting": "None",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["Racing"]
+  },
+  {
+    "cardId": "RAC_M10_GrandPrixLegend",
+    "displayName": "Grand Prix Legend",
+    "type": "Monster",
+    "cost": 7,
+    "baseAttack": 7,
+    "baseHealth": 7,
+    "speedWindow": "None",
+    "keywords": ["Overtake"],
+    "startingNitro": 0,
+    "effects": [
+      {
+        "effectType": "GainKeywordFirstStrikeIfNitro2",
+        "amount": 2,
+        "targeting": "None",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["Racing"]
+  },
+
+  {
+    "cardId": "RAC_S01_NitroBoost",
+    "displayName": "Nitro Boost",
+    "type": "Spell",
+    "cost": 1,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "startingNitro": 0,
+    "effects": [
+      {
+        "effectType": "BuffAttackThisTurn",
+        "amount": 2,
+        "targeting": "FriendlyMonster",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["Racing"]
+  },
+  {
+    "cardId": "RAC_S02_HardBrake",
+    "displayName": "Hard Brake",
+    "type": "Spell",
+    "cost": 1,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "Quick",
+    "keywords": [],
+    "startingNitro": 0,
+    "effects": [
+      {
+        "effectType": "DebuffAttackThisCombat",
+        "amount": 3,
+        "targeting": "AnyMonster",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["Racing"]
+  },
+  {
+    "cardId": "RAC_S03_DraftingLine",
+    "displayName": "Drafting Line",
+    "type": "Spell",
+    "cost": 2,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "startingNitro": 0,
+    "effects": [
+      {
+        "effectType": "Draw",
+        "amount": 1,
+        "targeting": "None",
+        "condition": "None"
+      },
+      {
+        "effectType": "GainNitroIfAttackedThisTurn",
+        "amount": 1,
+        "targeting": "None",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["Racing"]
+  },
+  {
+    "cardId": "RAC_S04_EngineTuneUp",
+    "displayName": "Engine Tune-Up",
+    "type": "Spell",
+    "cost": 2,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "startingNitro": 0,
+    "effects": [
+      {
+        "effectType": "Buff",
+        "amount": 1,
+        "targeting": "FriendlyMonster",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["Racing"]
+  },
+  {
+    "cardId": "RAC_S05_PitStop",
+    "displayName": "Pit Stop",
+    "type": "Spell",
+    "cost": 3,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "startingNitro": 0,
+    "effects": [
+      {
+        "effectType": "HealToFull",
+        "amount": 0,
+        "targeting": "FriendlyMonster",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["Racing"]
+  },
+  {
+    "cardId": "RAC_S06_SharpTurn",
+    "displayName": "Sharp Turn",
+    "type": "Spell",
+    "cost": 3,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "startingNitro": 0,
+    "effects": [
+      {
+        "effectType": "SwapBoardPositions",
+        "amount": 0,
+        "targeting": "AnyMonster",
+        "condition": "None"
+      },
+      {
+        "effectType": "Draw",
+        "amount": 1,
+        "targeting": "None",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["Racing"]
+  },
+  {
+    "cardId": "RAC_S07_TurboCharger",
+    "displayName": "Turbo Charger",
+    "type": "Spell",
+    "cost": 4,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "startingNitro": 0,
+    "effects": [
+      {
+        "effectType": "GrantRushThisTurn",
+        "amount": 0,
+        "targeting": "FriendlyMonster",
+        "condition": "None"
+      },
+      {
+        "effectType": "BuffAttackThisTurn",
+        "amount": 2,
+        "targeting": "FriendlyMonster",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["Racing"]
+  },
+  {
+    "cardId": "RAC_S08_CleanLap",
+    "displayName": "Clean Lap",
+    "type": "Spell",
+    "cost": 4,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "startingNitro": 0,
+    "effects": [
+      {
+        "effectType": "DestroyDamaged",
+        "amount": 0,
+        "targeting": "EnemyMonster",
+        "condition": "TargetMustBeDamaged"
+      }
+    ],
+    "archetypes": ["Racing"]
+  },
+  {
+    "cardId": "RAC_S09_FullThrottle",
+    "displayName": "Full Throttle",
+    "type": "Spell",
+    "cost": 5,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "startingNitro": 0,
+    "effects": [
+      {
+        "effectType": "BuffAllRacingAttackThisTurn",
+        "amount": 2,
+        "targeting": "None",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["Racing"]
+  },
+  {
+    "cardId": "RAC_S10_PodiumFinish",
+    "displayName": "Podium Finish",
+    "type": "Spell",
+    "cost": 6,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "startingNitro": 0,
+    "effects": [
+      {
+        "effectType": "DealDamage",
+        "amount": 5,
+        "targeting": "EnemyPlayer",
+        "condition": "AttackedThreeTimesThisTurn"
+      }
+    ],
+    "archetypes": ["Racing"]
+  }
+]

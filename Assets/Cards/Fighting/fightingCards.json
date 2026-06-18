@@ -1,0 +1,274 @@
+[
+  {
+    "cardId": "FIG_M01_ArcadeBrawler",
+    "displayName": "Arcade Brawler",
+    "type": "Monster",
+    "cost": 1,
+    "baseAttack": 2,
+    "baseHealth": 1,
+    "speedWindow": "None",
+    "keywords": ["Rush"],
+    "effects": [],
+    "archetypes": ["Fighting"]
+  },
+  {
+    "cardId": "FIG_M02_HitConfirmRookie",
+    "displayName": "Hit-Confirm Rookie",
+    "type": "Monster",
+    "cost": 1,
+    "baseAttack": 1,
+    "baseHealth": 2,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      { "effectType": "Draw", "amount": 1, "targeting": "None", "condition": "CardsPlayedAtLeast1ThisTurn" }
+    ],
+    "archetypes": ["Fighting"]
+  },
+  {
+    "cardId": "FIG_M03_FramePerfectStriker",
+    "displayName": "Frame-Perfect Striker",
+    "type": "Monster",
+    "cost": 2,
+    "baseAttack": 2,
+    "baseHealth": 2,
+    "speedWindow": "None",
+    "keywords": ["FirstStrike"],
+    "effects": [],
+    "archetypes": ["Fighting"]
+  },
+  {
+    "cardId": "FIG_M04_CounterSpecialist",
+    "displayName": "Counter Specialist",
+    "type": "Monster",
+    "cost": 2,
+    "baseAttack": 1,
+    "baseHealth": 4,
+    "speedWindow": "None",
+    "keywords": ["Counter"],
+    "effects": [],
+    "archetypes": ["Fighting"]
+  },
+  {
+    "cardId": "FIG_M05_ComboExtender",
+    "displayName": "Combo Extender",
+    "type": "Monster",
+    "cost": 3,
+    "baseAttack": 3,
+    "baseHealth": 3,
+    "speedWindow": "None",
+    "keywords": ["Combo"],
+    "effects": [],
+    "archetypes": ["Fighting"]
+  },
+  {
+    "cardId": "FIG_M06_StanceSwitcher",
+    "displayName": "Stance Switcher",
+    "type": "Monster",
+    "cost": 3,
+    "baseAttack": 2,
+    "baseHealth": 4,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      { "effectType": "GrantKeywordThisTurn", "amount": 0, "keyword": "FirstStrike", "targeting": "Self", "condition": "None" }
+    ],
+    "archetypes": ["Fighting"]
+  },
+  {
+    "cardId": "FIG_M07_GrappleTechnician",
+    "displayName": "Grapple Technician",
+    "type": "Monster",
+    "cost": 4,
+    "baseAttack": 3,
+    "baseHealth": 5,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      { "effectType": "Silence", "amount": 0, "targeting": "EnemyMonster", "condition": "None" }
+    ],
+    "archetypes": ["Fighting"]
+  },
+  {
+    "cardId": "FIG_M08_AirJuggleAce",
+    "displayName": "Air-Juggle Ace",
+    "type": "Monster",
+    "cost": 4,
+    "baseAttack": 4,
+    "baseHealth": 3,
+    "speedWindow": "None",
+    "keywords": ["Combo"],
+    "effects": [],
+    "archetypes": ["Fighting"]
+  },
+  {
+    "cardId": "FIG_M09_SuperMeterVeteran",
+    "displayName": "Super Meter Veteran",
+    "type": "Monster",
+    "cost": 5,
+    "baseAttack": 5,
+    "baseHealth": 5,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      { "effectType": "BuffAttackThisTurn", "amount": 2, "targeting": "Self", "condition": "CardsPlayedAtLeast3ThisTurn" }
+    ],
+    "archetypes": ["Fighting"]
+  },
+  {
+    "cardId": "FIG_M10_FinalRoundChampion",
+    "displayName": "Final Round Champion",
+    "type": "Monster",
+    "cost": 7,
+    "baseAttack": 7,
+    "baseHealth": 7,
+    "speedWindow": "None",
+    "keywords": ["FirstStrike"],
+    "effects": [
+      { "effectType": "DealDamage", "amount": 3, "targeting": "EnemyPlayer", "condition": "CardsPlayedAtLeast3ThisTurn" }
+    ],
+    "archetypes": ["Fighting"]
+  },
+
+  {
+    "cardId": "FIG_S01_PerfectBlock",
+    "displayName": "Perfect Block",
+    "type": "Spell",
+    "cost": 1,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "Quick",
+    "keywords": [],
+    "effects": [
+      { "effectType": "PreventCombatDamageThisCombat", "amount": 0, "targeting": "FriendlyMonster", "condition": "None" }
+    ],
+    "archetypes": ["Fighting"]
+  },
+  {
+    "cardId": "FIG_S02_WakeUpReversal",
+    "displayName": "Wake-Up Reversal",
+    "type": "Spell",
+    "cost": 1,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "Quick",
+    "keywords": [],
+    "effects": [
+      { "effectType": "GrantKeywordThisCombat", "amount": 0, "keyword": "Counter", "targeting": "FriendlyMonster", "condition": "None" }
+    ],
+    "archetypes": ["Fighting"]
+  },
+  {
+    "cardId": "FIG_S03_ChainCombo",
+    "displayName": "Chain Combo",
+    "type": "Spell",
+    "cost": 2,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      { "effectType": "BuffAttackThisTurn", "amount": 2, "targeting": "FriendlyMonster", "condition": "None" }
+    ],
+    "archetypes": ["Fighting"]
+  },
+  {
+    "cardId": "FIG_S04_TrainingMode",
+    "displayName": "Training Mode",
+    "type": "Spell",
+    "cost": 2,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      { "effectType": "Draw", "amount": 1, "targeting": "None", "condition": "None" }
+    ],
+    "archetypes": ["Fighting"]
+  },
+  {
+    "cardId": "FIG_S05_WhiffPunish",
+    "displayName": "Whiff Punish",
+    "type": "Spell",
+    "cost": 2,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      { "effectType": "DestroyDamaged", "amount": 0, "targeting": "EnemyMonster", "condition": "TargetMustBeDamaged" }
+    ],
+    "archetypes": ["Fighting"]
+  },
+  {
+    "cardId": "FIG_S06_CornerPressure",
+    "displayName": "Corner Pressure",
+    "type": "Spell",
+    "cost": 3,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      { "effectType": "BuffAllFightingAttackThisTurn", "amount": 1, "targeting": "None", "condition": "None" }
+    ],
+    "archetypes": ["Fighting"]
+  },
+  {
+    "cardId": "FIG_S07_GuardBreak",
+    "displayName": "Guard Break",
+    "type": "Spell",
+    "cost": 3,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      { "effectType": "Silence", "amount": 0, "targeting": "EnemyMonster", "condition": "None" }
+    ],
+    "archetypes": ["Fighting"]
+  },
+  {
+    "cardId": "FIG_S08_SuperMeterBurst",
+    "displayName": "Super Meter Burst",
+    "type": "Spell",
+    "cost": 4,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      { "effectType": "DealDamage", "amount": 4, "targeting": "EnemyMonster", "condition": "CardsPlayedAtLeast3ThisTurn" }
+    ],
+    "archetypes": ["Fighting"]
+  },
+  {
+    "cardId": "FIG_S09_RageActivation",
+    "displayName": "Rage Activation",
+    "type": "Spell",
+    "cost": 5,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      { "effectType": "GrantKeywordAllFightingThisTurn", "amount": 0, "keyword": "Combo", "targeting": "None", "condition": "None" }
+    ],
+    "archetypes": ["Fighting"]
+  },
+  {
+    "cardId": "FIG_S10_SuddenDeath",
+    "displayName": "Sudden Death",
+    "type": "Spell",
+    "cost": 6,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      { "effectType": "DealDamage", "amount": 5, "targeting": "FriendlyPlayer", "condition": "None" },
+      { "effectType": "DealDamage", "amount": 5, "targeting": "EnemyPlayer", "condition": "None" }
+    ],
+    "archetypes": ["Fighting"]
+  }
+]

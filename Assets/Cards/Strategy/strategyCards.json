@@ -1,0 +1,390 @@
+[
+  {
+    "cardId": "STR_M01_ScoutUnit",
+    "displayName": "Scout Unit",
+    "type": "Monster",
+    "cost": 1,
+    "baseAttack": 2,
+    "baseHealth": 1,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [],
+    "archetypes": ["Strategy"]
+  },
+  {
+    "cardId": "STR_M02_EconomyAide",
+    "displayName": "Economy Aide",
+    "type": "Monster",
+    "cost": 1,
+    "baseAttack": 1,
+    "baseHealth": 2,
+    "speedWindow": "None",
+    "keywords": ["Generate"],
+    "effects": [],
+    "archetypes": ["Strategy"]
+  },
+
+  {
+    "cardId": "STR_M03_DefensiveEngineer",
+    "displayName": "Defensive Engineer",
+    "type": "Monster",
+    "cost": 2,
+    "baseAttack": 1,
+    "baseHealth": 4,
+    "speedWindow": "None",
+    "keywords": ["Fortify"],
+    "effects": [],
+    "archetypes": ["Strategy"]
+  },
+  {
+    "cardId": "STR_M04_TechResearcher",
+    "displayName": "Tech Researcher",
+    "type": "Monster",
+    "cost": 2,
+    "baseAttack": 2,
+    "baseHealth": 2,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "Draw",
+        "amount": 1,
+        "targeting": "None",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["Strategy"]
+  },
+  {
+    "cardId": "STR_M05_ExpansionSettler",
+    "displayName": "Expansion Settler",
+    "type": "Monster",
+    "cost": 2,
+    "baseAttack": 2,
+    "baseHealth": 3,
+    "speedWindow": "None",
+    "keywords": ["Generate"],
+    "effects": [],
+    "archetypes": ["Strategy"]
+  },
+  {
+    "cardId": "STR_M06_SupplyOfficer",
+    "displayName": "Supply Officer",
+    "type": "Monster",
+    "cost": 2,
+    "baseAttack": 2,
+    "baseHealth": 3,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [],
+    "archetypes": ["Strategy"]
+  },
+
+  {
+    "cardId": "STR_M07_StructureWall",
+    "displayName": "Structure Wall",
+    "type": "Monster",
+    "cost": 3,
+    "baseAttack": 0,
+    "baseHealth": 7,
+    "speedWindow": "None",
+    "keywords": ["Guard", "Structure"],
+    "effects": [],
+    "archetypes": ["Strategy"]
+  },
+  {
+    "cardId": "STR_M08_DiplomacyEnvoy",
+    "displayName": "Diplomacy Envoy",
+    "type": "Monster",
+    "cost": 3,
+    "baseAttack": 2,
+    "baseHealth": 4,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [],
+    "archetypes": ["Strategy"]
+  },
+  {
+    "cardId": "STR_M09_SiegeCommander",
+    "displayName": "Siege Commander",
+    "type": "Monster",
+    "cost": 3,
+    "baseAttack": 4,
+    "baseHealth": 3,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [],
+    "archetypes": ["Strategy"]
+  },
+  {
+    "cardId": "STR_M10_WarPlanner",
+    "displayName": "War Planner",
+    "type": "Monster",
+    "cost": 3,
+    "baseAttack": 3,
+    "baseHealth": 3,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [],
+    "archetypes": ["Strategy"]
+  },
+
+  {
+    "cardId": "STR_M11_ForwardBase",
+    "displayName": "Forward Base",
+    "type": "Monster",
+    "cost": 4,
+    "baseAttack": 2,
+    "baseHealth": 8,
+    "speedWindow": "None",
+    "keywords": ["Guard", "Structure"],
+    "effects": [],
+    "archetypes": ["Strategy"]
+  },
+  {
+    "cardId": "STR_M12_GrandTactician",
+    "displayName": "Grand Tactician",
+    "type": "Monster",
+    "cost": 4,
+    "baseAttack": 4,
+    "baseHealth": 5,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [],
+    "archetypes": ["Strategy"]
+  },
+  {
+    "cardId": "STR_M13_CounterIntelChief",
+    "displayName": "Counter-Intel Chief",
+    "type": "Monster",
+    "cost": 4,
+    "baseAttack": 3,
+    "baseHealth": 5,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [],
+    "archetypes": ["Strategy"]
+  },
+
+  {
+    "cardId": "STR_M14_WarCouncilChair",
+    "displayName": "War Council Chair",
+    "type": "Monster",
+    "cost": 5,
+    "baseAttack": 5,
+    "baseHealth": 7,
+    "speedWindow": "None",
+    "keywords": ["Fortify"],
+    "effects": [],
+    "archetypes": ["Strategy"]
+  },
+  {
+    "cardId": "STR_M15_TotalWarEngine",
+    "displayName": "Total War Engine",
+    "type": "Monster",
+    "cost": 7,
+    "baseAttack": 8,
+    "baseHealth": 9,
+    "speedWindow": "None",
+    "keywords": ["Structure"],
+    "effects": [],
+    "archetypes": ["Strategy"]
+  },
+
+  {
+    "cardId": "STR_S01_FogOfWar",
+    "displayName": "Fog of War",
+    "type": "Spell",
+    "cost": 1,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "Quick",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "RemoveKeywordThisTurn",
+        "amount": 0,
+        "keyword": "Stealth",
+        "targeting": "EnemyMonster",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["Strategy"]
+  },
+  {
+    "cardId": "STR_S02_TradeAgreement",
+    "displayName": "Trade Agreement",
+    "type": "Spell",
+    "cost": 1,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "Draw",
+        "amount": 1,
+        "targeting": "None",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["Strategy"]
+  },
+
+  {
+    "cardId": "STR_S03_BuildStructure",
+    "displayName": "Build Structure",
+    "type": "Spell",
+    "cost": 2,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "SummonToken",
+        "amount": 0,
+        "targeting": "None",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["Strategy"]
+  },
+  {
+    "cardId": "STR_S04_ResearchBreakthrough",
+    "displayName": "Research Breakthrough",
+    "type": "Spell",
+    "cost": 2,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "Draw",
+        "amount": 2,
+        "targeting": "None",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["Strategy"]
+  },
+  {
+    "cardId": "STR_S05_FortifyPosition",
+    "displayName": "Fortify Position",
+    "type": "Spell",
+    "cost": 2,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "Buff",
+        "amount": 2,
+        "targeting": "FriendlyMonster",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["Strategy"]
+  },
+
+  {
+    "cardId": "STR_S06_MobilizeArmy",
+    "displayName": "Mobilize Army",
+    "type": "Spell",
+    "cost": 3,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "SummonToken",
+        "amount": 0,
+        "targeting": "None",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["Strategy"]
+  },
+  {
+    "cardId": "STR_S07_CounterIntel",
+    "displayName": "Counter-Intel",
+    "type": "Spell",
+    "cost": 3,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "Quick",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "Silence",
+        "amount": 0,
+        "targeting": "EnemyMonster",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["Strategy"]
+  },
+
+  {
+    "cardId": "STR_S08_UpgradeTree",
+    "displayName": "Upgrade Tree",
+    "type": "Spell",
+    "cost": 4,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "BuffAllFriendlyMonsters",
+        "amount": 1,
+        "targeting": "None",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["Strategy"]
+  },
+
+  {
+    "cardId": "STR_S09_EconomicBoom",
+    "displayName": "Economic Boom",
+    "type": "Spell",
+    "cost": 5,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "GainMaxBandwidthNextTurn",
+        "amount": 2,
+        "targeting": "FriendlyPlayer",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["Strategy"]
+  },
+
+  {
+    "cardId": "STR_S10_TotalWarDoctrine",
+    "displayName": "Total War Doctrine",
+    "type": "Spell",
+    "cost": 6,
+    "baseAttack": 0,
+    "baseHealth": 0,
+    "speedWindow": "None",
+    "keywords": [],
+    "effects": [
+      {
+        "effectType": "BuffAllFriendlyMonsters",
+        "amount": 2,
+        "targeting": "None",
+        "condition": "None"
+      }
+    ],
+    "archetypes": ["Strategy"]
+  }
+]

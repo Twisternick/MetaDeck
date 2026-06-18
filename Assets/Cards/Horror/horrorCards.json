@@ -1,0 +1,54 @@
+[
+  { "cardId":"HOR_M01_PanickedCivilian","displayName":"Panicked Civilian","type":"Monster","cost":1,"baseAttack":1,"baseHealth":2,"speedWindow":"None","keywords":["Fear"],"effects":[],"archetypes":["Horror"] },
+  { "cardId":"HOR_M02_PossessedVermin","displayName":"Possessed Vermin","type":"Monster","cost":1,"baseAttack":2,"baseHealth":1,"speedWindow":"None","keywords":["Fear"],"effects":[],"archetypes":["Horror"] },
+  { "cardId":"HOR_M03_GraveWhisperer","displayName":"Grave Whisperer","type":"Monster","cost":1,"baseAttack":1,"baseHealth":1,"speedWindow":"None","keywords":["Haunt"],"effects":[],"archetypes":["Horror"] },
+
+  { "cardId":"HOR_M04_InfectedHost","displayName":"Infected Host","type":"Monster","cost":2,"baseAttack":2,"baseHealth":2,"speedWindow":"None","keywords":["Fear"],"effects":[],"archetypes":["Horror"] },
+  { "cardId":"HOR_M05_LoneSurvivor","displayName":"Lone Survivor","type":"Monster","cost":2,"baseAttack":2,"baseHealth":3,"speedWindow":"None","keywords":[],"effects":[],"archetypes":["Horror"] },
+  { "cardId":"HOR_M06_ShadowStalker","displayName":"Shadow Stalker","type":"Monster","cost":2,"baseAttack":3,"baseHealth":1,"speedWindow":"None","keywords":[],"effects":[],"archetypes":["Horror"] },
+  { "cardId":"HOR_M07_SafeRoomKeeper","displayName":"Safe Room Keeper","type":"Monster","cost":2,"baseAttack":1,"baseHealth":4,"speedWindow":"None","keywords":["Guard"],"effects":[],"archetypes":["Horror"] },
+
+  { "cardId":"HOR_M08_PossessedDoll","displayName":"Possessed Doll","type":"Monster","cost":3,"baseAttack":2,"baseHealth":3,"speedWindow":"None","keywords":["Haunt"],"effects":[],"archetypes":["Horror"] },
+  { "cardId":"HOR_M09_RelentlessPursuer","displayName":"Relentless Pursuer","type":"Monster","cost":3,"baseAttack":3,"baseHealth":4,"speedWindow":"None","keywords":[],"effects":[],"archetypes":["Horror"] },
+  { "cardId":"HOR_M10_CultDevourer","displayName":"Cult Devourer","type":"Monster","cost":3,"baseAttack":4,"baseHealth":2,"speedWindow":"None","keywords":["Devour"],"effects":[],"archetypes":["Horror"] },
+
+  { "cardId":"HOR_M11_LastBulletGuard","displayName":"Last Bullet Guard","type":"Monster","cost":4,"baseAttack":2,"baseHealth":6,"speedWindow":"None","keywords":["Guard"],"effects":[],"archetypes":["Horror"] },
+  { "cardId":"HOR_M12_NightmareManifest","displayName":"Nightmare Manifest","type":"Monster","cost":4,"baseAttack":4,"baseHealth":4,"speedWindow":"None","keywords":["Fear"],"effects":[],"archetypes":["Horror"] },
+  { "cardId":"HOR_M13_EldritchAbomination","displayName":"Eldritch Abomination","type":"Monster","cost":5,"baseAttack":6,"baseHealth":6,"speedWindow":"None","keywords":["Devour"],"effects":[],"archetypes":["Horror"] },
+  { "cardId":"HOR_M14_HauntedTitan","displayName":"Haunted Titan","type":"Monster","cost":5,"baseAttack":5,"baseHealth":7,"speedWindow":"None","keywords":["Haunt"],"effects":[],"archetypes":["Horror"] },
+
+  { "cardId":"HOR_M15_ApexNightmare","displayName":"Apex Nightmare","type":"Monster","cost":7,"baseAttack":8,"baseHealth":8,"speedWindow":"None","keywords":["Fear"],"effects":[],"archetypes":["Horror"] },
+
+  { "cardId":"HOR_S01_JumpScare","displayName":"Jump Scare","type":"Spell","cost":1,"baseAttack":0,"baseHealth":0,"speedWindow":"Quick","keywords":[],"effects":[
+      { "effectType":"DebuffAttackThisCombat","amount":2,"targeting":"EnemyMonster","condition":"None" }
+    ],"archetypes":["Horror"] },
+  { "cardId":"HOR_S02_FlashlightBeam","displayName":"Flashlight Beam","type":"Spell","cost":1,"baseAttack":0,"baseHealth":0,"speedWindow":"None","keywords":[],"effects":[
+      { "effectType":"DealDamage","amount":1,"targeting":"EnemyMonster","condition":"None" }
+    ],"archetypes":["Horror"] },
+  { "cardId":"HOR_S03_LimitedSupplies","displayName":"Limited Supplies","type":"Spell","cost":2,"baseAttack":0,"baseHealth":0,"speedWindow":"None","keywords":[],"effects":[
+      { "effectType":"DiscardRandom","amount":1,"targeting":"EnemyPlayer","condition":"None" }
+    ],"archetypes":["Horror"] },
+  { "cardId":"HOR_S04_Barricade","displayName":"Barricade","type":"Spell","cost":2,"baseAttack":0,"baseHealth":0,"speedWindow":"None","keywords":[],"effects":[
+      { "effectType":"Buff","amount":1,"targeting":"FriendlyMonster","condition":"None" }
+    ],"archetypes":["Horror"] },
+  { "cardId":"HOR_S05_BloodTrail","displayName":"Blood Trail","type":"Spell","cost":2,"baseAttack":0,"baseHealth":0,"speedWindow":"None","keywords":[],"effects":[
+      { "effectType":"ReturnFromGraveyardToHand","amount":0,"targeting":"CardInYourGraveyard","condition":"None" }
+    ],"archetypes":["Horror"] },
+
+  { "cardId":"HOR_S06_Panic","displayName":"Panic","type":"Spell","cost":3,"baseAttack":0,"baseHealth":0,"speedWindow":"Quick","keywords":[],"effects":[
+      { "effectType":"Silence","amount":0,"targeting":"EnemyMonster","condition":"None" }
+    ],"archetypes":["Horror"] },
+  { "cardId":"HOR_S07_CursedRelic","displayName":"Cursed Relic","type":"Spell","cost":3,"baseAttack":0,"baseHealth":0,"speedWindow":"None","keywords":[],"effects":[
+      { "effectType":"GrantKeywordThisTurn","amount":0,"keyword":"Haunt","targeting":"FriendlyMonster","condition":"None" }
+    ],"archetypes":["Horror"] },
+  { "cardId":"HOR_S08_EmergencyHeal","displayName":"Emergency Heal","type":"Spell","cost":4,"baseAttack":0,"baseHealth":0,"speedWindow":"None","keywords":[],"effects":[
+      { "effectType":"Heal","amount":4,"targeting":"FriendlyPlayer","condition":"None" }
+    ],"archetypes":["Horror"] },
+  { "cardId":"HOR_S09_GraveCall","displayName":"Grave Call","type":"Spell","cost":5,"baseAttack":0,"baseHealth":0,"speedWindow":"None","keywords":[],"effects":[
+      { "effectType":"ReviveFromGraveyard","amount":0,"targeting":"CardInYourGraveyard","condition":"None" }
+    ],"archetypes":["Horror"] },
+  { "cardId":"HOR_S10_NightFalls","displayName":"Night Falls","type":"Spell","cost":6,"baseAttack":0,"baseHealth":0,"speedWindow":"None","keywords":[],"effects":[
+      { "effectType":"DealDamage","amount":3,"targeting":"EnemyPlayer","condition":"None" },
+      { "effectType":"DealDamage","amount":3,"targeting":"EnemyMonster","condition":"None" }
+    ],"archetypes":["Horror"] }
+]

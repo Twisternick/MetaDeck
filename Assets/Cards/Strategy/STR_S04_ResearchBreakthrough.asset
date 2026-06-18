@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 614462dc5d4626f44b0975ac2b7b0dce, type: 3}
+  m_Name: STR_S04_ResearchBreakthrough
+  m_EditorClassIdentifier: Assembly-CSharp::MetaDeck.Data.CardDefinition
+  cardId: STR_S04_ResearchBreakthrough
+  displayName: Research Breakthrough
+  type: 1
+  cost: 2
+  startingNitro: 0
+  baseAttack: 0
+  baseHealth: 0
+  speedWindow: 0
+  keywords: 
+  effects:
+  - effectType: 0
+    amount: 2
+    targeting: 0
+    condition: 0
+    keyword: 0
+  archetypes:
+  - Strategy
+  artSprite: {fileID: 21300000, guid: a9f5416666c8e0343bc876a16fdec8bd, type: 3}
