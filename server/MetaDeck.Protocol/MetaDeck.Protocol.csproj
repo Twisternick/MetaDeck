@@ -16,8 +16,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- DTOs, mappers, factory AND the serializer all live in Assets/Scripts/Game/Protocol now,
+         shared verbatim with the Unity client. -->
     <Compile Include="..\..\Assets\Scripts\Game\Protocol\**\*.cs" />
-    <Compile Include="Serialization\**\*.cs" />
   </ItemGroup>
 
   <ItemGroup>
