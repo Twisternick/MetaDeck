@@ -27,6 +27,11 @@ namespace MetaDeck.Unity
         [Tooltip("Automatically Quick Match after connecting (off if you use a lobby UI for rooms).")]
         [SerializeField] private bool autoQuickMatch = true;
 
+        [Tooltip("How many times to try connecting before giving up.")]
+        [SerializeField] private int connectAttempts = 5;
+        [Tooltip("Seconds to wait between connection attempts.")]
+        [SerializeField] private float retryDelaySeconds = 2f;
+
         [Header("Deck (set before matching)")]
         [Tooltip("Card ids for a player-built deck. Empty -> server uses the archetype or picks one at random.")]
         public string[] deckCardIds;
@@ -60,19 +65,34 @@ namespace MetaDeck.Unity
         {
             if (_ws != null) return;
             _cts = new CancellationTokenSource();
-            _ws = new ClientWebSocket();
-            try
+
+            int attempts = Mathf.Max(1, connectAttempts);
+            for (int attempt = 1; attempt <= attempts; attempt++)
             {
-                await _ws.ConnectAsync(new Uri(serverUrl), _cts.Token);
-                _ = ReceiveLoop(_cts.Token);
-                Debug.Log($"[Net] Connected to {serverUrl}");
-                if (autoQuickMatch) QuickMatch();
+                var ws = new ClientWebSocket();
+                try
+                {
+                    await ws.ConnectAsync(new Uri(serverUrl), _cts.Token);
+                    _ws = ws;
+                    _ = ReceiveLoop(_cts.Token);
+                    Debug.Log($"[Net] Connected to {serverUrl}");
+                    if (autoQuickMatch) QuickMatch();
+                    return;
+                }
+                catch (OperationCanceledException) { ws.Dispose(); return; } // shutting down
+                catch (Exception ex)
+                {
+                    ws.Dispose();
+                    Debug.LogWarning($"[Net] Connect attempt {attempt}/{attempts} failed: {ex.Message}");
+                    if (attempt >= attempts) break;
+
+                    try { await Task.Delay(TimeSpan.FromSeconds(retryDelaySeconds), _cts.Token); }
+                    catch (OperationCanceledException) { return; }
+                }
             }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[Net] Connect failed: {ex.Message}");
-                _ws = null;
-            }
+
+            Debug.LogError($"[Net] Could not connect to {serverUrl} after {attempts} attempt(s).");
+            OnError?.Invoke("Could not connect to server.");
         }
 
         // ---- Lobby ---- (each carries the currently-selected deck/archetype)

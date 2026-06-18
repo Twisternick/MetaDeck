@@ -16,6 +16,7 @@ namespace MetaDeck.Presentation
     public sealed class ClientStateBuilder
     {
         private readonly Dictionary<string, CardInstance> _cache = new();
+        private readonly HashSet<string> _warnedMissing = new();
 
         public GameState Build(SnapshotDto snap)
         {
@@ -67,6 +68,10 @@ namespace MetaDeck.Presentation
             if (!_cache.TryGetValue(dto.InstanceId, out var ci))
             {
                 var libDef = CardLibrary.Get(dto.CardId);
+                if (libDef == null && _warnedMissing.Add(dto.CardId ?? "<null>"))
+                    UnityEngine.Debug.LogWarning($"[CardLibrary] No card registered for id '{dto.CardId}' — " +
+                        "showing the id as a placeholder (no name/art/text). Add it to CardLibraryMB and re-export cards.json.");
+
                 var def = libDef != null ? libDef.ToCardDef() : Placeholder(dto);
                 def.baseHealth = dto.MaxHealth; // so GetMaxHealth() matches the server's value at creation
                 ci = new CardInstance(dto.InstanceId, def, dto.Owner);
