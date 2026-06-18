@@ -99,6 +99,34 @@ namespace MetaDeck.Server
             Check("archetype deck used (hand within Control set)",
                 archHand.Count == 3 && archHand.TrueForAll(c => c.CardId == "bruiser" || c.CardId == "sniper"));
 
+            // --- Rematch (both must agree) ---
+            Console.WriteLine("Rematch:");
+            var r1 = await Connect(url);
+            var r2 = await Connect(url);
+            await SendLobby(r1, LobbyRequestKind.QuickMatch);
+            await SendLobby(r2, LobbyRequestKind.QuickMatch);
+            await RecvUntilKind(r1, ServerMessageKind.Welcome);
+            await RecvUntilKind(r2, ServerMessageKind.Welcome);
+
+            await Send(r1, new CommandDto { Kind = CommandKind.Rematch });
+            Check("rematch pends until both agree", await RecvUntilKind(r1, ServerMessageKind.RematchPending) != null);
+            await Send(r2, new CommandDto { Kind = CommandKind.Rematch });
+            var rw1 = await RecvUntilKind(r1, ServerMessageKind.Welcome);
+            var rw2 = await RecvUntilKind(r2, ServerMessageKind.Welcome);
+            Check("both agreeing starts a fresh match", rw1 != null && rw2 != null && rw1.Snapshot.TurnNumber == 1);
+
+            // --- Disconnect notifies the opponent ---
+            Console.WriteLine("Disconnect:");
+            var d1 = await Connect(url);
+            var d2 = await Connect(url);
+            await SendLobby(d1, LobbyRequestKind.QuickMatch);
+            await SendLobby(d2, LobbyRequestKind.QuickMatch);
+            await RecvUntilKind(d1, ServerMessageKind.Welcome);
+            await RecvUntilKind(d2, ServerMessageKind.Welcome);
+
+            d1.Abort(); // d1 drops mid-match
+            Check("opponent notified when a player disconnects", await RecvUntilKind(d2, ServerMessageKind.OpponentLeft) != null);
+
             cts.Cancel();
             try { await serverTask; } catch { }
 

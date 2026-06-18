@@ -45,6 +45,8 @@ namespace MetaDeck.Unity
         // Lobby
         public event Action<string> OnRoomCreated; // join code
         public event Action OnWaiting;              // queued for a match
+        public event Action OnRematchPending;       // you asked for a rematch; waiting on the opponent
+        public event Action OnOpponentLeft;         // opponent left/disconnected; you're back in the lobby
         // Match
         public event Action OnWelcome;
         public event Action<SnapshotDto> OnSnapshot;
@@ -113,6 +115,10 @@ namespace MetaDeck.Unity
         // ---- In-match commands ----
         public void Send(CommandDto dto) => SendJson(ProtocolJson.Serialize(dto));
 
+        // ---- Match-end controls (after GameOver) ----
+        public void Rematch() => Send(new CommandDto { Kind = CommandKind.Rematch });
+        public void LeaveMatch() => Send(new CommandDto { Kind = CommandKind.LeaveMatch });
+
         private async void SendJson(string json)
         {
             if (!IsConnected) { Debug.LogWarning("[Net] Not connected; message dropped."); return; }
@@ -164,6 +170,12 @@ namespace MetaDeck.Unity
                     break;
                 case ServerMessageKind.Waiting:
                     OnWaiting?.Invoke();
+                    break;
+                case ServerMessageKind.RematchPending:
+                    OnRematchPending?.Invoke();
+                    break;
+                case ServerMessageKind.OpponentLeft:
+                    OnOpponentLeft?.Invoke();
                     break;
                 case ServerMessageKind.Welcome:
                     LocalPlayer = msg.AssignedPlayer;

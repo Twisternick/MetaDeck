@@ -21,7 +21,11 @@ namespace MetaDeck.Protocol
         PassPriority,
         RespondQuickFromHand,
         EndTurn,
-        ActivateMonsterEffect
+        ActivateMonsterEffect,
+
+        // Match-session control (sent during/after a match, handled by the server, not the engine).
+        Rematch,
+        LeaveMatch
     }
 
     public enum TargetKind { None, Card, Player }
@@ -158,7 +162,7 @@ namespace MetaDeck.Protocol
 
     // ---------- Server -> client envelope ----------
 
-    public enum ServerMessageKind { Welcome, Snapshot, Event, Error, RoomCreated, Waiting }
+    public enum ServerMessageKind { Welcome, Snapshot, Event, Error, RoomCreated, Waiting, OpponentLeft, RematchPending }
 
     /// <summary>Everything the server sends a client is wrapped in this; only the relevant field is set.</summary>
     public sealed class ServerMessage
@@ -176,5 +180,7 @@ namespace MetaDeck.Protocol
         public static ServerMessage OfError(string msg) => new ServerMessage { Kind = ServerMessageKind.Error, Error = msg };
         public static ServerMessage RoomCreatedMsg(string code) => new ServerMessage { Kind = ServerMessageKind.RoomCreated, RoomCode = code };
         public static ServerMessage WaitingMsg() => new ServerMessage { Kind = ServerMessageKind.Waiting };
+        public static ServerMessage OpponentLeftMsg() => new ServerMessage { Kind = ServerMessageKind.OpponentLeft };
+        public static ServerMessage RematchPendingMsg() => new ServerMessage { Kind = ServerMessageKind.RematchPending };
     }
 }

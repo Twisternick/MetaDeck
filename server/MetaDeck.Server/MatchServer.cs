@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.WebSockets;
 using System.Threading;
@@ -72,7 +73,29 @@ namespace MetaDeck.Server
             finally
             {
                 ForgetInLobby(conn);
+                await DetachFromMatch(conn, notifyOpponent: true); // if mid-match, free the opponent
                 try { await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "bye", CancellationToken.None); } catch { }
+            }
+        }
+
+        /// <summary>Remove a connection from its match; optionally tell the opponent they're back in the lobby.</summary>
+        private static async Task DetachFromMatch(PlayerConn conn, bool notifyOpponent)
+        {
+            var match = conn.Match;
+            if (match == null) return;
+
+            conn.Match = null;
+            conn.WantsRematch = false;
+
+            foreach (var other in match.Conns)
+            {
+                if (other == conn || other.Match != match) continue;
+                other.Match = null;
+                other.WantsRematch = false;
+                if (notifyOpponent)
+                {
+                    try { await other.Send(ServerMessage.OpponentLeftMsg(), CancellationToken.None); } catch { }
+                }
             }
         }
 
@@ -193,6 +216,10 @@ namespace MetaDeck.Server
             catch { await conn.Send(ServerMessage.OfError("Malformed command."), ct); return; }
             if (dto == null) return;
 
+            // Match-session control is handled here, not by the engine.
+            if (dto.Kind == CommandKind.LeaveMatch) { await DetachFromMatch(conn, notifyOpponent: true); return; }
+            if (dto.Kind == CommandKind.Rematch) { await HandleRematch(conn, ct); return; }
+
             var match = conn.Match;
             List<EventDto> events;
             string error;
@@ -224,6 +251,37 @@ namespace MetaDeck.Server
             }
         }
 
+        private async Task HandleRematch(PlayerConn conn, CancellationToken ct)
+        {
+            var match = conn.Match;
+            if (match == null) return;
+
+            conn.WantsRematch = true;
+            if (!match.Conns.All(c => c.WantsRematch))
+            {
+                await conn.Send(ServerMessage.RematchPendingMsg(), ct); // waiting on the other player
+                return;
+            }
+
+            // Both agreed: rebuild a fresh match with the same players, sides, and deck selections.
+            var p1 = match.Conns.First(c => c.Player == PlayerId.P1);
+            var p2 = match.Conns.First(c => c.Player == PlayerId.P2);
+
+            await match.Gate.WaitAsync(ct);
+            try
+            {
+                match.Game = new ServerMatch(
+                    DeckService.Build(_catalog, p1.DeckCardIds, p1.Archetype, _deckSize, _rng),
+                    DeckService.Build(_catalog, p2.DeckCardIds, p2.Archetype, _deckSize, _rng),
+                    _hp, _hand, _bandwidth, _rng);
+                foreach (var c in match.Conns) c.WantsRematch = false;
+            }
+            finally { match.Gate.Release(); }
+
+            foreach (var c in match.Conns)
+                await c.Send(ServerMessage.Welcome(c.Player, match.Game.BuildSnapshot(c.Player)), ct);
+        }
+
         private static EventDto FilterForRecipient(EventDto e, PlayerId recipient)
         {
             if (e.Kind == EventKind.CardDrawn && e.Player != recipient)
@@ -241,6 +299,7 @@ namespace MetaDeck.Server
             public string RoomCode;
             public string[] DeckCardIds;
             public string Archetype;
+            public bool WantsRematch;
             private readonly SemaphoreSlim _sendLock = new(1, 1);
 
             public PlayerConn(WebSocket ws) => Ws = ws;
