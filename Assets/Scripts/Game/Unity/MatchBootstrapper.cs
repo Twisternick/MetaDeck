@@ -87,7 +87,10 @@ namespace MetaDeck.Unity
                 if (def == null) continue;
 
                 var instanceId = Guid.NewGuid().ToString("N");
-                var card = new CardInstance(instanceId, def, owner);
+                var card = new CardInstance(instanceId, def.ToCardDef(), owner);
+
+                // The engine uses the POCO (no art); register the sprite for the client to resolve by id.
+                MetaDeck.Presentation.CardArtRegistry.Register(def.cardId, def.artSprite);
 
                 index[card.InstanceId] = card;
 

@@ -1,0 +1,8 @@
+# .NET build artifacts for the standalone server/engine projects
+bin/
+obj/
+
+# The root Unity .gitignore ignores *.csproj / *.sln (those are auto-generated for the Unity
+# project). The server's project files are hand-authored and MUST be committed, so re-include them.
+!*.csproj
+!*.sln

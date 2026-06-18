@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Standalone build of the pure game engine, reusing the exact same source files Unity compiles
+    (linked from Assets/Scripts/Game). It targets netstandard2.1 + C# 9 to match Unity, so a green
+    build here is a guarantee the engine has zero Unity dependencies and can run on the dedicated
+    server. The authoring ScriptableObject (Data/CardDefinition.cs) and all MonoBehaviours are
+    intentionally excluded.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>MetaDeck.Engine</AssemblyName>
+    <RootNamespace>MetaDeck</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Pure logic layers (no Unity types). -->
+    <Compile Include="..\..\Assets\Scripts\Game\Core\**\*.cs" />
+    <Compile Include="..\..\Assets\Scripts\Game\Engine\**\*.cs" />
+    <Compile Include="..\..\Assets\Scripts\Game\Effects\**\*.cs" />
+    <Compile Include="..\..\Assets\Scripts\Game\Events\**\*.cs" />
+    <Compile Include="..\..\Assets\Scripts\Game\Rules\**\*.cs" />
+    <Compile Include="..\..\Assets\Scripts\Game\Mutations\**\*.cs" />
+    <Compile Include="..\..\Assets\Scripts\Game\Registry\**\*.cs" />
+    <Compile Include="..\..\Assets\Scripts\Game\Keywords\**\*.cs" />
+    <Compile Include="..\..\Assets\Scripts\Game\Hooks\**\*.cs" />
+
+    <!-- Pure data POCOs only (NOT the CardDefinition ScriptableObject). -->
+    <Compile Include="..\..\Assets\Scripts\Game\Data\CardDef.cs" />
+    <Compile Include="..\..\Assets\Scripts\Game\Data\EffectDefinition.cs" />
+
+    <!-- Pure rules query helper the engine depends on (EffectRunner ctor); lives under UI/ today. -->
+    <Compile Include="..\..\Assets\Scripts\Game\UI\Core\RulesQueryService.cs" />
+  </ItemGroup>
+
+</Project>

@@ -7,7 +7,7 @@ namespace MetaDeck.Core
     public sealed class CardInstance
     {
         public string InstanceId { get; } // unique per match (guid string recommended)
-        public CardDefinition Def { get; }
+        public CardDef Def { get; }
         public PlayerId Owner { get; }
 
         public Zone Zone { get; set; }
@@ -57,7 +57,7 @@ namespace MetaDeck.Core
 
         public int SummonedTurn { get; set; } = -1; // for tracking summon sickness, etc.
 
-        public CardInstance(string instanceId, CardDefinition def, PlayerId owner)
+        public CardInstance(string instanceId, CardDef def, PlayerId owner)
         {
             InstanceId = instanceId;
             Def = def;

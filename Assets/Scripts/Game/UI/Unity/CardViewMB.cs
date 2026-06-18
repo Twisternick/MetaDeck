@@ -38,7 +38,7 @@ public sealed class CardViewMB : MonoBehaviour, IPointerClickHandler, IBeginDrag
         SetHighlight(false);
     }
 
-    public void Bind(CardInstance id, string cardName, int cost, int atk, int hp, int baseHp, HashSet<MetaDeck.Rules.Keyword> description, CardDefinition def)
+    public void Bind(CardInstance id, string cardName, int cost, int atk, int hp, int baseHp, HashSet<MetaDeck.Rules.Keyword> description, CardDef def)
     {
         InstanceId = id;
         nameText.text = cardName;

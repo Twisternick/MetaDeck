@@ -13,7 +13,7 @@ namespace MetaDeck.UI
     public static class EffectText
     {
         // Main entrypoint
-        public static string BuildCardText(CardDefinition def)
+        public static string BuildCardText(CardDef def)
         {
             if (def.effects == null || def.effects.Length == 0) return string.Empty;
 
@@ -30,7 +30,7 @@ namespace MetaDeck.UI
         }
 
         // Registry from effect type => formatter
-        private static readonly Dictionary<EffectType, Func<CardDefinition, EffectDefinition, string>> _formatters
+        private static readonly Dictionary<EffectType, Func<CardDef, EffectDefinition, string>> _formatters
             = new()
             {
                 { EffectType.Draw, (card, e) => $"Draw {Plural(e.amount, "card")}." },
@@ -121,7 +121,7 @@ namespace MetaDeck.UI
                 },
             };
 
-        public static string ToRulesLine(CardDefinition card, EffectDefinition e)
+        public static string ToRulesLine(CardDef card, EffectDefinition e)
         {
             // Unknown effect => fallback
             if (!_formatters.TryGetValue(e.effectType, out var fn))
@@ -130,14 +130,14 @@ namespace MetaDeck.UI
             return fn(card, e);
         }
 
-        private static string Fallback(CardDefinition card, EffectDefinition e)
+        private static string Fallback(CardDef card, EffectDefinition e)
         {
             // Debug-friendly fallback so you can ship while still adding nice text later
             var kw = e.keyword != Keyword.None ? $", keyword={e.keyword}" : "";
             return $"[{e.effectType} amount={e.amount}, target={e.targeting}, cond={e.condition}{kw}]";
         }
 
-        private static string Target(SimpleTargeting t, CardDefinition card)
+        private static string Target(SimpleTargeting t, CardDef card)
         {
             // You mentioned Self — if your targeting enum doesn't include Self,
             // you can still display "this" by using FriendlyMonster + null target selection at runtime.

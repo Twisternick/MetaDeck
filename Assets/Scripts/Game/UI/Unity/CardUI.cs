@@ -31,7 +31,7 @@ namespace MetaDeck.Presentation
 
             descriptionText.text = (card.Keywords.Count == 1 && card.Keywords.Contains(MetaDeck.Rules.Keyword.None)) ? "" : "<b>" + string.Join(", ", card.Keywords) + "</b>" + "\n" + MetaDeck.UI.EffectText.BuildCardText(card.Def);
 
-            if (artImage != null) artImage.sprite = card.Def.artSprite;
+            if (artImage != null) artImage.sprite = CardArtRegistry.Resolve(card.Def.cardId);
             if (card.Def.type == CardType.Monster)
             {
                 attackContainer.SetActive(true);
