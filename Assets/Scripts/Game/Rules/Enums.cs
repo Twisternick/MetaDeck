@@ -44,10 +44,12 @@ namespace MetaDeck.Rules
         District,
         Tax,
         Populate,
-        Overtake,       // Racing: gain Nitro on attacking & surviving
         Topdeck,
         Errata,
-        Copy
+        Copy,
+        // NOTE: append new keywords below this line ONLY. These are serialized by integer index in the
+        // card .asset files; inserting mid-list silently remaps existing cards to the wrong keyword.
+        Overtake        // Racing: gain Nitro on attacking & surviving
     }
 
     public enum SpeedWindow
@@ -75,10 +77,8 @@ namespace MetaDeck.Rules
         RevealOpponentHand,
 
         GainNitro,
-        Generate,            // gain temporary Bandwidth this turn
         SpendNitroForBuff,
         GainXPCounter,
-        Equip,               // permanently attach +X/+X and an optional keyword to a friendly monster
         Heal,
         BuffAllFriendlyMonsters,
         DiscardRandom,
@@ -88,7 +88,11 @@ namespace MetaDeck.Rules
         ReturnFromGraveyardToHand,
         ShuffleGraveyardIntoDeck,
         SwapBoardPositions,
-        PreventCombatDamageThisCombat
+        PreventCombatDamageThisCombat,
+        // NOTE: append new effect types below this line ONLY. These are serialized by integer index in
+        // the card .asset files; inserting mid-list silently remaps existing cards to the wrong effect.
+        Generate,            // gain temporary Bandwidth this turn
+        Equip                // permanently attach +X/+X and an optional keyword to a friendly monster
     }
 
     public enum SimpleTargeting
