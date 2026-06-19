@@ -29,5 +29,8 @@ namespace MetaDeck.Presentation
 
         public static int Count => _defs.Count;
         public static void Clear() => _defs.Clear();
+
+        /// <summary>All registered cards, for UI like the deck builder. Order is registration order.</summary>
+        public static IEnumerable<CardDefinition> All => _defs.Values;
     }
 }

@@ -55,6 +55,8 @@ namespace MetaDeck.Unity
 
         private ClientWebSocket _ws;
         private CancellationTokenSource _cts;
+        private LobbyRequestKind? _pendingLobbyKind; // lobby action to fire once a deferred connect lands
+        private string _pendingLobbyCode;
         private readonly ConcurrentQueue<ServerMessage> _inbox = new();
         private readonly SemaphoreSlim _sendLock = new(1, 1);
 
@@ -78,7 +80,15 @@ namespace MetaDeck.Unity
                     _ws = ws;
                     _ = ReceiveLoop(_cts.Token);
                     Debug.Log($"[Net] Connected to {serverUrl}");
-                    if (autoQuickMatch) QuickMatch();
+
+                    // A lobby action requested while disconnected fires now; otherwise optional auto-match.
+                    if (_pendingLobbyKind.HasValue)
+                    {
+                        SendLobby(_pendingLobbyKind.Value, _pendingLobbyCode);
+                        _pendingLobbyKind = null;
+                        _pendingLobbyCode = null;
+                    }
+                    else if (autoQuickMatch) QuickMatch();
                     return;
                 }
                 catch (OperationCanceledException) { ws.Dispose(); return; } // shutting down
@@ -97,11 +107,24 @@ namespace MetaDeck.Unity
             OnError?.Invoke("Could not connect to server.");
         }
 
-        // ---- Lobby ---- (each carries the currently-selected deck/archetype)
-        public void QuickMatch() => SendLobby(LobbyRequestKind.QuickMatch);
-        public void CreateRoom() => SendLobby(LobbyRequestKind.CreateRoom);
-        public void JoinRoom(string code) => SendLobby(LobbyRequestKind.JoinRoom, code);
+        // ---- Lobby ---- (each carries the currently-selected deck/archetype). These connect on demand:
+        // you can build a deck offline and only hit the server when you actually look for a match.
+        public void QuickMatch() => EnterLobby(LobbyRequestKind.QuickMatch);
+        public void CreateRoom() => EnterLobby(LobbyRequestKind.CreateRoom);
+        public void JoinRoom(string code) => EnterLobby(LobbyRequestKind.JoinRoom, code);
         public void CancelLobby() => SendJson(ProtocolJson.Serialize(new LobbyRequest { Kind = LobbyRequestKind.Cancel }));
+
+        /// <summary>
+        /// Send a lobby request, connecting first if needed. If not yet connected, the request is queued
+        /// and sent automatically once the connection lands (see Connect()).
+        /// </summary>
+        public void EnterLobby(LobbyRequestKind kind, string code = null)
+        {
+            if (IsConnected) { SendLobby(kind, code); return; }
+            _pendingLobbyKind = kind;
+            _pendingLobbyCode = code;
+            Connect();
+        }
 
         private void SendLobby(LobbyRequestKind kind, string code = null)
             => SendJson(ProtocolJson.Serialize(new LobbyRequest

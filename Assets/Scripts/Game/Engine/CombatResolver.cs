@@ -19,8 +19,9 @@ namespace MetaDeck.Engine
             }
             else
             {
-                bool aFS = attacker.HasKeyword(Keyword.FirstStrike);
-                bool dFS = defender.HasKeyword(Keyword.FirstStrike);
+                // First Strike applies only to a monster's FIRST combat each round, not every encounter.
+                bool aFS = HasFirstStrike(attacker, state);
+                bool dFS = HasFirstStrike(defender, state);
 
                 if (aFS && !dFS)
                 {
@@ -40,6 +41,10 @@ namespace MetaDeck.Engine
                     Deal(attacker, defender, aDmg, bus);
                     Deal(defender, attacker, dDmg, bus);
                 }
+
+                // Both combatants have now had a combat this round, so their First Strike is spent.
+                MarkFirstStrikeUsed(attacker, state);
+                MarkFirstStrikeUsed(defender, state);
             }
 
             // Combat-outcome keywords (from the attacker's perspective).
@@ -77,6 +82,20 @@ namespace MetaDeck.Engine
             attacker.Counters[CombatRules.DoubleJumpTurnKey] = state.TurnNumber;
             attacker.AttacksUsedThisTurn++;                    // once-per-turn attack limit
             state.GetPlayer(attacker.Owner).AttacksThisTurn++; // Momentum
+        }
+
+        // First Strike is a once-per-round benefit per monster (resets when TurnNumber changes), so a
+        // monster only strikes first in its first combat each round — not in every encounter.
+        private const string FirstStrikeUsedTurnKey = "FirstStrikeUsedTurn";
+
+        private static bool HasFirstStrike(CardInstance m, GameState state)
+            => m.HasKeyword(Keyword.FirstStrike)
+               && !(m.Counters.TryGetValue(FirstStrikeUsedTurnKey, out var t) && t == state.TurnNumber);
+
+        private static void MarkFirstStrikeUsed(CardInstance m, GameState state)
+        {
+            if (m.HasKeyword(Keyword.FirstStrike))
+                m.Counters[FirstStrikeUsedTurnKey] = state.TurnNumber;
         }
 
         private static bool IsDamaged(CardInstance c)

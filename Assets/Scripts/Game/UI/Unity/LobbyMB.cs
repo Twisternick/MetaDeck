@@ -1,5 +1,6 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.UI;
 
 namespace MetaDeck.Unity
@@ -19,8 +20,13 @@ namespace MetaDeck.Unity
         [SerializeField] private Button quickMatchButton;
         [SerializeField] private Button createRoomButton;
         [SerializeField] private Button joinRoomButton;
+        [SerializeField] private Button backButton;           // leaves matchmaking, returns to menu
         [SerializeField] private TMP_InputField joinCodeInput;
         [SerializeField] private TMP_Text statusText;
+
+        [Header("Events")]
+        [Tooltip("Raised when Back is pressed — wire to MainMenuMB.ShowMainMenu.")]
+        public UnityEvent onBack;
 
         private void Awake()
         {
@@ -39,6 +45,7 @@ namespace MetaDeck.Unity
             if (quickMatchButton != null) quickMatchButton.onClick.AddListener(QuickMatch);
             if (createRoomButton != null) createRoomButton.onClick.AddListener(CreateRoom);
             if (joinRoomButton != null) joinRoomButton.onClick.AddListener(JoinRoom);
+            if (backButton != null) backButton.onClick.AddListener(Back);
 
             if (lobbyPanel != null) lobbyPanel.SetActive(true);
             SetStatus("Choose a match type.");
@@ -56,6 +63,14 @@ namespace MetaDeck.Unity
             if (quickMatchButton != null) quickMatchButton.onClick.RemoveListener(QuickMatch);
             if (createRoomButton != null) createRoomButton.onClick.RemoveListener(CreateRoom);
             if (joinRoomButton != null) joinRoomButton.onClick.RemoveListener(JoinRoom);
+            if (backButton != null) backButton.onClick.RemoveListener(Back);
+        }
+
+        // Leave the matchmaking queue / cancel any pending lobby request, then return to the menu.
+        private void Back()
+        {
+            netClient?.CancelLobby();
+            onBack?.Invoke();
         }
 
         private void QuickMatch() { netClient?.QuickMatch(); SetStatus("Searching for an opponent…"); }

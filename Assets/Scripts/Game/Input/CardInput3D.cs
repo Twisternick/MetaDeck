@@ -22,6 +22,11 @@ public sealed class CardInput3D : MonoBehaviour
     [Header("Drag Plane")]
     [SerializeField] private Vector3 planeNormal = default; // if zero -> Vector3.up
 
+    [Header("Drag vs. Click")]
+    [Tooltip("Pointer must move at least this many screen pixels before a release counts as a play/" +
+             "summon/attack. A release under this is treated as a click (e.g. to read a card) and casts nothing.")]
+    [SerializeField] private float dragThresholdPixels = 40f;
+
     [SerializeField] private GameCommandFacadeMB commandFacade;
     [SerializeField] private MetaDeckNetClientMB netClient;
     [Tooltip("Fallback local player id if no net client is present.")]
@@ -34,6 +39,7 @@ public sealed class CardInput3D : MonoBehaviour
     private Plane _dragPlane;
     private Vector3 _grabOffset;
     private Quaternion _dragFacingRot;
+    private Vector2 _pressScreenPos; // pointer position when the drag was picked, to tell a click from a drag
 
     private void Awake()
     {
@@ -118,6 +124,7 @@ public sealed class CardInput3D : MonoBehaviour
 
         _dragCard = card;
         _dragVisual = visual;
+        _pressScreenPos = point.action.ReadValue<Vector2>();
 
         _dragPlane = new Plane(planeNormal, _dragCard.transform.position);
         _grabOffset = TryGetPointerOnPlane(out var planePoint) ? _dragCard.transform.position - planePoint : Vector3.zero;
@@ -133,10 +140,17 @@ public sealed class CardInput3D : MonoBehaviour
     {
         if (_dragCard == null) return;
 
-        var ray = cam.ScreenPointToRay(point.action.ReadValue<Vector2>());
+        var releaseScreenPos = point.action.ReadValue<Vector2>();
+        var ray = cam.ScreenPointToRay(releaseScreenPos);
 
-        if (_attacking) HandleAttackDrop(ray);
-        else HandleSummonOrPlayDrop(ray);
+        // A release that barely moved is a click (e.g. tapping a card to read it), not a play. Only
+        // commit an attack/summon/cast once the pointer has been dragged past the threshold.
+        bool wasDragged = Vector2.Distance(releaseScreenPos, _pressScreenPos) >= dragThresholdPixels;
+        if (wasDragged)
+        {
+            if (_attacking) HandleAttackDrop(ray);
+            else HandleSummonOrPlayDrop(ray);
+        }
 
         _dragVisual.CancelDrag();
         _dragCard.IsDragging = false;

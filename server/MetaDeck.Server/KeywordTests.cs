@@ -81,6 +81,24 @@ namespace MetaDeck.Server
                 Check("FirstStrike kills before retaliation", def.IsDestroyed && !fs.IsDestroyed);
             }
 
+            // --- FirstStrike is once per round, not every encounter ---
+            {
+                var z = new Arena(); // TurnNumber starts at 1
+                var fsDef = z.Place(PlayerId.P2, 0, 2, 2, Keyword.FirstStrike); // defender with First Strike
+                var a1 = z.Place(PlayerId.P1, 0, 1, 2);
+                var a2 = z.Place(PlayerId.P1, 1, 1, 2);
+
+                // First encounter this round: defender strikes first, kills a1 before it can retaliate.
+                z.Combat.ResolveAttack(z.State, a1, fsDef, z.Bus);
+                Check("FirstStrike defender takes no damage on its first encounter",
+                    fsDef.GetHealth() == 2 && a1.IsDestroyed, $"hp={fsDef.GetHealth()}");
+
+                // Second encounter same round: First Strike already spent, so combat is simultaneous.
+                z.Combat.ResolveAttack(z.State, a2, fsDef, z.Bus);
+                Check("FirstStrike does NOT re-trigger on a later encounter the same round",
+                    fsDef.GetHealth() == 1 && a2.IsDestroyed, $"hp={fsDef.GetHealth()}");
+            }
+
             // --- Fortify (damage pipeline) ---
             {
                 var z = new Arena();
@@ -273,6 +291,22 @@ namespace MetaDeck.Server
                 fx.Resolve(z.Ctx(equipper, host));
                 Check("Equip grants +2/+2 and the keyword",
                     host.GetAttack() == 4 && host.GetMaxHealth() == 4 && host.HasKeyword(Keyword.Rush));
+            }
+
+            // --- DoubleJump actually lands face damage through the full declare->resolve flow ---
+            // (Regression: CanAttackFace allowed it, but ResolvePendingAction re-checked raw HasGuard
+            //  and silently dropped the attack — so it passed unit checks yet failed in real games.)
+            {
+                var z = new Arena();
+                var dj = z.Place(PlayerId.P1, 0, 3, 3, Keyword.DoubleJump);
+                z.Place(PlayerId.P2, 0, 1, 3, Keyword.Guard); // opponent has a Guard up
+                var engine = new GameEngine(z.State, z.Bus);
+                var flow = new GameFlowStateMachine(engine, z.Bus);
+                int faceBefore = z.State.GetPlayer(PlayerId.P2).Hp;
+                flow.DeclareFaceAttack(dj); // opponent holds no Quick card -> resolves immediately
+                Check("DoubleJump deals face damage past a Guard (full flow)",
+                    z.State.GetPlayer(PlayerId.P2).Hp == faceBefore - dj.GetAttack(),
+                    $"hp={z.State.GetPlayer(PlayerId.P2).Hp} (expected {faceBefore - dj.GetAttack()})");
             }
 
             // --- Once-per-turn attack limit ---

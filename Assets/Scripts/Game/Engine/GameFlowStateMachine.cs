@@ -268,8 +268,11 @@ namespace MetaDeck.Engine
 
                 if (_pending.DefenderPlayer.HasValue)
                 {
-                    // Face attack — re-check Guard in case a Guard entered play during the chain.
-                    if (CombatRules.HasGuard(state, _pending.DefenderPlayer.Value)) return;
+                    // Face attack — re-check Guard in case a Guard entered play during the chain, but
+                    // honor a DoubleJump attacker's once-per-turn Guard bypass (matches CanAttackFace,
+                    // which is what BeginAttackCommand validated against when accepting this attack).
+                    if (CombatRules.HasGuard(state, _pending.DefenderPlayer.Value)
+                        && !CombatRules.CanBypassGuard(state, attacker)) return;
                     _engine.Combat.ResolveFaceAttack(state, attacker, _pending.DefenderPlayer.Value, _bus);
                 }
                 else
