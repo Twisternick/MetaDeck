@@ -1,4 +1,4 @@
-import { M, S, fx, QUICK, NEW } from '../helpers.js';
+import { M, S, fx, QUICK, NEW, QUICK_NEW } from '../helpers.js';
 
 export default {
   id: 'Horror',
@@ -10,6 +10,7 @@ export default {
     M('HOR_M01_PanickedCivilian', 'Panicked Civilian', 1, 1, 2, ['Fear']),
     M('HOR_M02_PossessedVermin', 'Possessed Vermin', 1, 2, 1, ['Fear']),
     M('HOR_M03_GraveWhisperer', 'Grave Whisperer', 1, 1, 2, ['Haunt']),
+    M('HOR_M19_PlagueRat', 'Plague Rat', 1, 2, 1, [], [fx('SummonToken', 1, 'None', { token: 'token_ghoul', trigger: 'death' })], NEW),
     M('HOR_M04_InfectedHost', 'Infected Host', 2, 2, 3, ['Fear']),
     M('HOR_M05_LoneSurvivor', 'Lone Survivor', 2, 2, 2, ['Checkpoint']),
     M('HOR_M06_ShadowStalker', 'Shadow Stalker', 2, 3, 2, ['Stealth']),
@@ -18,12 +19,18 @@ export default {
     M('HOR_M09_RelentlessPursuer', 'Relentless Pursuer', 3, 3, 3, ['Fear', 'Checkpoint']),
     M('HOR_M10_CultDevourer', 'Cult Devourer', 3, 3, 3, ['Devour']),
     M('HOR_M16_BoneCollector', 'Bone Collector', 3, 2, 3, [], [fx('Buff', 1, 'Self', { trigger: 'allyDeath' })], NEW),
+    M('HOR_M20_Banshee', 'Banshee', 3, 3, 2, ['Stealth', 'Haunt'], [], NEW),
+    M('HOR_M21_SeanceMedium', 'Seance Medium', 3, 2, 3, [], [fx('Draw', 1, 'None', { trigger: 'allyDeath' })], NEW),
     M('HOR_M11_LastBulletGuard', 'Last Bullet Guard', 4, 3, 6, ['Guard']),
     M('HOR_M12_NightmareManifest', 'Nightmare Manifest', 4, 5, 5, ['Fear']),
     M('HOR_M17_CryptHorde', 'Crypt Horde', 4, 3, 3, [], [fx('SummonToken', 2, 'None', { token: 'token_ghoul' })], NEW),
+    M('HOR_M22_AsylumWarden', 'Asylum Warden', 4, 2, 6, ['Guard', 'Fear'], [], NEW),
+    M('HOR_M23_ReanimatedHulk', 'Reanimated Hulk', 4, 4, 3, ['Fear', 'Checkpoint'], [], NEW),
     M('HOR_M13_EldritchAbomination', 'Eldritch Abomination', 5, 5, 5, ['Devour']),
     M('HOR_M14_HauntedTitan', 'Haunted Titan', 5, 4, 6, ['Haunt'], [fx('SummonToken', 1, 'None', { token: 'token_ghoul', trigger: 'death' })]),
+    M('HOR_M24_Necromancer', 'Necromancer', 5, 3, 4, [], [fx('Revive')], NEW),
     M('HOR_M18_FogLurker', 'Fog Lurker', 6, 5, 6, ['Stealth', 'Haunt'], [], NEW),
+    M('HOR_M25_ThingInTheWalls', 'Thing in the Walls', 6, 6, 5, ['Stealth', 'Devour'], [], NEW),
     M('HOR_M15_ApexNightmare', 'Apex Nightmare', 7, 7, 8, ['Fear', 'Devour']),
 
     S('HOR_S11_BloodPact', 'Blood Pact', 1, [fx('Destroy', 0, 'FriendlyMonster'), fx('Draw', 2)], NEW),
@@ -34,9 +41,12 @@ export default {
     S('HOR_S05_BloodTrail', 'Blood Trail', 1, [fx('ReturnFromGraveyardToHand')]),
     S('HOR_S06_Panic', 'Panic', 2, [fx('Silence', 0, 'EnemyMonster')], QUICK),
     S('HOR_S07_CursedRelic', 'Cursed Relic', 2, [fx('Buff', 1, 'FriendlyMonster'), fx('GrantKeyword', 0, 'FriendlyMonster', { keyword: 'Haunt' })]),
+    S('HOR_S13_CreepingDread', 'Creeping Dread', 1, [fx('DebuffAttack', 2, 'AllEnemyMonsters')], QUICK_NEW),
     S('HOR_S08_EmergencyHeal', 'Emergency Heal', 3, [fx('Heal', 6, 'FriendlyPlayer')]),
     S('HOR_S09_GraveCall', 'Grave Call', 3, [fx('Revive')]),
+    S('HOR_S14_SummoningCircle', 'Summoning Circle', 3, [fx('SummonToken', 3, 'None', { token: 'token_ghoul' })], NEW),
     S('HOR_S12_LightsOut', 'Lights Out', 4, [fx('DealDamage', 1, 'AllEnemyMonsters'), fx('GrantKeyword', 0, 'AllFriendlyMonsters', { keyword: 'Fear' })], NEW),
+    S('HOR_S15_FinalGirl', 'Final Girl', 4, [fx('DealDamage', 3, 'EnemyMonster'), fx('Heal', 4, 'FriendlyPlayer')], NEW),
     S('HOR_S10_NightFalls', 'Night Falls', 5, [fx('DealDamage', 2, 'AllEnemyMonsters'), fx('DealDamage', 3, 'EnemyPlayer')]),
   ],
 };

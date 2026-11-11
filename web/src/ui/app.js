@@ -1,14 +1,17 @@
 // App shell: main menu (deck picker), card gallery, rules, and the match screen.
 
 import { h, storage } from './dom.js';
-import { renderCard } from './card-view.js';
+import { renderCard, renderPreview, glossaryFor } from './card-view.js';
 import { startMatch } from './match.js';
+import { deckBuilder } from './deck-builder.js';
+import { decksFor, resolveDeck, randomStarter, isPlayable } from './deck-store.js';
 import { installTilt, installRipples, artSlot, deckArtUrls, removeFx } from './fx.js';
-import { DECKS, CARDS } from '../data/index.js';
+import { DECKS, CARDS, DECK_SIZE } from '../data/index.js';
 import { KEYWORDS, TERMS, START_HP, BOARD_SLOTS, MAX_HAND, OPENING_HAND } from '../engine/constants.js';
 
 const root = document.getElementById('app');
 const prefs = storage.get('metadeck.prefs', { myDeck: 'FPS', oppDeck: 'random' });
+prefs.lists ??= {}; // archetype id -> key of the deck list last picked for it
 const savePrefs = () => storage.set('metadeck.prefs', prefs);
 
 installTilt();
@@ -25,8 +28,11 @@ function menu() {
   };
   const play = (spectate = false) => {
     const opp = pickOpponent();
+    const mine = resolveDeck(prefs.myDeck, prefs.lists[prefs.myDeck]);
+    const theirs = randomStarter(opp);
     const launch = () => startMatch(root, {
       myDeck: prefs.myDeck, oppDeck: opp, spectate,
+      myCards: mine.cards, oppCards: theirs.cards,
       onExit: menu,
       onRematch: launch,
     });
@@ -43,16 +49,49 @@ function menu() {
       h('span', { class: 'deck-name' }, deck.name),
       h('span', { class: 'deck-tag' }, deck.tagline)));
 
-  const vsSide = (deck, label, right) => h('div', { class: `vs-side${right ? ' right' : ''}`, style: { '--deck': deck ? deck.color : '#888' } },
+  const build = (deck = null) => deckBuilder(root, {
+    archetype: prefs.myDeck, deck,
+    onBack: menu,
+    onPlay: saved => { prefs.lists[prefs.myDeck] = saved.key; savePrefs(); menu(); play(false); },
+  });
+
+  // One deck list: a starter or a custom deck. Unfinished custom decks open in the builder instead.
+  const listTile = (deck, i, selected) => {
+    const playable = isPlayable(deck);
+    const select = () => {
+      if (!playable) return build(deck);
+      prefs.lists[prefs.myDeck] = deck.key;
+      savePrefs();
+      render(false);
+    };
+    return h('div', {
+      class: `list-tile${selected ? ' selected' : ''}${playable ? '' : ' draft'}${i ? ' rise' : ''}`, style: { '--i': i },
+      role: 'button', tabindex: '0', 'aria-pressed': selected ? 'true' : 'false', onclick: select,
+      onkeydown: e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); select(); } },
+    },
+      h('span', { class: 'list-kind' }, deck.starter ? 'Starter' : playable ? 'Custom' : `Draft · ${deck.cards.length}/${DECK_SIZE}`),
+      h('span', { class: 'list-name' }, deck.name),
+      h('span', { class: 'list-blurb' }, deck.starter ? deck.blurb : `${deck.cards.length} cards`),
+      h('button', {
+        class: 'btn ghost small list-edit', onclick: e => { e.stopPropagation(); build(deck); },
+      }, deck.starter ? 'Copy & edit' : 'Edit'));
+  };
+
+  const vsSide = (deck, label, right, listName) => h('div', { class: `vs-side${right ? ' right' : ''}`, style: { '--deck': deck ? deck.color : '#888' } },
     right ? null : artSlot('', deck ? deckArtUrls(deck.id) : [], deck ? deck.icon : '🎲'),
     h('div', null,
       h('div', { class: 'vs-sub' }, label),
-      h('div', { class: 'vs-name' }, deck ? deck.name : 'Random deck')),
+      h('div', { class: 'vs-name' }, deck ? deck.name : 'Random deck'),
+      listName ? h('div', { class: 'vs-list' }, listName) : null),
     right ? artSlot('', deck ? deckArtUrls(deck.id) : [], deck ? deck.icon : '🎲') : null);
 
+  let listsShownFor = null; // deal the list tiles in again only when the archetype changes
   const render = (animate = true) => {
     const mine = DECKS.find(d => d.id === prefs.myDeck);
     const opp = prefs.oppDeck === 'random' ? null : DECKS.find(d => d.id === prefs.oppDeck);
+    const myList = resolveDeck(mine.id, prefs.lists[mine.id]);
+    const dealLists = !animate && listsShownFor !== mine.id;
+    listsShownFor = mine.id;
     root.replaceChildren(h('main', { class: 'menu' },
       h('header', { class: `menu-head${animate ? ' rise' : ''}` },
         h('div', { class: 'logo-kicker' }, 'Every deck is a genre'),
@@ -66,6 +105,14 @@ function menu() {
           savePrefs();
           render(false);
         })))),
+      h('section', { class: animate ? 'rise' : '', style: { '--i': 11 } },
+        h('h2', null, `${mine.name} deck list`),
+        h('div', { class: 'list-grid', style: { '--deck': mine.color } },
+          decksFor(mine.id).map((d, i) => listTile(d, dealLists ? i + 1 : 0, d.key === myList.key)),
+          h('button', { class: 'list-tile new', onclick: () => build() },
+            h('span', { class: 'list-plus', 'aria-hidden': 'true' }, '+'),
+            h('span', { class: 'list-name' }, 'New deck'),
+            h('span', { class: 'list-blurb' }, `Build your own from the ${mine.name} cards`)))),
       h('section', { class: animate ? 'rise' : '', style: { '--i': 12 } },
         h('h2', null, 'Opponent'),
         h('div', { class: 'chips' },
@@ -76,7 +123,7 @@ function menu() {
             onclick: () => { prefs.oppDeck = d.id; savePrefs(); render(false); },
           }, emblem(d), d.name)))),
       h('div', { class: `vs-strip${animate ? ' rise' : ''}`, style: { '--i': 13 } },
-        vsSide(mine, 'You', false),
+        vsSide(mine, 'You', false, myList.name),
         h('div', { class: 'vs-badge' }, 'VS'),
         vsSide(opp, 'Opponent', true)),
       h('div', { class: `menu-actions${animate ? ' rise' : ''}`, style: { '--i': 14 } },
@@ -98,6 +145,8 @@ function gallery(deckId, newOnly = false) {
   const maxCurve = Math.max(...curve);
   const monsters = deck.cards.filter(c => c.type === 'Monster').length;
   const newCount = deck.cards.filter(c => c.isNew).length;
+  const deckKeywords = [...new Map(deck.cards.flatMap(c => glossaryFor(CARDS[c.cardId])).map(e => [e[0], e])).values()]
+    .sort((a, b) => a[0].localeCompare(b[0]));
 
   root.replaceChildren(h('main', { class: 'gallery', style: { '--deck': deck.color } },
     h('header', { class: 'page-head' },
@@ -119,8 +168,27 @@ function gallery(deckId, newOnly = false) {
         h('span', { class: 'curve-n' }, n || ''),
         h('div', { class: 'curve-bar', style: { height: `${maxCurve ? (n / maxCurve) * 100 : 0}%`, '--i': cost } }),
         h('span', { class: 'curve-cost' }, cost === 7 ? '7+' : cost))))),
-    h('div', { class: 'card-grid' }, cards.map((c, i) => renderCard(c, { classes: 'rise', attrs: { style: `--i:${Math.min(i, 24)}; --deck:${deck.color}` } }))),
+    deckKeywords.length ? h('details', { class: 'deck-keywords rise', open: storage.get('metadeck.kwOpen', true) || null,
+      ontoggle: e => storage.set('metadeck.kwOpen', e.target.open) },
+      h('summary', null, `Keywords in this deck (${deckKeywords.length})`),
+      h('dl', { class: 'glossary' }, deckKeywords.map(([t, d]) => [h('dt', null, t), h('dd', null, d)]))) : null,
+    h('p', { class: 'muted gallery-hint' }, 'Click a card to see what its keywords mean.'),
+    h('div', { class: 'card-grid' }, cards.map((c, i) => renderCard(c, {
+      classes: 'rise', onclick: () => zoomCard(c),
+      attrs: { style: `--i:${Math.min(i, 24)}; --deck:${deck.color}`, role: 'button', tabindex: '0',
+        onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); zoomCard(c); } } },
+    }))),
   ));
+}
+
+// Gallery zoom: the card, large, with a glossary of everything it mentions. Click or Esc closes.
+function zoomCard(def) {
+  const close = () => { overlay.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = e => { if (e.key === 'Escape') close(); };
+  const overlay = h('div', { class: 'zoom gallery-zoom', role: 'dialog', 'aria-label': def.displayName, onclick: close },
+    h('div', { class: 'zoom-inner' }, renderPreview(null, def)));
+  document.addEventListener('keydown', onKey);
+  document.body.append(overlay);
 }
 
 function rules() {

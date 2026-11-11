@@ -5,7 +5,7 @@ import {
   effectiveCost, findMonster, hasKeyword, decisionPlayer,
 } from '../src/engine/game.js';
 import { chooseAction } from '../src/engine/ai.js';
-import { DECKS, CARDS, deckList } from '../src/data/index.js';
+import { DECKS, CARDS, deckList, starterDecks, deckErrors, DECK_SIZE, MAX_COPIES } from '../src/data/index.js';
 import { rulesText } from '../src/engine/text.js';
 import { CHOSEN_TARGETINGS } from '../src/engine/constants.js';
 
@@ -23,11 +23,11 @@ function setup() {
 const ready = m => { m.summonedTurn = 0; return m; };
 const ok = res => assert.ok(res.ok, res.reason);
 
-test('every deck has exactly 30 unique, valid cards', () => {
+test('every deck has exactly 40 unique, valid cards', () => {
   assert.equal(DECKS.length, 10);
   for (const deck of DECKS) {
-    assert.equal(deck.cards.length, 30, deck.id);
-    assert.equal(new Set(deck.cards.map(c => c.cardId)).size, 30, deck.id);
+    assert.equal(deck.cards.length, 40, deck.id);
+    assert.equal(new Set(deck.cards.map(c => c.cardId)).size, 40, deck.id);
     for (const c of deck.cards) {
       assert.ok(!rulesText(c).includes('['), `${c.cardId} has unformatted text: ${rulesText(c)}`);
       const chosen = c.effects.filter(e => (e.trigger || 'play') === 'play' && CHOSEN_TARGETINGS.has(e.targeting));
@@ -188,4 +188,34 @@ test('AI plays complete games between every deck using only legal actions', () =
     while (!s.over && steps++ < 3000) ok(applyAction(s, chooseAction(s)));
     assert.ok(s.over, `${a} vs ${b} finished`);
   }
+});
+
+test('every archetype has three legal, distinct starter decks', () => {
+  for (const deck of DECKS) {
+    const starters = starterDecks(deck.id);
+    assert.equal(starters.length, 3, deck.id);
+    for (const st of starters) assert.deepEqual(deckErrors(deck.id, st.cards), [], `${deck.id} ${st.name}`);
+    const lists = starters.map(st => [...st.cards].sort().join());
+    assert.equal(new Set(lists).size, 3, `${deck.id} starters differ`);
+  }
+});
+
+test('deck rules: size, copy limit and archetype', () => {
+  const pool = deckList('RPG');
+  assert.deepEqual(deckErrors('RPG', pool), []);
+  assert.equal(deckErrors('RPG', pool.slice(1)).length, 1);
+  const tooMany = [...pool.slice(MAX_COPIES + 1), ...Array(MAX_COPIES + 1).fill(pool[0])];
+  assert.equal(tooMany.length, DECK_SIZE);
+  assert.match(deckErrors('RPG', tooMany).join(), /at most/);
+  assert.match(deckErrors('RPG', [...pool.slice(1), deckList('FPS')[0]]).join(), /isn't a RPG card/);
+});
+
+test('AI plays complete games with every starter deck', () => {
+  DECKS.forEach((deck, i) => starterDecks(deck.id).forEach((st, j) => {
+    const opp = DECKS[(i + 1 + j) % DECKS.length].id;
+    const s = createGame({ decks: [st.cards, starterDecks(opp)[j].cards], deckIds: [deck.id, opp], seed: 500 + i * 3 + j, firstPlayer: j % 2 });
+    let steps = 0;
+    while (!s.over && steps++ < 3000) ok(applyAction(s, chooseAction(s)));
+    assert.ok(s.over, `${st.name} vs ${opp} finished`);
+  }));
 });

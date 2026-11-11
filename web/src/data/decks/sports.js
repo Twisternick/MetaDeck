@@ -1,4 +1,4 @@
-import { M, S, fx, QUICK, NEW } from '../helpers.js';
+import { M, S, fx, QUICK, NEW, QUICK_NEW } from '../helpers.js';
 
 export default {
   id: 'Sports',
@@ -9,21 +9,28 @@ export default {
   cards: [
     M('SPO_M01_RookieProspect', 'Rookie Prospect', 1, 2, 1, ['Momentum']),
     M('SPO_M02_BenchDefender', 'Bench Defender', 1, 1, 3, ['Guard']),
+    M('SPO_M19_WaterCarrier', 'Water Carrier', 1, 1, 2, [], [fx('Heal', 1, 'FriendlyPlayer', { trigger: 'turnEnd' })], NEW),
     M('SPO_M03_Playmaker', 'Playmaker', 2, 2, 2, [], [fx('Buff', 1, 'OtherFriendlyMonster')]),
     M('SPO_M04_DefensiveWall', 'Defensive Wall', 2, 1, 4, ['Guard']),
     M('SPO_M05_StarStriker', 'Star Striker', 2, 3, 2, ['Momentum']),
     M('SPO_M16_TeamMascot', 'Team Mascot', 2, 2, 2, [], [fx('SummonToken', 1, 'None', { token: 'token_benchwarmer' })], NEW),
+    M('SPO_M20_Cheerleader', 'Cheerleader', 2, 1, 2, ['Inspire'], [], NEW),
+    M('SPO_M21_Underdog', 'Underdog', 2, 2, 3, ['Clutch'], [], NEW),
     M('SPO_M06_TeamCaptain', 'Team Captain', 3, 2, 3, ['Inspire']),
     M('SPO_M07_GoalkeeperAnchor', 'Goalkeeper Anchor', 3, 1, 6, ['Guard']),
     M('SPO_M08_ClutchSpecialist', 'Clutch Specialist', 3, 3, 4, ['Clutch']),
     M('SPO_M09_PowerForward', 'Power Forward', 3, 4, 3, ['Momentum']),
     M('SPO_M10_VeteranCoach', 'Veteran Coach', 3, 1, 4, [], [fx('Buff', 1, 'RandomOtherFriendlyMonster', { trigger: 'turnEnd' })]),
+    M('SPO_M22_Midfielder', 'Midfielder', 3, 3, 3, ['Momentum'], [fx('Draw', 1, 'None', { cond: 'FriendlyAttackedThisTurn' })], NEW),
+    M('SPO_M23_DraftDayPick', 'Draft Day Pick', 3, 2, 2, [], [fx('SummonToken', 2, 'None', { token: 'token_benchwarmer' })], NEW),
     M('SPO_M11_MVPContender', 'MVP Contender', 4, 4, 4, ['Momentum', 'Rush']),
     M('SPO_M12_DefenseCoordinator', 'Defense Coordinator', 4, 3, 6, ['Guard']),
     M('SPO_M13_OvertimeRunner', 'Overtime Runner', 4, 5, 3, ['Clutch']),
     M('SPO_M17_StarQuarterback', 'Star Quarterback', 4, 3, 4, [], [fx('Buff', 1, 'AllOtherFriendlyMonsters')], NEW),
+    M('SPO_M24_Linebacker', 'Linebacker', 4, 4, 5, ['Guard'], [], NEW),
     M('SPO_M14_MVPLegend', 'MVP Legend', 5, 5, 6, ['Clutch', 'Momentum']),
     M('SPO_M18_HatTrickHero', 'Hat-Trick Hero', 5, 5, 5, ['Momentum'], [fx('Draw', 1, 'None', { trigger: 'turnEnd', cond: 'Attacked3' })], NEW),
+    M('SPO_M25_Superstar', 'Superstar', 6, 6, 5, ['Rush', 'Momentum'], [], NEW),
     M('SPO_M15_HallOfFamer', 'Hall of Famer', 7, 7, 7, ['Inspire']),
 
     S('SPO_S01_FastBreak', 'Fast Break', 1, [fx('GrantKeywordThisTurn', 0, 'FriendlyMonster', { keyword: 'Rush' }), fx('BuffAttackThisTurn', 1, 'FriendlyMonster')]),
@@ -34,9 +41,12 @@ export default {
     S('SPO_S07_InjuryReserve', 'Injury Reserve', 2, [fx('Silence', 0, 'EnemyMonster')]),
     S('SPO_S10_ClutchMoment', 'Clutch Moment', 1, [fx('Draw', 1), fx('Draw', 1, 'None', { cond: 'HealthLessThanOpponent' })]),
     S('SPO_S04_TeamSynergy', 'Team Synergy', 2, [fx('Buff', 1, 'AllFriendlyMonsters')]),
+    S('SPO_S13_Substitution', 'Substitution', 2, [fx('SummonToken', 1, 'None', { token: 'token_benchwarmer' }), fx('Draw', 1)], NEW),
+    S('SPO_S14_HailMary', 'Hail Mary', 2, [fx('DealDamage', 2, 'EnemyPlayer'), fx('DealDamage', 3, 'EnemyPlayer', { cond: 'HealthLessThanOpponent' })], NEW),
     S('SPO_S08_ComebackSeason', 'Comeback Season', 3, [fx('Heal', 5, 'FriendlyPlayer'), fx('Draw', 1, 'None', { cond: 'HealthLessThanOpponent' })]),
     S('SPO_S11_HalftimeSpeech', 'Halftime Speech', 3, [fx('BuffAttackThisTurn', 1, 'AllFriendlyMonsters'), fx('Draw', 1)], NEW),
     S('SPO_S09_OvertimePush', 'Overtime Push', 4, [fx('Buff', 2, 'AllFriendlyMonsters')]),
+    S('SPO_S15_FullCourtPress', 'Full-Court Press', 4, [fx('SummonToken', 2, 'None', { token: 'token_benchwarmer' }), fx('GrantKeywordThisTurn', 0, 'AllFriendlyMonsters', { keyword: 'Rush' })], NEW),
     S('SPO_S12_RedCard', 'Red Card', 5, [fx('Destroy', 0, 'EnemyMonster')], NEW),
   ],
 };
