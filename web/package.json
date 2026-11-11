@@ -1,0 +1,13 @@
+{
+  "name": "metadeck-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MetaDeck as a web game: a card battler where every deck is a video game genre.",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node serve.mjs",
+    "test": "node --test test/*.test.mjs",
+    "simulate": "node tools/simulate.mjs --games 100 --cards"
+  }
+}
