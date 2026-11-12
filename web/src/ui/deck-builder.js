@@ -7,6 +7,8 @@ import { renderCard, renderPreview } from './card-view.js';
 import { motionOK, flyTo, sparkle, removeFx } from './fx.js';
 import { getDeck, CARDS, DECK_SIZE, MAX_COPIES, countCards, deckErrors, starterDecks } from '../data/index.js';
 import { saveCustomDeck, deleteCustomDeck } from './deck-store.js';
+import { profile } from './profile.js';
+import { ownedTotal, missingCards, missingDust, hasPremium } from '../data/economy.js';
 
 const COST_FILTERS = ['All', 1, 2, 3, 4, 5, 6, '7+'];
 const TYPE_FILTERS = ['All', 'Monster', 'Spell'];
@@ -33,6 +35,8 @@ export function deckBuilder(root, { archetype, deck = null, onBack, onPlay }) {
   const add = (id, fromEl) => {
     if (st.cards.length >= DECK_SIZE) return flash(`The deck is full (${DECK_SIZE} cards).`);
     if ((counts().get(id) ?? 0) >= MAX_COPIES) return flash(`At most ${MAX_COPIES} copies of a card.`);
+    const have = ownedTotal(profile(), id);
+    if ((counts().get(id) ?? 0) >= have) return flash(have ? `You own ${have} ${have === 1 ? 'copy' : 'copies'}. Craft more in the Collection.` : 'You don’t own this card yet. Craft it in the Collection.');
     st.cards.push(id);
     st.dirty = true;
     update();
@@ -91,8 +95,10 @@ export function deckBuilder(root, { archetype, deck = null, onBack, onPlay }) {
         if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); remove(def.cardId); }
       },
     },
-      renderCard(def, { attrs: { style: `--deck:${arch.color}` } }),
-      h('div', { class: 'pool-copies', 'aria-hidden': 'true' }, Array.from({ length: MAX_COPIES }, () => h('span', { class: 'pip' }))),
+      renderCard(def, { attrs: { style: `--deck:${arch.color}` }, premium: hasPremium(profile(), def.cardId) && profile().cosmetics.premiumArt }),
+      h('div', { class: 'pool-copies', 'aria-hidden': 'true' }, Array.from({ length: MAX_COPIES }, (_, k) =>
+        h('span', { class: `pip${k >= ownedTotal(profile(), def.cardId) ? ' unowned' : ''}` }))),
+      ownedTotal(profile(), def.cardId) ? null : h('div', { class: 'pool-lock' }, '🔒 Not owned'),
       h('button', {
         class: 'pool-minus', title: 'Remove one', 'aria-label': `Remove ${def.displayName}`,
         onclick: e => { e.stopPropagation(); remove(def.cardId); },
@@ -130,7 +136,8 @@ export function deckBuilder(root, { archetype, deck = null, onBack, onPlay }) {
     for (const [id, el] of tiles) {
       const n = c.get(id) ?? 0;
       el.classList.toggle('in-deck', n > 0);
-      el.classList.toggle('maxed', n >= MAX_COPIES || full);
+      el.classList.toggle('maxed', n >= Math.min(MAX_COPIES, ownedTotal(profile(), id)) || full);
+      el.classList.toggle('unowned', !ownedTotal(profile(), id));
       el.querySelectorAll('.pip').forEach((p, i) => p.classList.toggle('on', i < n));
     }
   };
@@ -210,10 +217,12 @@ export function deckBuilder(root, { archetype, deck = null, onBack, onPlay }) {
       c.get(def.cardId) > 1 ? h('span', { class: 'row-qty' }, `×${c.get(def.cardId)}`) : null)) :
       [h('p', { class: 'muted deck-rows-empty' }, 'Click cards on the left to add them.')]));
 
+    const missing = missingCards(profile(), st.cards);
     const errors = n === DECK_SIZE ? deckErrors(archetype, st.cards) : [];
+    if (missing.length) errors.push(`You're missing ${missing.reduce((s, m) => s + m.need, 0)} of these cards (✨ ${missingDust(profile(), st.cards)} to craft). Craft them in the Collection.`);
     errorsEl.replaceChildren(...errors.map(e => h('div', null, e)));
     playBtn.disabled = n !== DECK_SIZE || errors.length > 0;
-    playBtn.title = playBtn.disabled ? `Add ${DECK_SIZE - n} more card${DECK_SIZE - n === 1 ? '' : 's'} to play` : '';
+    playBtn.title = n !== DECK_SIZE ? `Add ${DECK_SIZE - n} more card${DECK_SIZE - n === 1 ? "" : "s"} to play` : errors[0] ?? "";
     deleteBtn.hidden = !st.id;
     nameInput.value !== st.name && (nameInput.value = st.name);
     refreshPool();
@@ -243,7 +252,7 @@ export function deckBuilder(root, { archetype, deck = null, onBack, onPlay }) {
           }),
           filterChips('type', TYPE_FILTERS, 'Card type'),
           filterChips('cost', COST_FILTERS, 'Cost')),
-        h('p', { class: 'muted gallery-hint' }, `Click a card to add it (up to ${MAX_COPIES} copies). Right-click or use − to take one out.`),
+        h('p', { class: 'muted gallery-hint' }, `Click a card to add it (up to ${MAX_COPIES} copies, as many as you own). Right-click or use − to take one out.`),
         poolGrid),
       h('aside', { class: 'deck-panel rise', style: { '--i': 2 } },
         nameInput,

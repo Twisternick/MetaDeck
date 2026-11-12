@@ -8,6 +8,7 @@ import { renderCard, renderCardBack, renderMinion, glossaryFor, statusLines } fr
 import {
   motionOK, artSlot, heroArtUrls, cardArtUrls, impact, sparkle, dissolve, castFly, flyTo, dealFrom, lungeTransform,
   drawBeam, createArrow, showBanner, confetti, removeFx, keywordCallout, flashRing, hideTooltip,
+  damageSplat, screenShake, hurtVignette,
 } from './fx.js';
 import {
   createGame, applyAction, legalActions, decisionPlayer, playInfo, attackInfo, attackTargets,
@@ -26,7 +27,11 @@ const LONG_PRESS_MS = 380;
 // online = { seat, state, clock, send(msg), subscribe(fn) } plays a server match instead: state is the
 // server's view for our seat, and onRematch is unused (rematches go through the server).
 // Returns { close } so the caller can tear the screen down (online, when the server restarts the match).
-export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate = false, online = null, onExit, onRematch }) {
+// cosmetics = { back, arena, premium: Set of card ids } dresses the human's side. onResult({ won, damage })
+// is called once when a match the human played ends; whatever it returns (the rewards) is shown on the
+// game-over screen.
+export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate = false, online = null, onExit, onRematch, cosmetics = null, onResult = null }) {
+  const cos = { back: 'back:classic', arena: 'arena:standard', premium: new Set(), ...cosmetics };
   const HUMAN = online ? online.seat : 0;
   const OPP = 1 - HUMAN;
   const me = getDeck(online ? online.state.players[HUMAN].deckId : myDeck);
@@ -54,6 +59,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     kwOpen: false,         // keyword reference drawer
     lastTurnKey: null,
     celebrated: false,
+    rewards: undefined,    // what onResult returned, once the match is over
     firstRender: true,
     drag: null,            // { kind: 'card' | 'minion', uid, el, x0, y0, moved }
     arrow: null,
@@ -86,6 +92,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
   document.addEventListener('pointercancel', onPointerUp);
   view.addEventListener('pointerdown', onPressStart, true);
   view.addEventListener('pointerdown', onPointerDown);
+  view.addEventListener('click', onClick);
   view.addEventListener('contextmenu', onContextMenu);
   window.addEventListener('resize', onResize);
   const clockTicker = online ? setInterval(tickClock, 250) : null;
@@ -217,7 +224,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
       }
     }
     if (played && motionOK() && played.from) {
-      const ghost = renderCard(played.def, { classes: 'cast', ownerDeckId: played.deck.id });
+      const ghost = renderCard(played.def, { classes: 'cast', ownerDeckId: played.deck.id, premium: isPremium(played.def, played.pid) });
       ghost.style.fontSize = played.fontSize;
       if (summoned) {
         const minionEl = elFor(summoned.uid);
@@ -450,9 +457,19 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
   function refAt(x, y) {
     const hit = document.elementFromPoint(x, y);
     const el = hit instanceof Element ? hit.closest('[data-uid],[data-pid]') : null;
-    if (!el || !view.contains(el)) return null;
-    if (el.dataset.pid !== undefined) return playerRef(Number(el.dataset.pid));
-    return Number(el.dataset.uid);
+    const ref = !el || !view.contains(el) ? null
+      : el.dataset.pid !== undefined ? playerRef(Number(el.dataset.pid)) : Number(el.dataset.uid);
+    // Attacking: anything on the enemy side that isn't a monster is the enemy hero ("going face").
+    if (ui.mode === 'attack' && (ref === null || (typeof ref === 'number' && !findMonster(state, ref))) && inFaceZone(x, y, hit)) return playerRef(OPP);
+    return ref;
+  }
+  // Above the mat's centre line, away from buttons and drawers.
+  function inFaceZone(x, y, hit) {
+    if (hit instanceof Element && hit.closest('button, .hud, .log-drawer, .history, .action-dock, .board.mine')) return false;
+    const div = view.querySelector('.divider');
+    if (!div) return false;
+    const r = div.getBoundingClientRect();
+    return y < r.top + r.height / 2;
   }
   function overMat(x, y) {
     const mat = view.querySelector('.mat');
@@ -533,10 +550,22 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
       else render();
       return;
     }
-    // Dragged a monster: release over a valid target to attack, anywhere else to cancel.
+    // Dragged a monster: release over a valid target to attack, anywhere else to cancel
+    // (saying why when it was dropped on something it can't hit).
     const ref = refAt(e.clientX, e.clientY);
     if (ref !== null && ui.targets.includes(ref)) clickTarget(ref);
-    else cancel();
+    else {
+      const why = ref !== null && ref !== d.uid ? explainBadTarget(ref) : null;
+      cancel();
+      if (why) toast(why);
+    }
+  }
+
+  // Click-to-attack: a click on the enemy side outside any monster hits the enemy hero.
+  function onClick(e) {
+    if (ui.mode !== 'attack' || !(e.target instanceof Element) || e.target.closest('[data-uid],[data-pid]')) return;
+    const ref = refAt(e.clientX, e.clientY);
+    if (ref === playerRef(OPP)) clickTarget(ref);
   }
 
   // Touch: press and hold a card or monster to zoom it; lifting the finger closes it and
@@ -598,6 +627,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
       ui.hoverTarget = el;
       el?.classList.add('hover-target');
     }
+    view.querySelector('.face-zone')?.classList.toggle('lit', ref === playerRef(OPP));
   }
   function stopArrow() {
     ui.arrow?.remove();
@@ -620,7 +650,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
   // The large card (unless only keyword tips are wanted), live status of a monster, and a glossary.
   function inspectParts(def, inst, { tipsOnly = false, ownerDeckId = null } = {}) {
     const parts = [];
-    if (!tipsOnly) parts.push(renderCard(def, { classes: 'large', ownerDeckId, large: true }));
+    if (!tipsOnly) parts.push(renderCard(def, { classes: 'large', ownerDeckId, large: true, premium: isPremium(def, inst?.owner) }));
     if (inst) {
       const status = statusLines(state, inst);
       if (status.length) parts.push(h('div', { class: 'preview-status' }, status.map(s => h('div', null, s))));
@@ -653,7 +683,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     const mat = view.querySelector('.mat');
     if (!mat) return;
     const r = mat.getBoundingClientRect();
-    const wrap = h('div', { class: 'reveal', 'aria-hidden': 'true' }, renderCard(def, { classes: 'large', ownerDeckId: state.players[pid].deckId }));
+    const wrap = h('div', { class: 'reveal', 'aria-hidden': 'true' }, renderCard(def, { classes: 'large', ownerDeckId: state.players[pid].deckId, premium: isPremium(def, pid) }));
     document.body.append(wrap);
     wrap.style.left = `${r.left + r.width / 2 - wrap.offsetWidth / 2}px`;
     wrap.style.top = `${r.top + r.height / 2 - wrap.offsetHeight / 2}px`;
@@ -698,6 +728,8 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
 
   function animate(events, before) {
     let delayMs = 0;
+    let splatDelay = 0;
+    let shake = 0;
     let calloutDelay = 0;
     const stacks = new Map(); // element key -> callouts already shown on it in this batch
     const elOf = key => view.querySelector(key[0] === 'u' ? `[data-uid="${key.slice(1)}"]` : `[data-pid="${key.slice(1)}"]`);
@@ -742,11 +774,30 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
         if (clone) dissolve(clone, rect, getComputedStyle(clone).getPropertyValue('--deck') || '#ff4d6d');
         continue;
       }
+      if (e.type === 'damage' && e.amount !== 0) {
+        // Something was hurt: a splat that sits on it, a knock to the whole table, and for heroes
+        // a draining health bar (and a red edge flash when it's you).
+        const headshot = e.amount === 'HEADSHOT';
+        const hero = key[0] === 'p';
+        if (el) {
+          el.classList.remove('hit');
+          void el.offsetWidth;
+          el.classList.add('hit');
+        }
+        impact(rect, headshot ? '#ffd166' : '#ff4d6d', { size: headshot ? 1.6 : hero ? 1.4 : 1, sparks: hero ? 22 : 14 });
+        damageSplat(rect, headshot ? 'HEADSHOT' : `-${e.amount}`, { gold: headshot, delay: splatDelay });
+        splatDelay = Math.min(splatDelay + 90, 360);
+        shake = Math.max(shake, headshot || hero || e.amount >= 5 ? (hero && e.amount >= 5 ? 3 : 2) : 1);
+        if (hero) {
+          drainHpBar(el, e.pid, e.amount);
+          if (Number(key.slice(1)) === HUMAN && !spectate) hurtVignette();
+        }
+        continue;
+      }
       if (el && e.type === 'damage') {
         el.classList.remove('hit');
         void el.offsetWidth;
         el.classList.add('hit');
-        if (e.amount !== 0) impact(rect, e.amount === 'HEADSHOT' ? '#ffd166' : '#ff4d6d', { size: e.amount === 'HEADSHOT' ? 1.6 : 1 });
       }
       if (el && (e.type === 'heal' || e.type === 'buff' || e.type === 'levelup')) {
         el.classList.remove('healed');
@@ -765,6 +816,21 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
         delayMs = Math.min(delayMs + 60, 300);
       }
     }
+    if (shake) screenShake(view.querySelector('.arena'), shake);
+  }
+
+  // A hero's health bar: the lost part flashes white, then drains away behind the new value.
+  function drainHpBar(heroEl, pid, amount) {
+    const bar = heroEl?.closest('.hero-panel')?.querySelector('.hp-bar');
+    if (!bar || typeof amount !== 'number') return;
+    const pct = hp => `${Math.max(0, Math.min(100, (hp / START_HP) * 100))}%`;
+    const hp = state.players[pid].hp;
+    const chip = h('b', { class: 'hp-chip' });
+    chip.style.width = pct(hp + amount);
+    bar.prepend(chip);
+    if (!motionOK()) { chip.remove(); return; }
+    chip.animate([{ width: pct(hp + amount) }, { width: pct(hp + amount), offset: .4 }, { width: pct(hp) }],
+      { duration: 900, easing: 'cubic-bezier(.5,0,.2,1)', fill: 'forwards' }).onfinish = () => chip.remove();
   }
 
   function highlightIntent(action) {
@@ -835,13 +901,19 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     hideInspect();
     hideTooltip();
     const responding = !spectate && state.pending && state.pending.responder === HUMAN && !ui.busy;
+    if (state.over && ui.rewards === undefined) {
+      ui.rewards = !spectate && onResult
+        ? onResult({ won: state.winner === HUMAN, damage: Math.max(0, START_HP - Math.max(0, state.players[OPP].hp)) }) ?? null
+        : null;
+    }
     view.replaceChildren(...[
-      h('div', { class: `arena${ui.mode === 'attack' ? ' targeting' : ''}`, style: { '--my-deck': me.color, '--their-deck': them.color } },
+      h('div', { class: `arena${ui.mode === 'attack' ? ' targeting' : ''}`, 'data-arena': cos.arena.split(':')[1], style: { '--my-deck': me.color, '--their-deck': them.color } },
         h('div', { class: 'zone top' },
           renderHud(),
           renderHand(OPP),
           h('div', { class: 'corner theirs' }, renderPiles(OPP), renderHeroPanel(OPP))),
         h('div', { class: 'mat' },
+          ui.mode === 'attack' ? renderFaceZone() : null,
           renderBoard(OPP),
           renderDivider(),
           renderBoard(HUMAN)),
@@ -1025,7 +1097,9 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     return h('div', { class: `piles ${pid === HUMAN ? 'mine' : 'theirs'}` },
       h('div', { class: `pile deck${p.deck.length ? '' : ' empty'}`, title: `${p.deck.length} cards in deck` },
         h('span', { class: 'pile-label' }, 'Deck'),
-        Array.from({ length: stack }, () => h('div', { class: 'pile-card' }, 'M')),
+        Array.from({ length: stack }, () => pid === HUMAN && cos.back !== 'back:classic'
+          ? h('div', { class: 'pile-card skinned', 'data-back': cos.back.split(':')[1] }, h('div', { class: 'back-skin' }, h('span', null, 'M')))
+          : h('div', { class: 'pile-card' }, 'M')),
         h('span', { class: 'pile-count' }, p.deck.length)),
       zoomable(h('div', {
         class: `pile grave${p.grave.length ? '' : ' empty'}`, title: `${p.grave.length} cards in graveyard`, style: { '--deck': deck.color },
@@ -1059,6 +1133,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
           cost: effectiveCost(state, card),
           classes,
           ownerDeckId: p.deckId,
+          premium: isPremium(def, pid),
           attrs: {
             'data-uid': card.uid,
             onmouseenter: e => showInspect(def, null, e.currentTarget, { tipsOnly: mine }),
@@ -1089,6 +1164,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
       ].join(' ');
       slots.push(h('div', { class: 'slot' }, zoomable(renderMinion(state, m, {
         classes,
+        premium: isPremium(defOf(m), m.owner),
         // My own monsters are driven by pointer events (click or drag). Click handlers exist only
         // for picking a target: the browser fires 'click' after 'pointerup', on whatever was
         // re-rendered under the pointer, so the source must never carry one.
@@ -1098,6 +1174,18 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
       }), () => [defOf(m), m])));
     }
     return h('div', { class: `board ${pid === HUMAN ? 'mine' : 'theirs'}` }, slots);
+  }
+
+  // While attacking, the enemy half of the mat lights up as one big target for their hero.
+  function renderFaceZone() {
+    const open = ui.targets.includes(playerRef(OPP));
+    const name = state.players[OPP].name;
+    return [
+      h('div', { class: `face-zone${open ? '' : ' blocked'}`, 'aria-hidden': 'true' }),
+      h('div', { class: `face-label${open ? '' : ' blocked'}`, 'aria-hidden': 'true' },
+        open ? ['⚔ Attack ', h('b', null, name), h('span', null, 'aim anywhere on their side')]
+          : [`${kwIcon('Guard')} `, h('b', null, name), h('span', null, 'is protected by Guard')]),
+    ];
   }
 
   function renderDivider() {
@@ -1167,6 +1255,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
           ? `${state.players[HUMAN].name} (${me.name}) vs ${state.players[OPP].name} (${them.name}) · ${state.turn} turns`
           : `${me.name} vs ${them.name} · ${state.turn} turns`),
         online && forfeitLine ? h('p', { class: 'muted' }, forfeitLine) : null,
+        ui.rewards?.render ? ui.rewards.render() : null,
         h('div', { class: 'dialog-actions' },
           online ? renderOnlineRematch() : h('button', { class: 'btn primary', onclick: () => { teardown(); onRematch(); } }, 'Rematch'),
           h('button', { class: 'btn ghost', onclick: exit }, online ? 'Back to lobby' : 'Main menu'))));
@@ -1178,6 +1267,11 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     if (ui.rematch.includes(HUMAN)) return h('button', { class: 'btn primary', disabled: true }, 'Waiting for opponent…');
     const asked = ui.rematch.includes(OPP);
     return h('button', { class: `btn primary${asked ? ' pulse' : ''}`, onclick: () => online.send({ t: 'rematch' }) }, asked ? 'Accept rematch' : 'Rematch');
+  }
+
+  // The human's own cards show their premium version when the player owns one (a cosmetic only).
+  function isPremium(def, owner) {
+    return !spectate && owner === HUMAN && cos.premium.has(def.cardId);
   }
 
   setClock(online?.clock);

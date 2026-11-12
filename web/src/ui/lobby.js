@@ -10,8 +10,9 @@ import { getDeck } from '../data/index.js';
 
 const NAME_KEY = 'metadeck.netName';
 
-// deck = { archetype, name, cards } – the list picked in the main menu.
-export function lobby(root, { deck, onBack }) {
+// deck = { archetype, name, cards } – the list picked in the main menu. matchExtras() gives the
+// cosmetics and onResult (rewards) for each match.
+export function lobby(root, { deck, onBack, matchExtras = () => ({}) }) {
   removeFx();
   const s = {
     phase: 'connecting',   // connecting | offline | idle | queued | hosting | match
@@ -103,7 +104,7 @@ export function lobby(root, { deck, onBack }) {
     const go = () => {
       if (exited) return;
       match?.close();
-      match = startMatch(root, { online, onExit: backToLobby });
+      match = startMatch(root, { online, onExit: backToLobby, ...matchExtras() });
     };
     if (match || msg.resumed) go(); else splash(msg).then(go);
   }

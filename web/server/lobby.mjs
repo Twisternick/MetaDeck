@@ -16,10 +16,15 @@
 // connection is rate limited, each address has a connection cap, decks are shuffled with crypto
 // randomness and the engine's RNG is reseeded before every move (so no outcome can be predicted), and
 // a player who stops taking turns forfeits.
+//
+// With `accounts` (server/accounts.mjs), a signed-in player plays under their account name, may only
+// bring cards their account owns, and is paid their match rewards by the server when the match ends.
 
 import crypto from 'node:crypto';
 import { createGame, applyAction, decisionPlayer } from '../src/engine/game.js';
 import { getDeck, deckErrors } from '../src/data/index.js';
+import { START_HP } from '../src/engine/constants.js';
+import { missingCards } from '../src/data/economy.js';
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_LEN = 5;
@@ -32,6 +37,7 @@ export function createLobby({
   helloMs = 10_000,    // a connection has this long to say hello
   maxPerIp = 16,       // open connections per address
   rate = { burst: 30, perSec: 12 }, // messages per connection, as a token bucket
+  accounts = null,
 } = {}) {
   const players = new Map(); // token -> player
   const rooms = new Map();   // code -> room
@@ -99,7 +105,8 @@ export function createLobby({
       player = { token: crypto.randomUUID(), name: '', ws, status: 'idle', room: null, deck: null, graceTimer: null };
       players.set(player.token, player);
     }
-    player.name = cleanName(msg.name) || player.name || `Player ${crypto.randomInt(1000, 10000)}`;
+    player.account = ws.account ?? player.account ?? null;
+    player.name = player.account?.name || cleanName(msg.name) || player.name || `Player ${crypto.randomInt(1000, 10000)}`;
     const room = player.room;
     send(player, { t: 'welcome', token: player.token, name: player.name, inMatch: !!room?.game });
 
@@ -146,7 +153,7 @@ export function createLobby({
     switch (msg.t) {
       case 'name': {
         const name = cleanName(msg.name);
-        if (name && player.status !== 'playing') {
+        if (name && player.status !== 'playing' && !player.account) {
           player.name = name;
           send(player, { t: 'welcome', token: player.token, name });
           if (player.status === 'hosting') broadcastLobby();
@@ -178,6 +185,11 @@ export function createLobby({
       && deck.cards.every(c => typeof c === 'string') && deckErrors(deck.archetype, deck.cards).length === 0;
     if (!ok) {
       send(player, { t: 'error', message: "That deck isn't legal. Pick a complete 40-card deck." });
+      return null;
+    }
+    const profile = accounts && player.account ? accounts.profileFor(player.account) : null;
+    if (profile && missingCards(profile, deck.cards).length) {
+      send(player, { t: 'error', message: "Your account doesn't own every card in that deck." });
       return null;
     }
     return { archetype: deck.archetype, cards: [...deck.cards], name: String(deck.name ?? '').slice(0, 40) };
@@ -347,7 +359,22 @@ export function createLobby({
       state: view(game, i), events: eventsFor(events, i),
     }));
     if (abandoned) forfeit(room, actor, 'inactive');
-    if (game.over) broadcastLobby();
+    if (game.over) { payOut(room); broadcastLobby(); }
+  }
+
+  // Match rewards for signed-in players, once per game, from the server's own result.
+  function payOut(room) {
+    const game = room.game;
+    if (!accounts || !game?.over || game.paid) return;
+    game.paid = true;
+    room.seats.forEach((p, i) => {
+      if (!p.account) return;
+      const out = accounts.recordOnline(p.account, {
+        deckId: game.players[i].deckId, won: game.winner === i,
+        damage: START_HP - Math.max(0, game.players[1 - i].hp),
+      });
+      if (out) send(p, { t: 'rewards', out, deckId: game.players[i].deckId });
+    });
   }
 
   function forfeit(room, seatNo, why) {
@@ -361,6 +388,7 @@ export function createLobby({
     room.seats.forEach((p, i) => send(p, {
       t: 'update', actor: seatNo, action: null, forfeit: seatNo, clock: null, state: view(game, i), events: [],
     }));
+    payOut(room);
   }
 
   // ------------------------------------------------------------ turn clock

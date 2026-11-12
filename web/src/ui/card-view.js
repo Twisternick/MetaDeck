@@ -11,6 +11,7 @@ import { rulesLines } from '../engine/text.js';
 import { getAttack, getHealth, getMaxHealth, hasKeyword, defOf, attackBonuses } from '../engine/game.js';
 import { artSlot, cardArtUrls, cardBackUrls } from './fx.js';
 import { kwChip, richText, kwIcon, kwKind, kwColor, kwName, glossaryList } from './keywords.js';
+import { rarityOf, RARITY } from '../data/economy.js';
 
 const NEUTRAL = { name: 'Token', icon: '◆', color: '#7d8590' };
 
@@ -32,12 +33,14 @@ function typeLine(def, deck) {
   ];
 }
 
-export function renderCard(def, { cost = def.cost, classes = '', onclick, attrs = {}, ownerDeckId = null, large = false } = {}) {
+// `premium` draws the animated premium version (a cosmetic the player owns; it plays the same).
+export function renderCard(def, { cost = def.cost, classes = '', onclick, attrs = {}, ownerDeckId = null, large = false, premium = false } = {}) {
   const { deck, style } = deckStyle(def, ownerDeckId);
   const costClass = cost > def.cost ? ' cost-up' : '';
   const costTip = cost > def.cost ? `Costs ${cost - def.cost} more: an enemy Tax monster is on the board.` : null;
+  const rarity = def.deckId ? rarityOf(def.cardId) : null;
   return h('div', {
-    class: `card ${def.type === 'Spell' ? 'spell' : 'monster'}${def.speedWindow === 'Quick' ? ' quick' : ''} ${classes}`,
+    class: `card ${def.type === 'Spell' ? 'spell' : 'monster'}${def.speedWindow === 'Quick' ? ' quick' : ''}${rarity ? ` rarity-${rarity}` : ''}${premium ? ' premium' : ''} ${classes}`,
     style, onclick, 'data-tilt': '12', ...attrs,
   },
     h('div', { class: `card-cost${costClass}`, 'data-kw': costTip ? null : 'Bandwidth', 'data-tip': costTip, 'data-tip-title': costTip ? `${kwIcon('Tax')} Taxed` : null }, cost),
@@ -55,19 +58,25 @@ export function renderCard(def, { cost = def.cost, classes = '', onclick, attrs 
           h('span', { class: 'stat atk', 'data-tip': 'Attack: damage this deals when it fights.', 'data-tip-title': 'Attack' }, def.baseAttack),
           h('span', { class: 'stat hp', 'data-tip': 'Health: it is destroyed when this reaches 0.', 'data-tip-title': 'Health' }, def.baseHealth))
       : null,
+    rarity ? h('div', { class: 'card-gem', 'data-tip': `${RARITY[rarity].name} card`, 'data-tip-title': 'Rarity' }) : null,
+    premium ? h('div', { class: 'card-premium', 'aria-hidden': 'true' }, h('i'), h('i'), h('i')) : null,
     h('div', { class: 'card-foil', 'aria-hidden': 'true' }),
     h('div', { class: 'card-glare', 'aria-hidden': 'true' }),
   );
 }
 
-export function renderCardBack(classes = '') {
-  return h('div', { class: `card card-back ${classes}` }, artSlot('', cardBackUrls(), 'M'));
+// `skin` is a card back cosmetic id ('back:aurora'); the classic back is the art slot alone.
+export function renderCardBack(classes = '', skin = 'back:classic') {
+  const name = skin.split(':')[1];
+  return h('div', { class: `card card-back ${classes}`, 'data-back': name },
+    artSlot('', cardBackUrls(), 'M'),
+    name !== 'classic' ? h('div', { class: 'back-skin', 'aria-hidden': 'true' }, h('span', null, 'M')) : null);
 }
 
 // Keywords that mean nothing on the board on their own (tags), hidden from badges to save room.
 const TAG_KEYWORDS = new Set(['Drone', 'District']);
 
-export function renderMinion(state, m, { classes = '', onclick, onmouseenter } = {}) {
+export function renderMinion(state, m, { classes = '', onclick, onmouseenter, premium = false } = {}) {
   const def = defOf(m);
   const ownerDeckId = state.players[m.owner].deckId;
   const { deck, style } = deckStyle(def, ownerDeckId);
@@ -97,18 +106,19 @@ export function renderMinion(state, m, { classes = '', onclick, onmouseenter } =
 
   const bonusTip = bonuses.map(b => `${kwName(b.keyword)} +${b.amount}`).join(', ');
   return h('div', {
-    class: `minion ${flags} ${classes}`, style, 'data-uid': m.uid, 'data-tilt': '10', onclick, onmouseenter,
+    class: `minion ${flags}${premium ? ' premium' : ''} ${classes}`, style, 'data-uid': m.uid, 'data-tilt': '10', onclick, onmouseenter,
     role: 'button', tabindex: '0', 'aria-label': `${def.displayName}, ${atk} attack, ${hp} health`,
   },
     artSlot('minion-art', cardArtUrls(def, ownerDeckId), deck.icon),
-    h('div', { class: 'minion-name' }, def.displayName),
-    h('div', { class: 'minion-badges' },
+    // Keyword strip between the art and the name: named chips, icon-only when there are too many to fit.
+    kws.length || m.xp ? h('div', { class: `minion-badges${kws.length > 2 ? ' compact' : ''}` },
       kws.map(k => h('span', {
         class: `badge kind-${kwKind(k)}${lit.has(k) ? ' lit' : ''}${m.tempKw.includes(k) && !m.kw.includes(k) ? ' temp' : ''}`,
         style: { '--kw': kwColor(k) }, 'data-kw': k, 'aria-label': kwName(k),
-      }, kwIcon(k))),
+      }, h('i', { 'aria-hidden': 'true' }, kwIcon(k)), h('b', null, kwName(k)))),
       m.xp ? h('span', { class: 'xp', 'data-tip': `${m.xp} XP${m.leveled ? ' · Leveled Up' : ' · Levels Up at 3'}`, 'data-tip-title': `${kwIcon('XP')} XP` }, `${m.xp}xp`) : null,
-    ),
+    ) : null,
+    h('div', { class: 'minion-name' }, def.displayName),
     sleeping ? h('div', { class: 'minion-status', 'data-tip': 'Summoning sickness: monsters attack from the turn after they arrive, unless they have Rush.', 'data-tip-title': '💤 Resting' }, 'zzz') : null,
     rushReady ? h('div', { class: 'minion-status good', 'data-kw': 'Rush' }, `${kwIcon('Rush')} Rush`) : null,
     suppressed ? h('div', { class: 'minion-status bad', 'data-kw': 'Suppress' }, `${kwIcon('Suppression')} Suppressed`) : null,
@@ -147,9 +157,9 @@ export function statusLines(state, instance) {
   return status;
 }
 
-export function renderPreview(state, def, instance) {
+export function renderPreview(state, def, instance, { premium = false } = {}) {
   const ownerDeckId = instance && state ? state.players[instance.owner].deckId : null;
-  const parts = [renderCard(def, { classes: 'large', ownerDeckId, large: true })];
+  const parts = [renderCard(def, { classes: 'large', ownerDeckId, large: true, premium })];
   if (instance && state) {
     const status = statusLines(state, instance);
     if (status.length) parts.push(h('div', { class: 'preview-status' }, status.map(s => h('div', null, s))));

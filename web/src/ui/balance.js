@@ -4,11 +4,14 @@
 
 import { h, storage } from './dom.js';
 import { removeFx } from './fx.js';
-import { DECKS, CARDS } from '../data/index.js';
+import { DECKS, CARDS, starterDecks } from '../data/index.js';
 
 const GAME_OPTIONS = [20, 50, 100, 250, 500, 1000, 2500, 5000, 10000];
 const CHUNK = 250; // games per worker job, so big matchups spread across every thread
 const FAVORED = 0.55, UNFAVORED = 0.45;
+// New player check: a free starter deck should win at least STARTER_TARGET against the full decks, and
+// below STARTER_FLOOR it needs a buff (to the starter list, not the meta).
+const STARTER_TARGET = 0.45, STARTER_FLOOR = 0.40;
 
 let running = null; // the live run, so leaving the screen can stop its workers
 
@@ -19,12 +22,16 @@ export function balanceLab(root, { onBack }) {
   const ids = DECKS.map(d => d.id);
   const deck = id => DECKS.find(d => d.id === id);
   let stats = null; // results of the current or last run
+  let starters = null; // results of the last new player check
 
   // ---------- static layout; live updates only touch text, widths and classes ----------
   const progressFill = h('div', { class: 'bl-progress-fill' });
   const progressText = h('span', null, 'Ready');
   const rateText = h('span', { class: 'bl-rate' });
   const runBtn = h('button', { class: 'btn primary big', onclick: () => (running ? stop(true) : start()) }, 'Check game balance');
+  const starterBtn = h('button', { class: 'btn ghost big', onclick: () => (running ? stop(true) : startStarters()) }, 'Check starter decks');
+  const starterTable = h('div', { class: 'bl-table-wrap' },
+    h('p', { class: 'muted bl-empty' }, `Plays each archetype's free starter deck (the one every new player owns) against every other archetype's full deck. A starter should win at least ${pct(STARTER_TARGET)}; below ${pct(STARTER_FLOOR)} it needs a buff.`));
   const sendBtn = h('button', { class: 'btn primary big online', disabled: true, onclick: () => sendToClaude() }, 'Send stats to Claude');
   const sendNote = h('p', { class: 'bl-send-note muted' });
   const gameChips = h('div', { class: 'chips' });
@@ -80,7 +87,7 @@ export function balanceLab(root, { onBack }) {
       h('div', { class: 'bl-control-text' },
         h('p', null, 'Plays every deck against every other deck with the built-in AI on both sides, each deck going first half the time.'),
         h('div', { class: 'bl-games' }, h('span', { class: 'muted' }, 'Games per matchup'), gameChips), estimate),
-      h('div', { class: 'bl-actions' }, runBtn, sendBtn)),
+      h('div', { class: 'bl-actions' }, runBtn, starterBtn, sendBtn)),
     sendNote,
     h('div', { class: 'bl-progress rise', style: { '--i': 1 } }, progressFill, h('div', { class: 'bl-progress-text' }, progressText, rateText)),
     h('div', { class: 'bl-live rise', style: { '--i': 2 } },
@@ -91,6 +98,7 @@ export function balanceLab(root, { onBack }) {
     h('section', { class: 'rise', style: { '--i': 4 } }, h('h2', null, "Matchups · row deck's win rate"), h('div', { class: 'bl-grid-wrap' }, grid)),
     h('section', { class: 'rise', style: { '--i': 5 } }, h('h2', null, 'Balance check'), verdictTable),
     h('section', { class: 'rise', style: { '--i': 6 } }, h('h2', null, 'Card outliers'), cardTable),
+    h('section', { class: 'rise', style: { '--i': 7 } }, h('h2', null, 'New player check'), starterTable),
   ));
 
   // ---------- running ----------
@@ -123,6 +131,7 @@ export function balanceLab(root, { onBack }) {
     runBtn.textContent = 'Stop';
     runBtn.classList.remove('primary');
     runBtn.classList.add('danger');
+    starterBtn.disabled = true;
     renderChips();
 
     const card = next => {
@@ -178,6 +187,85 @@ export function balanceLab(root, { onBack }) {
     function schedule() { if (!frame) frame = setTimeout(() => { frame = 0; if (running) paintLive(live); }, 120); }
   }
 
+  // ---------- new player check ----------
+  function startStarters() {
+    starters = { wins: {}, games: 0, total: 0, gamesPer: prefs.games, started: performance.now() };
+    const queue = [];
+    const chunks = Math.ceil(prefs.games / CHUNK);
+    for (const a of ids) for (const b of ids) {
+      if (a === b) continue;
+      for (let c = 0; c < chunks; c++) queue.push({ key: `${a}>${b}`, a, b, games: Math.min(CHUNK, prefs.games - c * CHUNK), aCards: starterDecks(a)[0].cards });
+    }
+    starters.total = queue.length ? (ids.length * (ids.length - 1)) * prefs.games : 0;
+    const baseSeed = Math.floor(Math.random() * 1e9);
+    let assigned = 0;
+    const threads = Math.max(1, Math.min((navigator.hardwareConcurrency || 4) - 1, 8, queue.length));
+    running = { workers: [], started: performance.now(), busy: 0, starters: true };
+    starterBtn.textContent = 'Stop';
+    starterBtn.classList.add('danger');
+    runBtn.disabled = true;
+    renderChips();
+    starterTable.replaceChildren(h('p', { class: 'muted bl-empty' }, 'Playing starter decks…'));
+    let frame = 0;
+    const assign = worker => {
+      const next = queue.shift();
+      if (!next) { worker.terminate(); if (!running.busy) finishStarters(); return; }
+      running.busy++;
+      worker.postMessage({ ...next, seed: baseSeed + assigned++ * 100003 });
+    };
+    for (let t = 0; t < threads; t++) {
+      const worker = new Worker(new URL('./balance-worker.js', import.meta.url), { type: 'module' });
+      running.workers.push(worker);
+      worker.onmessage = ({ data }) => {
+        if (!running) return;
+        if (data.type === 'error') { sendNote.textContent = `Simulation error: ${data.message}`; stop(); return; }
+        if (data.type === 'game') {
+          const r = data.result;
+          const cell = ((starters.wins[r.a] ??= {})[r.b] ??= [0, 0]);
+          cell[0] += r.winner === 0 ? 1 : r.winner === 'draw' ? 0.5 : 0;
+          cell[1]++;
+          starters.games++;
+          if (!frame) frame = setTimeout(() => {
+            frame = 0;
+            if (!running) return;
+            progressFill.style.width = `${(100 * starters.games) / starters.total}%`;
+            progressText.textContent = `Starter decks: ${starters.games.toLocaleString()} / ${starters.total.toLocaleString()} games`;
+          }, 120);
+          return;
+        }
+        running.busy--;
+        assign(worker);
+      };
+      worker.onerror = e => { sendNote.textContent = `Simulation error: ${e.message}`; stop(); };
+      assign(worker);
+    }
+  }
+
+  function finishStarters(partial = false) {
+    running = null;
+    starters.finishedAt = new Date();
+    starters.partial = partial;
+    starterBtn.textContent = 'Check starter decks';
+    starterBtn.classList.remove('danger');
+    runBtn.disabled = false;
+    renderChips();
+    progressFill.style.width = '100%';
+    progressText.textContent = `Starter decks: ${starters.games.toLocaleString()} games`;
+    starters.rows = starterRows(starters, ids);
+    starterTable.replaceChildren(
+      h('table', { class: 'bl-table' },
+        h('thead', null, h('tr', null, ['Archetype', 'Free starter', 'vs full decks', 'Worst matchup', 'Full deck (last run)', 'Verdict'].map(t => h('th', null, t)))),
+        h('tbody', null, starters.rows.map((r, i) => h('tr', { class: 'rise', style: { '--i': i, '--deck': deck(r.id).color } },
+          h('td', { class: 'bl-td-deck' }, deck(r.id).icon, ' ', deck(r.id).name),
+          h('td', null, r.name),
+          h('td', { class: r.rate < STARTER_FLOOR ? 'bad' : r.rate >= STARTER_TARGET ? 'good' : '' }, `${(r.rate * 100).toFixed(1)}%`),
+          h('td', null, r.worst ? `${deck(r.worst[0]).name} ${pct(r.worst[1])}` : '–'),
+          h('td', null, stats?.played?.[r.id] ? `${(winRate(stats, r.id) * 100).toFixed(1)}%` : '–'),
+          h('td', null, h('span', { class: `bl-verdict ${r.verdict.kind}`, title: r.verdict.why }, r.verdict.label)))))),
+      h('p', { class: 'muted bl-legend' }, `${starters.gamesPer} games per matchup. Pass is ${pct(STARTER_TARGET)} or more against the full decks; Buff needed is under ${pct(STARTER_FLOOR)}. If a starter fails, strengthen its list in src/data/starters.js rather than weakening the other decks.`));
+    sendBtn.disabled = false;
+  }
+
   function finish() {
     const seconds = (performance.now() - running.started) / 1000;
     running = null;
@@ -187,6 +275,7 @@ export function balanceLab(root, { onBack }) {
     runBtn.textContent = 'Check game balance';
     runBtn.classList.add('primary');
     runBtn.classList.remove('danger');
+    starterBtn.disabled = false;
     renderChips();
     activeGrid.replaceChildren(h('p', { class: 'muted bl-empty' }, `All ${stats.games.toLocaleString()} games finished in ${duration(seconds)}.`));
     paintLive(new Map());
@@ -197,6 +286,12 @@ export function balanceLab(root, { onBack }) {
   function stop(byUser = false) {
     if (!running) return;
     for (const w of running.workers) w.terminate();
+    if (running.starters) {
+      if (byUser && starters.games) finishStarters(true);
+      else { running = null; starterBtn.textContent = 'Check starter decks'; starterBtn.classList.remove('danger'); runBtn.disabled = false; renderChips(); }
+      return;
+    }
+    starterBtn.disabled = false;
     running = null;
     runBtn.textContent = 'Check game balance';
     runBtn.classList.add('primary');
@@ -313,8 +408,8 @@ export function balanceLab(root, { onBack }) {
   }
 
   async function sendToClaude() {
-    if (!stats?.report) return;
-    const markdown = toMarkdown(stats, ids);
+    if (!stats?.report && !starters?.rows) return;
+    const markdown = toMarkdown(stats, ids, starters);
     sendBtn.disabled = true;
     let saved = null;
     try {
@@ -409,11 +504,31 @@ function analyze(s, ids) {
   };
 }
 
-function toMarkdown(s, ids) {
-  const r = s.report;
+// One row per archetype for the new player check, weakest starter first.
+function starterRows(st, ids) {
+  return ids.filter(id => st.wins[id]).map(id => {
+    const m = Object.entries(st.wins[id]).map(([op, [w, n]]) => [op, w / n]).sort((a, b) => a[1] - b[1]);
+    const totals = Object.values(st.wins[id]).reduce((t, [w, n]) => [t[0] + w, t[1] + n], [0, 0]);
+    const rate = totals[0] / (totals[1] || 1);
+    const verdict = rate >= STARTER_TARGET ? { kind: 'ok', label: 'Pass', why: `Wins ${pct(rate)} against the full decks.` }
+      : rate >= STARTER_FLOOR ? { kind: 'watch', label: 'Watch', why: `Between ${pct(STARTER_FLOOR)} and ${pct(STARTER_TARGET)}: new players will struggle a little.` }
+      : { kind: 'weak', label: 'Buff needed', why: `Under ${pct(STARTER_FLOOR)}: new players with this deck will lose too often.` };
+    return { id, name: starterDecks(id)[0].name, rate, worst: m[0], matchups: m, verdict };
+  }).sort((a, b) => a.rate - b.rate);
+}
+
+function toMarkdown(s, ids, st = null) {
   const name = id => DECKS.find(d => d.id === id).name;
   const out = [];
   out.push('# MetaDeck meta report', '');
+  if (st?.rows) {
+    out.push('## New player check', '', `Each archetype's free starter deck against every other archetype's full deck, ${st.gamesPer} games per matchup${st.partial ? ' (stopped early)' : ''}. Target ${pct(STARTER_TARGET)} or more; under ${pct(STARTER_FLOOR)} needs a buff.`, '');
+    out.push('| Archetype | Free starter | vs full decks | Worst matchup | Verdict |', '|---|---|---|---|---|');
+    for (const r of st.rows) out.push(`| ${name(r.id)} | ${r.name} | ${(r.rate * 100).toFixed(1)}% | ${r.worst ? `${name(r.worst[0])} ${pct(r.worst[1])}` : '–'} | ${r.verdict.label} |`);
+    out.push('');
+  }
+  if (!s?.report) return out.join('\n');
+  const r = s.report;
   out.push(`Generated ${s.finishedAt.toISOString()} by the Balance lab. ${s.games} AI-vs-AI games, ${s.gamesPer} per matchup${s.partial ? ' (stopped early, so some matchups are incomplete)' : ''}.`);
   out.push(`Average length ${r.avgTurns.toFixed(1)} turns · first player wins ${pct(r.firstRate)} · draws ${s.draws} · one matchup's 95% noise ±${Math.round(r.noise * 100)}%.`, '');
   out.push('## Balance check', '', '| Deck | Overall | Favored (>55%) | Even | Unfavored (<45%) | Best | Worst | Spread | Verdict |', '|---|---|---|---|---|---|---|---|---|');

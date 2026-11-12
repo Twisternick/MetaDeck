@@ -146,6 +146,48 @@ export function impact(rect, color = '#ff4d6d', { sparks = 14, size = 1 } = {}) 
   }
 }
 
+// A jagged damage badge that slams onto what was hit and holds there long enough to read.
+export function damageSplat(rect, text, { gold = false, delay = 0 } = {}) {
+  if (!rect) return;
+  const size = Math.max(64, Math.min(116, Math.min(rect.width, rect.height) * .72));
+  // Kept on screen: heroes sit in the corners.
+  const half = String(text).length > 3 ? size * .95 : size / 2;
+  const x = Math.max(half + 6, Math.min(window.innerWidth - half - 6, center(rect).x));
+  const y = Math.max(size / 2 + 6, Math.min(window.innerHeight - size / 2 - 6, center(rect).y));
+  const splat = h('div', { class: `dmg-splat${gold ? ' gold' : ''}${String(text).length > 3 ? ' wide' : ''}` },
+    h('i'), h('b', null, text));
+  splat.style.cssText = `left:${x}px;top:${y}px;--s:${size}px`;
+  fxLayer().append(splat);
+  const life = 1250;
+  if (!motionOK()) { setTimeout(() => splat.remove(), delay + life); return; }
+  const tilt = rand(-14, 14);
+  splat.animate([
+    { transform: `translate(-50%,-50%) scale(2.6) rotate(${tilt - 20}deg)`, opacity: 0 },
+    { transform: `translate(-50%,-50%) scale(.86) rotate(${tilt}deg)`, opacity: 1, offset: .1 },
+    { transform: `translate(-50%,-50%) scale(1.08) rotate(${tilt}deg)`, offset: .18 },
+    { transform: `translate(-50%,-50%) scale(1) rotate(${tilt}deg)`, opacity: 1, offset: .78 },
+    { transform: `translate(-50%,-90%) scale(.7) rotate(${tilt}deg)`, opacity: 0 },
+  ], { duration: life, delay, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'both' }).onfinish = () => splat.remove();
+}
+
+// Shake the whole arena; strength 1 is a light knock, 3 a heavy blow.
+export function screenShake(el, strength = 1) {
+  if (!motionOK() || !el) return;
+  const a = 3 + strength * 4;
+  const frames = [0, 1, -1, .8, -.6, .4, -.2, 0].map((k, i) => ({
+    transform: `translate(${(k * a).toFixed(1)}px, ${(i % 2 ? -1 : 1) * k * a * .5}px)`,
+  }));
+  el.animate(frames, { duration: 360 + strength * 60, easing: 'ease-out' });
+}
+
+// Red pulse from the screen edges: the player's own hero just took damage.
+export function hurtVignette() {
+  const v = h('div', { class: 'hurt-vignette' });
+  fxLayer().append(v);
+  if (!motionOK()) { setTimeout(() => v.remove(), 500); return; }
+  v.animate([{ opacity: 0 }, { opacity: 1, offset: .15 }, { opacity: 0 }], { duration: 750, easing: 'ease-out' }).onfinish = () => v.remove();
+}
+
 // Soft rising motes for heals and buffs.
 export function sparkle(rect, color = '#34f5a2', count = 10) {
   if (!motionOK() || !rect) return;

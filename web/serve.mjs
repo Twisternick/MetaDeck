@@ -5,13 +5,20 @@
 // styles.css, src/ and assets/), sends strict security headers, accepts the game's socket only from
 // pages it served, and only takes Balance lab reports from this machine. Behind a reverse proxy, set
 // TRUST_PROXY=1 so the per-address connection cap sees each player's address instead of the proxy's.
+//
+// Player accounts (server/accounts.mjs) are kept in data/accounts.json, or DATA_DIR if set. That folder
+// is never served. On startup the server writes data/admin-token, which tools/grant.mjs uses to add
+// currency to an account from this machine.
 
 import http from 'node:http';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { acceptWebSocket } from './server/ws.mjs';
 import { createLobby } from './server/lobby.mjs';
+import { createAccounts } from './server/accounts.mjs';
+import { handleAccountApi, sessionToken } from './server/account-api.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const port = Number(process.env.PORT || process.argv[2]) || 5173;
@@ -24,7 +31,13 @@ const types = {
 // The only paths the game loads. Everything else in web/ (the server, tools, tests, reports) stays private.
 const PUBLIC = [/^\/index\.html$/, /^\/styles\.css$/, /^\/src\//, /^\/assets\//];
 
-const lobby = createLobby();
+const dataDir = path.resolve(process.env.DATA_DIR || path.join(root, 'data'));
+const accounts = createAccounts({ file: path.join(dataDir, 'accounts.json') });
+const lobby = createLobby({ accounts });
+fs.mkdirSync(dataDir, { recursive: true });
+const adminToken = crypto.randomBytes(24).toString('base64url');
+fs.writeFileSync(path.join(dataDir, 'admin-token'), adminToken, { mode: 0o600 });
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { accounts.flush(); process.exit(0); });
 
 function securityHeaders(req) {
   const host = req.headers.host ?? '';
@@ -114,8 +127,24 @@ function serveStatic(req, res) {
   });
 }
 
+// Account endpoints. Test purchases (Gems for free, clearly labelled) are only offered to a browser on this
+// machine; a deployed server never grants them.
+const fromThisMachine = req => loopback.has(req.socket.remoteAddress) && localHost(req.headers.host) && !(trustProxy && req.headers['x-forwarded-for']);
+const accountCtx = {
+  accounts, sameOrigin, clientIp,
+  secure: req => !!req.socket.encrypted || (trustProxy && req.headers['x-forwarded-proto'] === 'https'),
+  testPurchases: fromThisMachine,
+  isAdmin: req => {
+    const given = Buffer.from(String(req.headers['x-admin-token'] ?? ''));
+    const want = Buffer.from(adminToken);
+    return fromThisMachine(req) && given.length === want.length && crypto.timingSafeEqual(given, want);
+  },
+};
+
 const server = http.createServer((req, res) => {
   try {
+    const route = /^\/api\/account\/([a-z]+)$/.exec(new URL(req.url, 'http://x').pathname);
+    if (route) { handleAccountApi(req, res, route[1], accountCtx); return; }
     if (req.url === '/api/meta-report') {
       if (req.method === 'POST') saveReport(req, res); else res.writeHead(405, { Allow: 'POST' }).end();
       return;
@@ -139,6 +168,7 @@ server.on('upgrade', (req, socket) => {
   if (pathname !== '/ws' || !sameOrigin(req)) { socket.end('HTTP/1.1 403 Forbidden\r\n\r\n'); return; }
   acceptWebSocket(req, socket, ws => {
     ws.ip = clientIp(req);
+    ws.account = accounts.accountFor(sessionToken(req));
     lobby.connect(ws);
   });
 });

@@ -6,10 +6,10 @@ import { chooseAction } from '../engine/ai.js';
 import { deckList } from '../data/index.js';
 
 self.onmessage = ({ data: job }) => {
-  const { key, a, b, games, seed } = job;
+  const { key, a, b, games, seed, aCards } = job; // aCards: a deck list for side a (the new player check)
   for (let g = 0; g < games; g++) {
     const first = g % 2;
-    const state = createGame({ decks: [deckList(a), deckList(b)], deckIds: [a, b], seed: seed + g, firstPlayer: first });
+    const state = createGame({ decks: [aCards ?? deckList(a), deckList(b)], deckIds: [a, b], seed: seed + g, firstPlayer: first });
     const played = [new Set(), new Set()];
     let guard = 0;
     while (!state.over && guard++ < 4000) {

@@ -5,8 +5,8 @@
 export const STARTERS = {
   FPS: [
     { name: 'Blitz Squad', blurb: 'Rush in early, pick off blockers with Headshots and push damage.',
-      double: ['M01', 'M09', 'M05', 'M03', 'M26', 'M25', 'M17', 'S06', 'S11', 'S14'],
-      cut: ['M07', 'M16', 'M19', 'M20', 'M18', 'M23', 'M27', 'S10', 'S12', 'M30'] },
+      double: ['M01', 'M09', 'M05', 'M22', 'M26', 'M25', 'M17', 'S06', 'S11', 'S14'],
+      cut: ['M07', 'M16', 'S07', 'M02', 'M18', 'M23', 'M27', 'S10', 'S12', 'M30'] },
     { name: 'Overwatch', blurb: 'Hold the line with Guards and sweep the board with explosives.',
       double: ['M07', 'M27', 'M16', 'M23', 'M11', 'S04', 'S06', 'S12', 'M30', 'M19'],
       cut: ['M01', 'M09', 'M05', 'M02', 'M26', 'M17', 'S02', 'S13', 'M03', 'M21'] },
@@ -28,7 +28,7 @@ export const STARTERS = {
   Platformer: [
     { name: 'Speedrun', blurb: 'Rush and Double Jump straight past Guards to the enemy face.',
       double: ['M04', 'M10', 'M21', 'M01', 'M19', 'M03', 'M24', 'S07', 'S14', 'M08'],
-      cut: ['M07', 'M16', 'M09', 'M22', 'M25', 'M15', 'S09', 'S11', 'S10', 'S05'] },
+      cut: ['M07', 'M16', 'M09', 'M22', 'S02', 'S08', 'S09', 'S11', 'S10', 'S05'] },
     { name: 'Extra Lives', blurb: 'Checkpoints and Power-Ups make every monster hard to kill.',
       double: ['M07', 'M18', 'M22', 'M06', 'M14', 'S04', 'S08', 'M11', 'S15', 'S09'],
       cut: ['M04', 'M10', 'M21', 'M02', 'M05', 'M13', 'M17', 'S07', 'S02', 'S06'] },
@@ -38,8 +38,8 @@ export const STARTERS = {
   ],
   RPG: [
     { name: 'Adventuring Party', blurb: 'Cheap heroes gain XP fast and Level Up into legends.',
-      double: ['M01', 'M02', 'M05', 'M20', 'M09', 'M22', 'S01', 'S06', 'M11', 'S14'],
-      cut: ['M19', 'M03', 'M04', 'M12', 'M25', 'M15', 'M18', 'S09', 'S08', 'S07'] },
+      double: ['M01', 'M02', 'M05', 'M23', 'M09', 'M22', 'S01', 'S06', 'M11', 'S14'],
+      cut: ['M19', 'M03', 'M04', 'S03', 'M25', 'S02', 'M18', 'S09', 'S08', 'S07'] },
     { name: 'Holy Order', blurb: 'Clerics and Paladins guard, heal and grind the enemy down.',
       double: ['M19', 'M03', 'M04', 'M07', 'M23', 'M12', 'M25', 'S03', 'S13', 'S11'],
       cut: ['M01', 'M02', 'M20', 'M09', 'M22', 'M10', 'M17', 'S01', 'S05', 'S07'] },
@@ -82,8 +82,8 @@ export const STARTERS = {
   ],
   Strategy: [
     { name: 'Fortress', blurb: 'Walls and artillery that never attack but grind everything down.',
-      double: ['M07', 'M21', 'M11', 'M17', 'M24', 'M03', 'M16', 'S05', 'S12', 'S14'],
-      cut: ['M01', 'M22', 'M05', 'M02', 'M20', 'M09', 'M12', 'S01', 'S06', 'S10'] },
+      double: ['M07', 'M21', 'M11', 'M17', 'M24', 'M03', 'M25', 'S05', 'S12', 'S14'],
+      cut: ['M01', 'M22', 'M05', 'M02', 'M20', 'M04', 'M06', 'S01', 'S06', 'S10'] },
     { name: 'Economy', blurb: 'Build Bandwidth early and land the biggest late game.',
       double: ['M02', 'M05', 'M06', 'M23', 'S11', 'S09', 'S15', 'M14', 'M25', 'M15'],
       cut: ['M01', 'M19', 'M22', 'M07', 'M21', 'M16', 'M17', 'S01', 'S07', 'S13'] },
@@ -93,8 +93,8 @@ export const STARTERS = {
   ],
   CityBuilder: [
     { name: 'Boomtown', blurb: 'Citizens everywhere: flood the board with tokens.',
-      double: ['M16', 'M19', 'M04', 'M20', 'M09', 'M21', 'S03', 'S11', 'S13', 'M17'],
-      cut: ['M02', 'M10', 'M23', 'M11', 'M25', 'M22', 'S05', 'S15', 'S01', 'S10'] },
+      double: ['M16', 'M19', 'M04', 'M20', 'M12', 'M21', 'S03', 'S11', 'S13', 'M17'],
+      cut: ['M02', 'M10', 'M23', 'M11', 'M25', 'M22', 'S05', 'S15', 'S01', 'M05'] },
     { name: 'Red Tape', blurb: 'Tax, discard and curfews tie the opponent up.',
       double: ['M02', 'M10', 'M23', 'S05', 'S01', 'S15', 'M08', 'M13', 'S12', 'M22'],
       cut: ['M16', 'M19', 'M18', 'M20', 'M09', 'M21', 'M12', 'M15', 'S03', 'S14'] },

@@ -8,8 +8,15 @@ import { lobby } from './lobby.js';
 import { balanceLab } from './balance.js';
 import { net } from './net.js';
 import { decksFor, resolveDeck, randomStarter, isPlayable } from './deck-store.js';
+import { profile, act, walletBar, signedIn, initAccount, reload } from './profile.js';
+import { accountScreen } from './account.js';
+import { collection } from './collection.js';
+import { shop } from './shop.js';
+import { season } from './season.js';
+import { rewardsPanel, toast } from './packs.js';
+import { missingCards, missingDust, archInfo, archLevel, starterUnlockLevel, hasPremium } from '../data/economy.js';
 import { installTilt, installRipples, installTooltips, artSlot, deckArtUrls, removeFx } from './fx.js';
-import { DECKS, CARDS, DECK_SIZE } from '../data/index.js';
+import { DECKS, CARDS, DECK_SIZE, getDeck } from '../data/index.js';
 import { KEYWORDS, TERMS, START_HP, BOARD_SLOTS, MAX_HAND, OPENING_HAND } from '../engine/constants.js';
 import { describeTip, glossaryList, kwName, KW_META, KIND_COLORS } from './keywords.js';
 
@@ -24,6 +31,51 @@ installTooltips(describeTip);
 
 const emblem = deck => h('span', { class: 'chip-emblem', 'aria-hidden': 'true' }, deck.icon);
 
+const nav = {
+  shop: () => shop(root, { onBack: menu, nav }),
+  collection: () => collection(root, { onBack: menu, nav }),
+  season: () => season(root, { onBack: menu, nav }),
+  account: () => accountScreen(root, { onBack: menu, nav }),
+};
+
+// Signed in, the server pays online match rewards itself and tells us with a 'rewards' message.
+let rewardWaiter = null;
+net.subscribe(msg => {
+  if (msg.t !== 'rewards') return;
+  reload();
+  if (rewardWaiter) rewardWaiter(msg); else pendingRewards = msg;
+});
+let pendingRewards = null;
+
+// A deck list can be played when it's legal and the player owns every card in it.
+const usable = deck => isPlayable(deck) && missingCards(profile(), deck.cards).length === 0;
+
+// The human's cosmetics in a match, and paying out its rewards when it ends.
+function matchExtras(deckId, online = false) {
+  const p = profile();
+  return {
+    cosmetics: {
+      back: p.cosmetics.back, arena: p.cosmetics.arena,
+      premium: new Set(p.cosmetics.premiumArt ? Object.keys(p.cards).filter(id => hasPremium(p, id)) : []),
+    },
+    // The game-over screen shows `holder`, filled in once the rewards are known.
+    onResult: ({ won, damage }) => {
+      const holder = h('div', { class: 'rewards-holder' }, h('p', { class: 'muted rewards-wait' }, 'Adding up your rewards…'));
+      const show = out => holder.replaceChildren(rewardsPanel(out, deckId));
+      const note = text => holder.replaceChildren(h('p', { class: 'muted' }, text));
+      if (online && signedIn()) {
+        const got = msg => { rewardWaiter = null; pendingRewards = null; reload().then(() => show(msg.out)); };
+        if (pendingRewards) got(pendingRewards); else rewardWaiter = got;
+      } else if (online) {
+        note('Sign in to earn rewards from online matches.');
+      } else {
+        act('recordMatch', { deckId, won, damage }).then(r => (r.ok ? show(r.out) : note(r.reason)));
+      }
+      return { render: () => holder };
+    },
+  };
+}
+
 function menu() {
   removeFx();
   const pickOpponent = () => {
@@ -33,13 +85,14 @@ function menu() {
   };
   const play = (spectate = false) => {
     const opp = pickOpponent();
-    const mine = resolveDeck(prefs.myDeck, prefs.lists[prefs.myDeck]);
+    const mine = resolveDeck(prefs.myDeck, prefs.lists[prefs.myDeck], usable);
     const theirs = randomStarter(opp);
     const launch = () => startMatch(root, {
       myDeck: prefs.myDeck, oppDeck: opp, spectate,
       myCards: mine.cards, oppCards: theirs.cards,
       onExit: menu,
       onRematch: launch,
+      ...(spectate ? {} : matchExtras(prefs.myDeck)),
     });
     launch();
   };
@@ -50,6 +103,7 @@ function menu() {
   },
     artSlot('deck-art', deckArtUrls(deck.id), deck.icon),
     h('span', { class: 'pick', 'aria-hidden': 'true' }, '✓'),
+    h('span', { class: 'deck-level', title: 'Archetype level' }, `Lv ${archLevel(archInfo(profile(), deck.id).xp)}`),
     h('span', { class: 'deck-tile-body' },
       h('span', { class: 'deck-name' }, deck.name),
       h('span', { class: 'deck-tag' }, deck.tagline)));
@@ -60,26 +114,57 @@ function menu() {
     onPlay: saved => { prefs.lists[prefs.myDeck] = saved.key; savePrefs(); menu(); play(false); },
   });
 
-  // One deck list: a starter or a custom deck. Unfinished custom decks open in the builder instead.
+  // Craft every card a deck list is missing, if there's Dust for all of them.
+  const craftMissing = deck => {
+    const cost = missingDust(profile(), deck.cards);
+    const count = missingCards(profile(), deck.cards).reduce((s, m) => s + m.need, 0);
+    if (!confirm(`Craft the ${count} missing card${count === 1 ? '' : 's'} for ${cost} Dust?`)) return;
+    act('craftDeck', { cards: deck.cards }).then(r => {
+      if (!r.ok) return toast(r.reason, 'bad');
+      toast(`${deck.name} is ready to play`);
+      prefs.lists[prefs.myDeck] = deck.key;
+      savePrefs();
+      render(false);
+    });
+  };
+
+  // One deck list: a starter or a custom deck. Unfinished custom decks open in the builder instead, and
+  // lists with cards the player doesn't own yet say how to get them.
   const listTile = (deck, i, selected) => {
     const playable = isPlayable(deck);
+    const missing = playable ? missingCards(profile(), deck.cards) : [];
+    const locked = missing.length > 0;
+    const starterIndex = deck.starter ? Number(deck.key.split(':')[2]) : -1;
+    const dust = locked ? missingDust(profile(), deck.cards) : 0;
     const select = () => {
-      if (!playable) return build(deck);
+      if (!playable || (locked && !deck.starter)) return build(deck);
+      if (locked) return;
       prefs.lists[prefs.myDeck] = deck.key;
       savePrefs();
       render(false);
     };
+    const kind = locked
+      ? (deck.starter ? `🔒 Level ${starterUnlockLevel(starterIndex)}` : `Missing ${missing.reduce((s, m) => s + m.need, 0)} cards`)
+      : deck.starter ? (starterIndex === 0 ? 'Starter · Free' : 'Starter') : playable ? 'Custom' : `Draft · ${deck.cards.length}/${DECK_SIZE}`;
     return h('div', {
-      class: `list-tile${selected ? ' selected' : ''}${playable ? '' : ' draft'}${i ? ' rise' : ''}`, style: { '--i': i },
+      class: `list-tile${selected ? ' selected' : ''}${playable ? '' : ' draft'}${locked ? ' locked' : ''}${i ? ' rise' : ''}`, style: { '--i': i },
       role: 'button', tabindex: '0', 'aria-pressed': selected ? 'true' : 'false', onclick: select,
       onkeydown: e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); select(); } },
     },
-      h('span', { class: 'list-kind' }, deck.starter ? 'Starter' : playable ? 'Custom' : `Draft · ${deck.cards.length}/${DECK_SIZE}`),
+      h('span', { class: 'list-kind' }, kind),
       h('span', { class: 'list-name' }, deck.name),
       h('span', { class: 'list-blurb' }, deck.starter ? deck.blurb : `${deck.cards.length} cards`),
-      h('button', {
-        class: 'btn ghost small list-edit', onclick: e => { e.stopPropagation(); build(deck); },
-      }, deck.starter ? 'Copy & edit' : 'Edit'));
+      locked ? h('span', { class: 'list-unlock' }, deck.starter
+        ? `Reach level ${starterUnlockLevel(starterIndex)} with ${getDeck(deck.archetype).name}, or craft the missing cards.`
+        : 'Craft the missing cards to play it.') : null,
+      h('span', { class: 'list-buttons' },
+        locked ? h('button', {
+          class: 'btn primary small', disabled: profile().dust < dust || null, title: profile().dust < dust ? `You have ${profile().dust} Dust` : null,
+          onclick: e => { e.stopPropagation(); craftMissing(deck); },
+        }, `Craft ✨ ${dust}`) : null,
+        h('button', {
+          class: 'btn ghost small list-edit', onclick: e => { e.stopPropagation(); build(deck); },
+        }, deck.starter ? 'Copy & edit' : 'Edit')));
   };
 
   const vsSide = (deck, label, right, listName) => h('div', { class: `vs-side${right ? ' right' : ''}`, style: { '--deck': deck ? deck.color : '#888' } },
@@ -94,10 +179,11 @@ function menu() {
   const render = (animate = true) => {
     const mine = DECKS.find(d => d.id === prefs.myDeck);
     const opp = prefs.oppDeck === 'random' ? null : DECKS.find(d => d.id === prefs.oppDeck);
-    const myList = resolveDeck(mine.id, prefs.lists[mine.id]);
+    const myList = resolveDeck(mine.id, prefs.lists[mine.id], usable);
     const dealLists = !animate && listsShownFor !== mine.id;
     listsShownFor = mine.id;
     root.replaceChildren(h('main', { class: 'menu' },
+      walletBar({ nav, quiet: !animate }),
       h('header', { class: `menu-head${animate ? ' rise' : ''}` },
         h('div', { class: 'logo-kicker' }, 'Every deck is a genre'),
         h('div', { class: 'logo-wrap' }, h('h1', { class: 'logo' }, 'MetaDeck')),
@@ -135,6 +221,8 @@ function menu() {
         h('button', { class: 'btn primary big', onclick: () => play(false) }, 'Play vs AI'),
         h('button', { class: 'btn primary big online', onclick: online }, 'Play online'),
         h('button', { class: 'btn ghost', onclick: () => play(true) }, 'Watch AI vs AI'),
+        h('button', { class: 'btn ghost', onclick: () => collection(root, { onBack: menu, nav, tab: 'cards', deckId: prefs.myDeck }) }, 'Collection'),
+        h('button', { class: 'btn ghost', onclick: nav.shop }, 'Shop'),
         h('button', { class: 'btn ghost', onclick: () => gallery(prefs.myDeck) }, 'Card gallery'),
         h('button', { class: 'btn ghost', onclick: rules }, 'How to play'),
         h('button', { class: 'btn ghost', onclick: () => balanceLab(root, { onBack: menu }) }, 'Balance lab')),
@@ -145,8 +233,8 @@ function menu() {
 
 // Online play with the deck list picked in the menu.
 function online() {
-  const deck = resolveDeck(prefs.myDeck, prefs.lists[prefs.myDeck]);
-  lobby(root, { deck: { archetype: prefs.myDeck, cards: deck.cards, name: deck.name }, onBack: menu });
+  const deck = resolveDeck(prefs.myDeck, prefs.lists[prefs.myDeck], usable);
+  lobby(root, { deck: { archetype: prefs.myDeck, cards: deck.cards, name: deck.name }, onBack: menu, matchExtras: () => matchExtras(prefs.myDeck, true) });
 }
 
 function gallery(deckId, newOnly = false) {
@@ -239,5 +327,6 @@ function rules() {
     )));
 }
 
-// A reload during an online match goes straight back to it (the server keeps it for a while).
-if (net.inMatch) online(); else menu();
+// Pick up a signed-in account first, then go to the menu. A reload during an online match goes
+// straight back to it (the server keeps it for a while).
+initAccount().finally(() => { if (net.inMatch) online(); else menu(); });

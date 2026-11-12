@@ -9,6 +9,8 @@
     "start": "node serve.mjs",
     "art": "node tools/art-studio.mjs",
     "test": "node --test test/*.test.mjs",
-    "simulate": "node tools/simulate.mjs --games 100 --cards"
+    "simulate": "node tools/simulate.mjs --games 100 --cards",
+    "grant": "node tools/grant.mjs",
+    "set-password": "node tools/set-password.mjs"
   }
 }
