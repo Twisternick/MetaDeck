@@ -1,39 +1,44 @@
 # Artwork slots
 
-Every art slot in the UI is an image placeholder. Drop a PNG at the path below and the UI picks it up on the next load, no code change needed. Until an image exists, the slot shows an animated gradient mesh with the deck's emblem, so nothing looks broken while art is being generated.
+Every art slot in the UI is an image placeholder. Drop a `.webp` or `.png` at the path below and the UI picks it up on the next load, no code change needed. Until an image exists, the slot shows an animated gradient mesh with the deck's emblem, so nothing looks broken while art is being generated.
 
-Images are loaded in order; the first one that exists wins. Missing files are only requested once per page load.
+Each slot is tried as `.webp`, then `.png`, then its fallback; the first one that exists wins. Missing files are only requested once per page load.
 
-| Slot | Path | Suggested size | Falls back to |
+| Slot | Path | Size (Art Studio) | Falls back to |
 |---|---|---|---|
-| Card art (one per card) | `cards/<cardId>.png`, e.g. `cards/FPS_M10_SniperOperative.png` | 512 × 320 (16:10) | the deck's art, then the placeholder |
-| Deck art (menu tiles, gallery, cards without art) | `decks/<deckId>.png`: `FPS`, `Horror`, `Platformer`, `RPG`, `Racing`, `Fighting`, `Sports`, `Strategy`, `CityBuilder`, `CardGame` | 768 × 480 | placeholder |
-| Hero portrait (match screen avatar) | `heroes/<deckId>.png` | 256 × 256, centered subject | deck art, then placeholder |
-| Token art | `cards/<tokenId>.png` (ids in `src/data/tokens.js`), otherwise `decks/token.png` | 512 × 320 | the summoner's deck art |
-| Card back | `ui/card-back.png` | 400 × 560 (5:7) | placeholder with the "M" monogram |
+| Card art (one per card) | `cards/<cardId>.webp`, e.g. `cards/FPS_M10_SniperOperative.webp` | 768 × 480 (16:10) | the deck's art, then the placeholder |
+| Deck art (menu tiles, gallery, cards without art) | `decks/<deckId>.webp`: `FPS`, `Horror`, `Platformer`, `RPG`, `Racing`, `Fighting`, `Sports`, `Strategy`, `CityBuilder`, `CardGame` | 1024 × 640 | placeholder |
+| Hero portrait (match screen avatar) | `heroes/<deckId>.webp` | 512 × 512, centered subject | deck art, then placeholder |
+| Token art | `cards/<tokenId>.webp` (ids in `src/data/tokens.js`), otherwise `decks/token.webp` | 768 × 480 | the summoner's deck art |
+| Card back | `ui/card-back.webp` | 560 × 784 (5:7) | placeholder with the "M" monogram |
 | Favicon | `ui/favicon.png` (already present, generated) | 64 × 64 | — |
 
 Card ids are the first argument of every `M(...)` / `S(...)` entry in `src/data/decks/*.js`. Deck ids are the `id` field at the top of each deck file.
 
-## Prompting AI image generators
+## Making art with the Art Studio
 
-A consistent style across the whole set matters more than any single image. A base prompt that works well with the dark, neon UI:
+```bash
+npm run art
+```
 
-> digital painting, dramatic rim lighting, deep shadows, vivid neon accent color **<deck color>**, cinematic composition, centered subject, no text, no borders, no watermark, 16:10
+Then open http://localhost:5174. The studio lists every slot above, grouped by deck, with a ready-made prompt for each. Use it with any image generator you can copy images out of, such as ChatGPT or Gemini:
 
-Append a per-deck flavor:
+1. Click **Copy prompt** on a card.
+2. Paste the prompt into the generator.
+3. Right-click the result and choose **Copy image**. You can also download it and drop the file on the card, or use **File…**.
+4. Back in the studio, press **Ctrl+V**. Drag to frame the image (scroll to zoom), then press **Enter**.
 
-| Deck | Color | Flavor |
-|---|---|---|
-| FPS | `#7f9a3c` | tactical operators, night-vision green, smoke, muzzle flash |
-| Horror | `#7b3a8c` | haunted, fog, violet moonlight, silhouettes with glowing eyes |
-| Platformer | `#3d9bd6` | bright sky-blue, floating platforms, stars and springs, playful |
-| RPG | `#c08a2e` | heroic fantasy, gold filigree, enchanted gear, glowing runes |
-| Racing | `#d4473a` | motion blur, neon streaks, asphalt at night, nitro flames |
-| Fighting | `#e0782a` | martial arts arena, orange stage lights, impact sparks |
-| Sports | `#2f9e5b` | stadium floodlights, green turf, confetti, crowd bokeh |
-| Strategy | `#4364a8` | war-room blues, hex grids, fortress walls, banners |
-| City Builder | `#3f8f8c` | teal skyline at dusk, cranes, districts, warm windows |
-| Card Game | `#8c56c4` | floating cards, purple arcane glow, shuffling motion |
+The studio saves the image as a WebP of the right size, then moves on to the next card that still needs art and copies its prompt. The progress bar and tab counts show what is left. To redo an image, untick **Missing only**.
 
-For hero portraits, use the same prompt with "portrait, head and shoulders, looking at camera, square".
+Two options make the loop faster, and both are on by default:
+
+- **4 cards per image:** a card prompt asks for a 2×2 grid of four cards from the same deck. The studio splits the pasted image into four cards, each of which can be reframed. Untick any panel that came out badly; it stays on the to-do list. Deck art, hero portraits and the card back are always one per image.
+- **Grab copied image on return:** when you switch back to the studio with a new image on the clipboard, it opens straight away, so you don't need Ctrl+V. The browser asks once for permission to read the clipboard.
+
+The studio only listens on `127.0.0.1` and can only write `.webp` files inside `assets/img/cards|decks|heroes|ui`.
+
+## Prompts
+
+Prompts are generated from the card data in `tools/art-studio/slots.js`. Every deck has its own art style (`DECK_STYLE`): night-time cinematic realism for FPS, found-footage stills for Horror, pixel art for Platformer, an illuminated storybook for RPG, neon synthwave for Racing, anime for Fighting, sports photography for Sports, a vintage war poster for Strategy, a tilt-shift diorama for City Builder and holographic foil for Card Game. Tokens use the style of the deck that summons them. Each prompt adds shared family rules (one readable focal subject, original designs, no text or frames), a subject built from the card's name, cost and keywords, and the card's rules text as context.
+
+Keep the styles stable while a set is being made: consistency within a deck matters more than any single image. Generating a deck's cards in one long ChatGPT conversation helps, and so does attaching the style-test panel you picked as a reference ("match this art style").
