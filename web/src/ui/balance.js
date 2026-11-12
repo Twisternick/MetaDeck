@@ -6,7 +6,8 @@ import { h, storage } from './dom.js';
 import { removeFx } from './fx.js';
 import { DECKS, CARDS } from '../data/index.js';
 
-const GAME_OPTIONS = [20, 50, 100, 250, 500];
+const GAME_OPTIONS = [20, 50, 100, 250, 500, 1000, 2500, 5000, 10000];
+const CHUNK = 250; // games per worker job, so big matchups spread across every thread
 const FAVORED = 0.55, UNFAVORED = 0.45;
 
 let running = null; // the live run, so leaving the screen can stop its workers
@@ -27,10 +28,16 @@ export function balanceLab(root, { onBack }) {
   const sendBtn = h('button', { class: 'btn primary big online', disabled: true, onclick: () => sendToClaude() }, 'Send stats to Claude');
   const sendNote = h('p', { class: 'bl-send-note muted' });
   const gameChips = h('div', { class: 'chips' });
-  const renderChips = () => gameChips.replaceChildren(...GAME_OPTIONS.map(n => h('button', {
-    class: `chip${prefs.games === n ? ' selected' : ''}`, disabled: running ? true : null,
-    onclick: () => { prefs.games = n; storage.set('metadeck.balance', prefs); renderChips(); },
-  }, `${n} games`)));
+  const estimate = h('span', { class: 'bl-estimate muted' });
+  const pairings = (ids.length * (ids.length - 1)) / 2;
+  const renderChips = () => {
+    gameChips.replaceChildren(...GAME_OPTIONS.map(n => h('button', {
+      class: `chip${prefs.games === n ? ' selected' : ''}`, disabled: running ? true : null,
+      onclick: () => { prefs.games = n; storage.set('metadeck.balance', prefs); renderChips(); },
+    }, n.toLocaleString())));
+    const total = pairings * prefs.games;
+    estimate.textContent = `${pairings} matchups × ${prefs.games.toLocaleString()} = ${total.toLocaleString()} games · about ${duration(total / (prefs.rate || 200))}`;
+  };
   renderChips();
 
   const activeGrid = h('div', { class: 'bl-active' }, h('p', { class: 'muted bl-empty' }, 'Matchups appear here while the simulation runs.'));
@@ -72,7 +79,7 @@ export function balanceLab(root, { onBack }) {
     h('section', { class: 'bl-controls rise' },
       h('div', { class: 'bl-control-text' },
         h('p', null, 'Plays every deck against every other deck with the built-in AI on both sides, each deck going first half the time.'),
-        h('div', { class: 'bl-games' }, h('span', { class: 'muted' }, 'Games per matchup'), gameChips)),
+        h('div', { class: 'bl-games' }, h('span', { class: 'muted' }, 'Games per matchup'), gameChips), estimate),
       h('div', { class: 'bl-actions' }, runBtn, sendBtn)),
     sendNote,
     h('div', { class: 'bl-progress rise', style: { '--i': 1 } }, progressFill, h('div', { class: 'bl-progress-text' }, progressText, rateText)),
@@ -90,14 +97,19 @@ export function balanceLab(root, { onBack }) {
   function start() {
     stats = newStats(ids);
     stats.gamesPer = prefs.games;
-    const queue = [];
-    for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) queue.push({ a: ids[i], b: ids[j] });
+    const matchups = [];
+    for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) matchups.push({ a: ids[i], b: ids[j] });
     // Shuffle so the active matchups aren't all one deck at the start.
-    for (let i = queue.length - 1; i > 0; i--) { const k = Math.floor(Math.random() * (i + 1)); [queue[i], queue[k]] = [queue[k], queue[i]]; }
-    stats.total = queue.length * prefs.games;
+    for (let i = matchups.length - 1; i > 0; i--) { const k = Math.floor(Math.random() * (i + 1)); [matchups[i], matchups[k]] = [matchups[k], matchups[i]]; }
+    // Each matchup is split into chunks of CHUNK games. A matchup's chunks stay together in the queue, so only a few
+    // matchups are live at once, and a big one is shared across threads instead of leaving the others idle at the end.
+    const chunks = Math.ceil(prefs.games / CHUNK);
+    const queue = matchups.flatMap(m => Array.from({ length: chunks }, (_, c) =>
+      ({ ...m, key: `${m.a}|${m.b}`, games: Math.min(CHUNK, prefs.games - c * CHUNK), chunks })));
+    stats.total = matchups.length * prefs.games;
     const baseSeed = Math.floor(Math.random() * 1e9);
     const threads = Math.max(1, Math.min((navigator.hardwareConcurrency || 4) - 1, 8, queue.length));
-    const live = new Map(); // pairing key -> { a, b, wins: [a, b], n, el }
+    const live = new Map(); // matchup key -> { a, b, wins: [a, b], n, chunksLeft, card elements }
     activeGrid.replaceChildren();
     feed.replaceChildren();
     for (const id of ids) for (const c of ids) if (cells[id]?.[c]) { cells[id][c].textContent = ''; cells[id][c].className = 'bl-cell'; cells[id][c].style.removeProperty('--wr'); }
@@ -107,35 +119,36 @@ export function balanceLab(root, { onBack }) {
     sendBtn.disabled = true;
     sendNote.textContent = '';
 
-    running = { workers: [], started: performance.now() };
+    running = { workers: [], started: performance.now(), busy: 0 };
     runBtn.textContent = 'Stop';
     runBtn.classList.remove('primary');
     runBtn.classList.add('danger');
     renderChips();
 
-    const assign = (worker, slot) => {
-      const next = queue.shift();
-      if (!next) { slot.remove(); worker.terminate(); if (!running.workers.some(w => w.busy)) finish(); return; }
-      const key = `${next.a}|${next.b}`;
-      worker.busy = key;
+    const card = next => {
       const scoreA = h('b', null, '0'), scoreB = h('b', null, '0');
       const split = h('div', { class: 'bl-split-fill' });
-      const count = h('span', { class: 'bl-count' }, `0 / ${prefs.games}`);
+      const count = h('span', { class: 'bl-count' }, `0 / ${prefs.games.toLocaleString()}`);
       const el = h('div', { class: 'bl-match', style: { '--a': deck(next.a).color, '--b': deck(next.b).color } },
         h('div', { class: 'bl-side' }, h('span', { class: 'bl-emblem' }, deck(next.a).icon), h('span', null, deck(next.a).name), scoreA),
         h('div', { class: 'bl-vs' }, 'VS'),
         h('div', { class: 'bl-side right' }, scoreB, h('span', null, deck(next.b).name), h('span', { class: 'bl-emblem' }, deck(next.b).icon)),
         h('div', { class: 'bl-split' }, split), count);
-      slot.replaceChildren(el);
-      live.set(key, { ...next, wins: [0, 0], n: 0, scoreA, scoreB, split, count, el });
-      worker.postMessage({ key, a: next.a, b: next.b, games: prefs.games, seed: baseSeed + stats.assigned * 1009 });
+      activeGrid.append(el);
+      return { a: next.a, b: next.b, wins: [0, 0], n: 0, chunksLeft: next.chunks, scoreA, scoreB, split, count, el };
+    };
+
+    const assign = worker => {
+      const next = queue.shift();
+      if (!next) { worker.terminate(); if (!running.busy) finish(); return; }
+      if (!live.has(next.key)) live.set(next.key, card(next));
+      running.busy++;
+      worker.postMessage({ key: next.key, a: next.a, b: next.b, games: next.games, seed: baseSeed + stats.assigned * 100003 });
       stats.assigned++;
     };
 
     for (let t = 0; t < threads; t++) {
       const worker = new Worker(new URL('./balance-worker.js', import.meta.url), { type: 'module' });
-      const slot = h('div', { class: 'bl-slot' });
-      activeGrid.append(slot);
       running.workers.push(worker);
       worker.onmessage = ({ data }) => {
         if (!running) return;
@@ -148,17 +161,21 @@ export function balanceLab(root, { onBack }) {
           schedule();
           return;
         }
-        live.delete(data.key);
-        worker.busy = null;
-        pushFeed(m);
-        assign(worker, slot);
+        running.busy--;
+        if (--m.chunksLeft === 0) {
+          live.delete(data.key);
+          m.el.remove();
+          pushFeed(m);
+        }
+        assign(worker);
       };
       worker.onerror = e => { sendNote.textContent = `Simulation error: ${e.message}`; stop(); };
-      assign(worker, slot);
+      assign(worker);
     }
 
+    // A timer rather than requestAnimationFrame, so long runs keep updating in a background tab.
     let frame = 0;
-    function schedule() { if (!frame) frame = requestAnimationFrame(() => { frame = 0; paintLive(live); }); }
+    function schedule() { if (!frame) frame = setTimeout(() => { frame = 0; if (running) paintLive(live); }, 120); }
   }
 
   function finish() {
@@ -166,11 +183,12 @@ export function balanceLab(root, { onBack }) {
     running = null;
     stats.seconds = seconds;
     stats.finishedAt = new Date();
+    if (seconds > 2) { prefs.rate = stats.games / seconds; storage.set('metadeck.balance', prefs); }
     runBtn.textContent = 'Check game balance';
     runBtn.classList.add('primary');
     runBtn.classList.remove('danger');
     renderChips();
-    activeGrid.replaceChildren(h('p', { class: 'muted bl-empty' }, `All ${stats.games.toLocaleString()} games finished in ${seconds.toFixed(1)}s.`));
+    activeGrid.replaceChildren(h('p', { class: 'muted bl-empty' }, `All ${stats.games.toLocaleString()} games finished in ${duration(seconds)}.`));
     paintLive(new Map());
     paintFinal();
     sendBtn.disabled = false;
@@ -196,7 +214,7 @@ export function balanceLab(root, { onBack }) {
     const winner = rate >= 0.5 ? m.a : m.b;
     const item = h('li', { class: 'bl-feed-item', style: { '--deck': deck(winner).color } },
       h('span', null, deck(m.a).icon, ' ', deck(m.a).name),
-      h('b', null, `${m.wins[0]} – ${m.wins[1]}`),
+      h('b', null, `${m.wins[0].toLocaleString()} – ${m.wins[1].toLocaleString()}`),
       h('span', null, deck(m.b).name, ' ', deck(m.b).icon));
     feed.prepend(item);
     while (feed.children.length > 14) feed.lastChild.remove();
@@ -219,12 +237,12 @@ export function balanceLab(root, { onBack }) {
     progressFill.style.width = `${(100 * done) / stats.total}%`;
     progressText.textContent = `${done.toLocaleString()} / ${stats.total.toLocaleString()} games`;
     const secs = (performance.now() - (running?.started ?? performance.now())) / 1000;
-    rateText.textContent = running && secs > 0.5 ? `${Math.round(done / secs)} games/s · ${Math.max(0, Math.ceil((stats.total - done) / (done / secs || 1)))}s left` : '';
+    rateText.textContent = running && secs > 0.5 ? `${Math.round(done / secs)} games/s · ${duration((stats.total - done) / (done / secs || 1))} left` : '';
     for (const m of live.values()) {
       m.scoreA.textContent = m.wins[0];
       m.scoreB.textContent = m.wins[1];
       m.split.style.width = `${m.n ? (100 * m.wins[0]) / m.n : 50}%`;
-      m.count.textContent = `${m.n} / ${prefs.games}`;
+      m.count.textContent = `${m.n.toLocaleString()} / ${prefs.games.toLocaleString()}`;
       paintCell(cells[m.a][m.b], m.wins[0] / (m.n || 1));
       paintCell(cells[m.b][m.a], m.wins[1] / (m.n || 1));
       cells[m.a][m.b].classList.add('live');
@@ -323,6 +341,7 @@ function stopRun() { if (running) { for (const w of running.workers) w.terminate
 
 const stat = (label, value) => h('div', { class: 'bl-stat rise' }, h('span', null, label), h('b', null, value));
 const pct = x => `${Math.round(x * 100)}%`;
+const duration = secs => (secs < 90 ? `${Math.max(1, Math.round(secs))}s` : secs < 5400 ? `${Math.round(secs / 60)} min` : `${(secs / 3600).toFixed(1)} h`);
 
 // ---------- statistics ----------
 function newStats(ids) {
