@@ -105,11 +105,11 @@ Fear weakens attackers, Haunt punishes removal, and the dead keep coming back.
 
 | Card | Before | After |
 |---|---|---|
-| Panicked Civilian | unchanged |  |
+| Panicked Civilian | 1 · 1/2 · Fear | 1 · 1/3 · Fear |
 | Possessed Vermin | unchanged |  |
 | Grave Whisperer | 1 · 1/1 · Haunt | 1 · 1/2 · Haunt |
 | **Blood Pact** 🆕 | — | 1 · Destroy a friendly monster. Draw 2 cards. |
-| Jump Scare | 1 · Quick · DebuffAttackThisCombat 2 → EnemyMonster | 1 · Quick · Give an enemy monster -2 ATK this turn. |
+| Jump Scare | 1 · Quick · DebuffAttackThisCombat 2 → EnemyMonster | 1 · Quick · Give an enemy monster -3 ATK this turn. |
 | Flashlight Beam | 1 · DealDamage 1 → EnemyMonster | 1 · Deal 2 damage to an enemy monster. |
 | Blood Trail | 2 · ReturnFromGraveyardToHand → CardInYourGraveyard | 1 · Return the last card in your graveyard to your hand. |
 | Infected Host | 2 · 2/2 · Fear | 2 · 2/3 · Fear |
@@ -124,7 +124,7 @@ Fear weakens attackers, Haunt punishes removal, and the dead keep coming back.
 | Relentless Pursuer | 3 · 3/4 | 3 · 3/3 · Fear, Checkpoint |
 | Cult Devourer | 3 · 4/2 · Devour | 3 · 3/3 · Devour |
 | **Bone Collector** 🆕 | — | 3 · 2/3 · Whenever another friendly monster dies, gain +1/+1. |
-| Emergency Heal | 4 · Heal 4 → FriendlyPlayer | 3 · Restore 6 HP to you. |
+| Emergency Heal | 4 · Heal 4 → FriendlyPlayer | 2 · Restore 6 HP to you. |
 | Grave Call | 5 · ReviveFromGraveyard → CardInYourGraveyard | 3 · Revive your most recently destroyed monster. |
 | Last Bullet Guard | 4 · 2/6 · Guard | 4 · 3/6 · Guard |
 | Nightmare Manifest | 4 · 4/4 · Fear | 4 · 5/5 · Fear |
@@ -516,7 +516,7 @@ All ten decks finish between 47% and 54%, the same spread as the 30-card decks. 
 | **Necromancer** | 5 | 3/4 | Play: Revive your most recently destroyed monster. |
 | **Thing in the Walls** | 6 | 6/5 | Stealth, Devour |
 | **Creeping Dread** | 1 | Spell | Quick · Give all enemy monsters -2 ATK this turn. |
-| **Summoning Circle** | 3 | Spell | Summon three 1/1 Ghouls with Fear. |
+| **Summoning Circle** | 2 | Spell | Summon three 1/1 Ghouls with Fear. |
 | **Final Girl** | 4 | Spell | Deal 3 damage to an enemy monster. Restore 4 HP to you. |
 
 ### ⭐ Platformer
@@ -638,3 +638,32 @@ All ten decks finish between 47% and 54%, the same spread as the 30-card decks. 
 | **Stack Response** | 2 | Spell | Quick · Give an enemy monster -2 ATK this turn. Draw a card. |
 | **Burn Spell** | 3 | Spell | Deal 3 damage to an enemy. |
 | **Board Wipe** | 5 | Spell | Deal 3 damage to all monsters. |
+
+## Horror tuning
+
+A 49,500-game round robin (100 and 1,000 games per pairing) put Horror at 46%. It was the only deck with no favored matchup: its best result was 53%, and it lost clearly to Strategy (37%), Card Game (39%) and RPG (44%). Every other deck had at least one matchup it wins and one it loses, which is the rock-paper-scissors shape we want. Horror's four lowest-scoring cards each got a small buff:
+
+| Card | Before | After |
+|---|---|---|
+| Panicked Civilian | 1 · 1/2 · Fear | 1 · 1/3 · Fear |
+| Jump Scare | 1 · Quick · -2 ATK this turn | 1 · Quick · -3 ATK this turn |
+| Emergency Heal | 3 · Restore 6 HP | 2 · Restore 6 HP |
+| Summoning Circle | 3 · Summon three Ghouls | 2 · Summon three Ghouls |
+
+Result, 45,000 games (1,000 per pairing):
+
+```
+Deck         Overall  Favored(>55%) Even  Unfav(<45%)  Best              Worst
+Strategy        53%          4        4         1     FPS 60%           CardGame 44%
+Platformer      51%          1        7         1     RPG 58%           Strategy 43%
+CardGame        51%          4        2         3     RPG 61%           Sports 41%
+Sports          51%          3        4         2     CardGame 59%      FPS 41%
+FPS             51%          2        5         2     Fighting 63%      Strategy 40%
+Horror          51%          2        5         2     Fighting 60%      CardGame 41%
+Fighting        49%          2        4         3     RPG 59%           FPS 37%
+Racing          49%          2        6         1     RPG 59%           Sports 45%
+CityBuilder     48%          0        7         2     Racing 55%        RPG 42%
+RPG             47%          1        4         4     CityBuilder 58%   CardGame 40%
+```
+
+Horror is now at 51%. It beats Fighting (60%) and Sports (58%), and still loses to Strategy and Card Game. RPG's 47% in this run is run-to-run noise: two more 9,000-game RPG runs came out at 49% with the change, against 50% without it.
