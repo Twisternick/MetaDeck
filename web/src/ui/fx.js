@@ -70,8 +70,12 @@ export function installRipples() {
 // ------------------------------------------------------------ art slots
 // An art slot shows the first image in `candidates` that loads; until then (or if none
 // exists) it shows an animated placeholder with the deck emblem. Missing images are
-// remembered so re-renders never re-request them.
+// remembered so re-renders never re-request them, until the tab regains focus (art may
+// have been added in the Art Studio meanwhile).
 const artStatus = new Map(); // url -> 'ok' | 'missing'
+window.addEventListener('focus', () => {
+  for (const [url, status] of artStatus) if (status === 'missing') artStatus.delete(url);
+});
 
 export function artSlot(className, candidates, emblem, { label = false, alt = '' } = {}) {
   const urls = candidates.filter(u => u && artStatus.get(u) !== 'missing');
@@ -97,13 +101,13 @@ export function artSlot(className, candidates, emblem, { label = false, alt = ''
   return box;
 }
 
-export const cardArtUrls = (def, ownerDeckId) => [
-  `assets/img/cards/${def.cardId}.png`,
-  `assets/img/decks/${def.deckId ?? ownerDeckId ?? 'token'}.png`,
-];
-export const deckArtUrls = deckId => [`assets/img/decks/${deckId}.png`];
-export const heroArtUrls = deckId => [`assets/img/heroes/${deckId}.png`, `assets/img/decks/${deckId}.png`];
-export const cardBackUrls = () => ['assets/img/ui/card-back.png'];
+// Each slot is tried as .webp (what the Art Studio saves), then .png.
+const imgUrls = key => [`assets/img/${key}.webp`, `assets/img/${key}.png`];
+export const cardArtUrls = (def, ownerDeckId) =>
+  [...imgUrls(`cards/${def.cardId}`), ...imgUrls(`decks/${def.deckId ?? ownerDeckId ?? 'token'}`)];
+export const deckArtUrls = deckId => imgUrls(`decks/${deckId}`);
+export const heroArtUrls = deckId => [...imgUrls(`heroes/${deckId}`), ...imgUrls(`decks/${deckId}`)];
+export const cardBackUrls = () => imgUrls('ui/card-back');
 
 // ------------------------------------------------------------ fx layer
 let layer = null;

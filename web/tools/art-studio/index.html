@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MetaDeck Art Studio</title>
+  <link rel="icon" href="/assets/img/ui/favicon.png">
+  <link rel="stylesheet" href="studio.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <h1>Art Studio</h1>
+      <p class="steps">
+        <b>1</b> Copy a prompt &nbsp;<b>2</b> Paste it into ChatGPT &nbsp;<b>3</b> Right-click the image → Copy image
+        &nbsp;<b>4</b> Switch back here (or Ctrl+V), check the crops, press Enter
+      </p>
+    </div>
+    <div class="progress"><div class="bar"><i id="bar"></i></div><span id="count"></span></div>
+    <div class="toggles">
+      <label title="One image holds 4 cards in a 2×2 grid"><input type="checkbox" id="batchMode" checked> 4 cards per image</label>
+      <label title="Opens a copied image as soon as you switch back to this tab"><input type="checkbox" id="autoGrab" checked> Grab copied image on return</label>
+      <label><input type="checkbox" id="autoCopy" checked> Copy next prompt after saving</label>
+      <label><input type="checkbox" id="missingOnly" checked> Missing only</label>
+    </div>
+  </header>
+  <nav class="tabs" id="tabs"></nav>
+  <main class="grid" id="grid"></main>
+
+  <div class="modal" id="crop" hidden>
+    <div class="crop-box">
+      <div class="crop-head"><b id="cropTitle"></b><span class="hint">Drag to move · scroll to zoom</span></div>
+      <div id="cropCells" class="cells"></div>
+      <div class="crop-actions">
+        <button class="btn" id="cropCancel">Cancel <kbd>Esc</kbd></button>
+        <button class="btn primary" id="cropSave">Save <kbd>Enter</kbd></button>
+      </div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <script type="module" src="studio.js"></script>
+</body>
+</html>
