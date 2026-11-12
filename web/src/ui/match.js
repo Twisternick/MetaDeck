@@ -3,19 +3,20 @@
 // The human is always player 0; player 1 is the AI (or a second AI when spectating).
 
 import { h, delay } from './dom.js';
-import { renderCard, renderCardBack, renderMinion, glossaryFor } from './card-view.js';
+import { renderCard, renderCardBack, renderMinion, glossaryFor, statusLines } from './card-view.js';
 import {
   motionOK, artSlot, heroArtUrls, cardArtUrls, impact, sparkle, dissolve, castFly, flyTo, dealFrom, lungeTransform,
-  drawBeam, createArrow, showBanner, confetti, removeFx,
+  drawBeam, createArrow, showBanner, confetti, removeFx, keywordCallout, flashRing, hideTooltip,
 } from './fx.js';
 import {
   createGame, applyAction, legalActions, decisionPlayer, playInfo, attackInfo, attackTargets,
-  effectiveCost, findMonster, playerRef, defOf,
+  effectiveCost, findMonster, playerRef, defOf, hasKeyword, attackBonuses,
 } from '../engine/game.js';
 import { chooseAction } from '../engine/ai.js';
 import { getDeck, deckList, CARDS } from '../data/index.js';
-import { BOARD_SLOTS, START_HP } from '../engine/constants.js';
-import { keywordName } from '../engine/text.js';
+import { BOARD_SLOTS, START_HP, KEYWORDS } from '../engine/constants.js';
+import { rulesLines } from '../engine/text.js';
+import { kwName, kwIcon, kwColor, kwKind, kwText, kwHint, richText, glossaryList } from './keywords.js';
 
 const HUMAN = 0;
 const AI = 1;
@@ -46,6 +47,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     handCount: [0, 0],     // for face-down hands, which have no uids
     history: [],           // last played cards, newest first
     logOpen: false,
+    kwOpen: false,         // keyword reference drawer
     lastTurnKey: null,
     celebrated: false,
     firstRender: true,
@@ -57,6 +59,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     press: null,           // { x0, y0, timer } – a touch held on something zoomable
     reveal: null,          // { el, def } – opponent's card shown in the centre before it resolves
     pointer: { x: 0, y: 0 },
+    quietUntil: 0,         // no hover popup until then (while callouts play)
   };
   const aiControls = pid => spectate || pid === AI;
   // Elements that can be inspected, mapped to what they show: el -> () => [def, inst]
@@ -77,7 +80,9 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
   window.addEventListener('resize', onResize);
 
   function onKey(e) {
-    if (e.key === 'Escape') { if (ui.logOpen && ui.mode === 'idle') { ui.logOpen = false; render(); } else cancel(); }
+    if (e.key === 'Escape') {
+      if ((ui.logOpen || ui.kwOpen) && ui.mode === 'idle') { ui.logOpen = false; ui.kwOpen = false; render(); } else cancel();
+    }
   }
   function onResize() {
     fitHands();
@@ -146,6 +151,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     ui.targets = [];
     if (!res.ok) { toast(res.reason); return false; }
     const events = state.events.splice(0);
+    if (events.some(e => e.type === 'keyword' || e.type === 'damage')) ui.quietUntil = Date.now() + 1400;
     for (const e of events) {
       if (e.type === 'play' && CARDS[e.id]) {
         ui.history.unshift({ def: CARDS[e.id], pid: e.pid, key: `${state.turn}-${e.uid}` });
@@ -266,12 +272,27 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
   function clickTarget(ref) {
     if (!ui.targets.includes(ref)) {
       if (ui.mode !== 'idle' && ref === ui.source) return cancel();
-      return toast(ui.mode === 'attack' ? "Can't attack that." : 'Not a valid target.');
+      return toast(explainBadTarget(ref));
     }
     const action = ui.mode === 'attack'
       ? { type: 'attack', uid: ui.source, target: ref }
       : { type: ui.asResponse ? 'respond' : 'play', uid: ui.source, target: ref };
     act(action).then(pump);
+  }
+
+  // Why a click during targeting did nothing, naming the keyword that is in the way.
+  function explainBadTarget(ref) {
+    const tgt = typeof ref === 'string' ? null : findMonster(state, ref);
+    if (ui.mode !== 'attack') {
+      if (tgt && hasKeyword(tgt, 'Stealth') && tgt.owner !== HUMAN) return `${kwIcon('Stealth')} Stealth: enemy effects can't target it until it attacks.`;
+      return 'Not a valid target for this card.';
+    }
+    const att = findMonster(state, ui.source);
+    if (tgt && tgt.owner === HUMAN) return "That's your own monster.";
+    if (tgt && hasKeyword(tgt, 'Stealth')) return `${kwIcon('Stealth')} Stealth: it can't be attacked until it attacks.`;
+    const guardUp = state.players[AI].board.some(x => x && hasKeyword(x, 'Guard'));
+    if (guardUp && att && !hasKeyword(att, 'DoubleJump') && !(tgt && hasKeyword(tgt, 'Guard'))) return `${kwIcon('Guard')} Guard: you must attack a Guard monster first.`;
+    return "Can't attack that.";
   }
 
   function endTurn() {
@@ -449,7 +470,8 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
 
   function showInspect(def, inst, anchor, { tipsOnly = false } = {}) {
     hideInspect();
-    if (ui.drag || ui.zoom || window.innerWidth < 900) return;
+    // Right after an action, keep the hover popup closed so it does not cover the keyword callouts.
+    if (ui.drag || ui.zoom || window.innerWidth < 900 || Date.now() < ui.quietUntil) return;
     const ownerDeckId = inst ? state.players[inst.owner].deckId : null;
     const parts = inspectParts(def, inst, { tipsOnly, ownerDeckId });
     if (!parts.length) return;
@@ -460,17 +482,11 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     const parts = [];
     if (!tipsOnly) parts.push(renderCard(def, { classes: 'large', ownerDeckId, large: true }));
     if (inst) {
-      const status = [];
-      if (inst.xp) status.push(`${inst.xp} XP${inst.leveled ? ' (Leveled Up)' : ''}`);
-      if (inst.silenced) status.push('Silenced');
-      if (state.turn <= inst.suppressedUntil) status.push("Suppressed — can't attack");
-      if (inst.tempKw.length) status.push(`This turn: ${inst.tempKw.map(keywordName).join(', ')}`);
-      const temp = inst.mods.filter(x => x.temp).reduce((s, x) => s + x.atk, 0);
-      if (temp) status.push(`${temp > 0 ? '+' : ''}${temp} ATK this turn`);
+      const status = statusLines(state, inst);
       if (status.length) parts.push(h('div', { class: 'preview-status' }, status.map(s => h('div', null, s))));
     }
     const gloss = glossaryFor(def, inst);
-    if (gloss.length) parts.push(h('dl', { class: 'glossary' }, gloss.map(([t, d]) => [h('dt', null, t), h('dd', null, d)])));
+    if (gloss.length) parts.push(glossaryList(gloss));
     return parts;
   }
   function placeInspect(el, anchor, tipsOnly) {
@@ -542,25 +558,42 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
 
   function animate(events, before) {
     let delayMs = 0;
+    let calloutDelay = 0;
+    const stacks = new Map(); // element key -> callouts already shown on it in this batch
+    const elOf = key => view.querySelector(key[0] === 'u' ? `[data-uid="${key.slice(1)}"]` : `[data-pid="${key.slice(1)}"]`);
+    // A keyword announcement above a monster or hero: icon + KEYWORD + what it just did.
+    const callout = (key, { keyword, icon, name, text, color }) => {
+      const el = elOf(key);
+      const rect = el ? el.getBoundingClientRect() : before.rects.get(key);
+      if (!rect) return;
+      const n = stacks.get(key) ?? 0;
+      stacks.set(key, n + 1);
+      const c = color ?? kwColor(keyword);
+      keywordCallout(rect, { icon: icon ?? kwIcon(keyword), name: name ?? kwName(keyword), text, color: c, delay: calloutDelay, stack: n });
+      if (n === 0) flashRing(el, rect, c, calloutDelay);
+      calloutDelay = Math.min(calloutDelay + 160, 900);
+    };
     for (const e of events) {
       const key = e.uid !== undefined && e.type !== 'play' && e.type !== 'draw' ? `u${e.uid}` : e.pid !== undefined ? `p${e.pid}` : null;
       if (!key) continue;
+      if (e.type === 'keyword') { callout(key, { keyword: e.keyword, text: e.text }); continue; }
+      if (e.type === 'suppress') { callout(key, { keyword: 'Suppression', name: 'Suppressed', text: "Can't attack next turn" }); continue; }
+      if (e.type === 'silence') { callout(key, { keyword: 'Silence', name: 'Silenced', text: 'Loses keywords and text' }); continue; }
+      if (e.type === 'fizzle' && !e.keyword) callout(key, { keyword: 'Quick', icon: '💨', name: 'Fizzle', text: e.why, color: '#9aa3c2' });
       let text = null, cls = '';
       switch (e.type) {
         case 'damage': text = e.amount === 'HEADSHOT' ? 'HEADSHOT' : e.amount ? `-${e.amount}` : '0'; cls = e.amount === 'HEADSHOT' ? 'dmg big' : 'dmg'; break;
         case 'heal': text = `+${e.amount}`; cls = 'heal'; break;
-        case 'shield': text = 'Blocked!'; cls = 'info'; break;
-        case 'checkpoint': text = 'Checkpoint!'; cls = 'info'; break;
-        case 'levelup': text = 'Level Up!'; cls = 'heal'; break;
-        case 'silence': text = 'Silenced'; cls = 'info'; break;
-        case 'death': text = null; break;
-        case 'buff': text = '▲'; cls = 'heal'; break;
+        case 'shield': case 'checkpoint': case 'levelup': case 'death': text = null; break; // announced by their keyword callouts
+        case 'buff': text = e.text ?? '▲'; cls = e.temp ? 'heal small' : 'heal'; break;
+        case 'debuff': text = e.text; cls = 'dmg small'; break;
         case 'fizzle': text = 'Fizzled'; cls = 'info'; break;
-        case 'nitro': text = 'Nitro +1'; cls = 'info'; break;
+        case 'nitro': text = e.boost ? `🔥 Boost −${-e.amount}` : `Nitro ${e.amount > 0 ? '+' : ''}${e.amount}`; cls = 'nitro'; break;
+        case 'bandwidth': text = `+${e.amount} Bandwidth`; cls = 'info'; break;
         case 'burn': text = 'Burned'; cls = 'info'; break;
         default: continue;
       }
-      const el = view.querySelector(key[0] === 'u' ? `[data-uid="${key.slice(1)}"]` : `[data-pid="${key.slice(1)}"]`);
+      const el = elOf(key);
       const rect = el ? el.getBoundingClientRect() : before.rects.get(key);
       if (!rect) continue;
 
@@ -660,6 +693,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
   function render() {
     if (ui.exited) return;
     hideInspect();
+    hideTooltip();
     const responding = !spectate && state.pending && state.pending.responder === HUMAN && !ui.busy;
     view.replaceChildren(...[
       h('div', { class: `arena${ui.mode === 'attack' ? ' targeting' : ''}`, style: { '--my-deck': me.color, '--their-deck': them.color } },
@@ -678,6 +712,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
         renderHistory(),
         renderDock(responding),
         ui.logOpen ? renderLogDrawer() : null,
+        ui.kwOpen ? renderKeywordDrawer() : null,
       ),
       state.over ? renderGameOver() : null,
       ui.toast ? h('div', { class: 'toast', role: 'status' }, ui.toast) : null,
@@ -729,7 +764,8 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
   function renderHud() {
     return h('div', { class: 'hud' },
       h('button', { class: 'btn ghost small', onclick: exit }, '← Menu'),
-      h('button', { class: `btn ghost small${ui.logOpen ? ' active' : ''}`, onclick: () => { ui.logOpen = !ui.logOpen; render(); }, 'aria-pressed': ui.logOpen ? 'true' : 'false' }, 'Log'),
+      h('button', { class: `btn ghost small${ui.logOpen ? ' active' : ''}`, onclick: () => { ui.logOpen = !ui.logOpen; ui.kwOpen = false; render(); }, 'aria-pressed': ui.logOpen ? 'true' : 'false' }, 'Log'),
+      h('button', { class: `btn ghost small${ui.kwOpen ? ' active' : ''}`, onclick: () => { ui.kwOpen = !ui.kwOpen; ui.logOpen = false; render(); }, 'aria-pressed': ui.kwOpen ? 'true' : 'false' }, '? Keywords'),
       h('span', { class: 'turn-pill' }, 'Turn', h('b', null, state.turn)));
   }
 
@@ -739,6 +775,38 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
       h('div', { class: 'log', 'aria-live': 'polite' }, state.log.slice(-80).map(l => h('div', { class: 'log-line' }, l.text))));
     requestAnimationFrame(() => { const log = drawer.querySelector('.log'); if (log) log.scrollTop = log.scrollHeight; });
     return drawer;
+  }
+
+  // Reference drawer: every keyword on the board or in your hand first (with where it is), then the rest.
+  function renderKeywordDrawer() {
+    const where = new Map();
+    const add = (k, w) => { if (!KEYWORDS[k]) return; if (!where.has(k)) where.set(k, new Set()); where.get(k).add(w); };
+    for (const p of state.players) {
+      for (const m of p.board) if (m) for (const k of [...m.kw, ...m.tempKw]) add(k, p.id === HUMAN && !spectate ? 'your board' : `${p.name}'s board`);
+    }
+    if (!spectate) {
+      for (const c of state.players[HUMAN].hand) {
+        const d = defOf(c);
+        d.keywords.forEach(k => add(k, 'your hand'));
+        d.effects.forEach(e => e.keyword && add(e.keyword, 'your hand'));
+      }
+    }
+    const byName = (a, b) => kwName(a).localeCompare(kwName(b));
+    const inPlay = [...where.keys()].sort(byName);
+    const rest = Object.keys(KEYWORDS).filter(k => !where.has(k)).sort(byName);
+    const row = (k, place) => h('div', { class: `kw-row kind-${kwKind(k)}`, style: { '--kw': kwColor(k) } },
+      h('i', { class: 'kw-ico', 'aria-hidden': 'true' }, kwIcon(k)),
+      h('div', { class: 'kw-row-body' },
+        h('b', null, kwName(k), place ? h('span', { class: 'kw-where' }, place) : null),
+        h('div', { class: 'kw-row-hint' }, kwHint(k)),
+        h('div', { class: 'kw-row-text' }, kwText(k))));
+    return h('div', { class: 'log-drawer kw-drawer' },
+      h('h3', null, 'Keywords'),
+      h('div', { class: 'log kw-list' },
+        h('h4', null, 'In play'),
+        inPlay.length ? inPlay.map(k => row(k, [...where.get(k)].join(' · '))) : h('p', { class: 'muted kw-empty' }, 'Nothing with a keyword is on the board or in your hand yet.'),
+        h('h4', null, 'All keywords'),
+        rest.map(k => row(k))));
   }
 
   function renderHistory() {
@@ -888,8 +956,23 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
       const tgt = typeof state.pending.target === 'string' ? 'you' : defOf(findMonster(state, state.pending.target) ?? { id: 'token_citizen' }).displayName;
       message = `${att ? defOf(att).displayName : 'An enemy'} attacks ${tgt}! Respond with a Quick card?`;
       cls = 'alert';
-    } else if (ui.mode === 'target') { message = 'Choose a target'; cls = 'mine'; }
-    else if (ui.mode === 'attack') { message = 'Choose what to attack'; cls = 'mine'; }
+    } else if (ui.mode === 'target') {
+      const card = state.players[HUMAN].hand.find(c => c.uid === ui.source);
+      message = [h('b', null, 'Choose a target'), card ? h('span', { class: 'mid-sub' }, richText(rulesLines(defOf(card)).join(' '))) : null];
+      cls = 'mine';
+    }
+    else if (ui.mode === 'attack') {
+      const att = findMonster(state, ui.source);
+      const guardUp = state.players[AI].board.some(x => x && hasKeyword(x, 'Guard'));
+      const notes = [];
+      if (att && guardUp && !hasKeyword(att, 'DoubleJump')) notes.push(`${kwIcon('Guard')} Guard is up: only Guard monsters can be attacked`);
+      if (att && guardUp && hasKeyword(att, 'DoubleJump')) notes.push(`${kwIcon('DoubleJump')} Double Jump: ignores Guard`);
+      if (att) for (const b of attackBonuses(state, att)) notes.push(`${kwIcon(b.keyword)} ${kwName(b.keyword)}: +${b.amount} ATK`);
+      if (att && hasKeyword(att, 'Headshot')) notes.push(`${kwIcon('Headshot')} Headshot: destroys a damaged monster outright`);
+      if (att && hasKeyword(att, 'FirstStrike')) notes.push(`${kwIcon('FirstStrike')} First Strike: hits first`);
+      message = [h('b', null, 'Choose what to attack'), notes.length ? h('span', { class: 'mid-sub' }, notes.join(' · ')) : null];
+      cls = 'mine';
+    }
     else if (decisionPlayer(state) === AI) { message = state.pending ? 'Opponent is deciding on a response' : 'Opponent is thinking'; thinking = true; }
     else { message = 'Your turn · drag cards onto the mat · drag monsters to attack'; cls = 'mine'; }
     return h('div', { class: 'divider' }, h('div', { class: `mid-msg ${cls}${thinking ? ' thinking' : ''}` }, message));

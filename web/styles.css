@@ -1138,3 +1138,166 @@ button { font: inherit; color: inherit; }
   .list-blurb { font-size: 11.5px; }
   .list-tile.new { min-height: 110px; }
 }
+
+
+/* ---------- keyword clarity: chips, terms, badges, tooltips, callouts, drawer ---------- */
+/* Every keyword carries --kw (its kind colour): combat red, defense blue, trigger violet,
+   bonus gold, economy cyan, tag grey. See ui/keywords.js. */
+.kw-chip {
+  --kw: var(--deck);
+  display: inline-flex; align-items: center; gap: .3em; cursor: help;
+  font-family: var(--tech); font-weight: 700; font-size: .84em; letter-spacing: .6px; text-transform: uppercase; line-height: 1.2;
+  padding: .14em .55em .12em .4em; border-radius: .45em; color: #fff;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--kw) 42%, #0b0e20), color-mix(in srgb, var(--kw) 26%, #0b0e20));
+  border: 1px solid color-mix(in srgb, var(--kw) 75%, #fff); box-shadow: 0 0 .7em -0.25em var(--kw), inset 0 1px 0 rgba(255,255,255,.18);
+  text-shadow: 0 1px 1px rgba(0,0,0,.6);
+  transition: transform .18s var(--ease-spring), box-shadow .2s, filter .2s;
+}
+.kw-chip:hover, .kw-chip:focus-visible { transform: translateY(-1px) scale(1.06); box-shadow: 0 0 1em -0.1em var(--kw), inset 0 1px 0 rgba(255,255,255,.25); filter: brightness(1.15); outline: none; z-index: 2; }
+.kw-chip .kw-ico { font-style: normal; font-size: 1.05em; line-height: 1; filter: drop-shadow(0 0 .25em color-mix(in srgb, var(--kw) 80%, transparent)); }
+.kw-chip .kw-extra { margin-left: .2em; color: var(--accent); }
+.card-kws { gap: .3em; margin-bottom: .35em; }
+
+/* keywords and rules terms inside card text */
+.term {
+  --kw: var(--accent);
+  color: color-mix(in srgb, var(--kw) 80%, #fff); font-weight: 700; cursor: help; white-space: nowrap;
+  border-bottom: 1px dotted color-mix(in srgb, var(--kw) 70%, transparent); border-radius: .15em;
+  transition: background .15s, color .15s;
+}
+.term:hover, .term:focus-visible { background: color-mix(in srgb, var(--kw) 28%, transparent); color: #fff; outline: none; }
+.quick-tag { border-bottom: 0; }
+/* "Play:", "Death:", ... */
+.trig {
+  display: inline-flex; align-items: center; gap: .25em; cursor: help; margin-right: .25em;
+  font-family: var(--tech); font-weight: 700; font-size: .84em; letter-spacing: .5px; text-transform: uppercase; line-height: 1.15;
+  padding: .05em .45em .02em .35em; border-radius: .35em; color: #fff;
+  background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18);
+}
+.trig i { font-style: normal; font-size: .85em; }
+.trig:hover, .trig:focus-visible { background: rgba(255,255,255,.22); outline: none; }
+.card-line { line-height: 1.3; }
+
+/* board badges: icon per keyword, lit when the keyword is doing something right now */
+.minion-badges { gap: 3px; font-size: 12px; }
+.minion-badges .badge {
+  --kw: #9aa3c2;
+  display: inline-grid; place-items: center; width: 20px; height: 20px; padding: 0; border-radius: 7px; cursor: help; line-height: 1;
+  background: color-mix(in srgb, var(--kw) 22%, rgba(0,0,0,.65)); border: 1px solid color-mix(in srgb, var(--kw) 55%, transparent);
+  box-shadow: 0 2px 6px rgba(0,0,0,.4); transition: transform .18s var(--ease-spring), box-shadow .25s;
+}
+.minion-badges .badge:hover { transform: scale(1.2); z-index: 2; }
+.minion-badges .badge.lit { background: color-mix(in srgb, var(--kw) 55%, #000); border-color: color-mix(in srgb, var(--kw) 90%, #fff); box-shadow: 0 0 10px -1px var(--kw), 0 2px 6px rgba(0,0,0,.4); animation: badgeGlow 1.6s ease-in-out infinite; }
+.minion-badges .badge.temp { border-style: dashed; }
+@keyframes badgeGlow { 50% { box-shadow: 0 0 16px 1px var(--kw), 0 2px 6px rgba(0,0,0,.4); } }
+.minion-badges .xp { cursor: help; }
+
+.minion-status { display: inline-flex; align-items: center; gap: 4px; cursor: help; }
+.minion-status.bad { background: color-mix(in srgb, var(--bad) 45%, #120409); border-color: color-mix(in srgb, var(--bad) 70%, transparent); color: #ffd9de; box-shadow: 0 0 12px -2px var(--bad); }
+.minion-status.good { background: color-mix(in srgb, var(--good) 40%, #04140c); border-color: color-mix(in srgb, var(--good) 70%, transparent); color: #d9ffe8; box-shadow: 0 0 12px -2px var(--good); animation: statusPop .5s var(--ease-spring) both; }
+@keyframes statusPop { from { transform: translateX(-50%) scale(.4); opacity: 0; } to { transform: translateX(-50%) scale(1); opacity: 1; } }
+
+/* active conditional attack bonus (Momentum, Clutch, Combo, Slipstream, Inspire) */
+.minion-bonus {
+  position: absolute; left: -2px; bottom: 20px; z-index: 5; cursor: help;
+  font-family: var(--tech); font-weight: 700; font-size: 11px; letter-spacing: .3px; line-height: 1;
+  padding: 3px 6px 2px; border-radius: 999px; color: var(--accent-ink);
+  background: linear-gradient(135deg, #ffe08a, var(--accent) 60%, var(--accent-2)); border: 1px solid rgba(255,255,255,.7);
+  box-shadow: 0 0 12px -1px var(--accent), 0 2px 6px rgba(0,0,0,.5); animation: bonusPop .5s var(--ease-spring) both, bonusGlow 1.6s ease-in-out .5s infinite;
+}
+@keyframes bonusPop { from { transform: scale(.3) rotate(-20deg); opacity: 0; } }
+@keyframes bonusGlow { 50% { box-shadow: 0 0 20px 2px var(--accent), 0 2px 6px rgba(0,0,0,.5); } }
+.minion.boosted .stat.atk { animation: atkPulse 1.6s ease-in-out infinite; }
+@keyframes atkPulse { 50% { box-shadow: 0 .15em .5em rgba(0,0,0,.5), 0 0 1.2em .1em var(--atk), inset 0 -0.35em .5em rgba(0,0,0,.25); } }
+
+/* a keyword just fired on this element */
+.minion.kw-lit, .hero.kw-lit { box-shadow: 0 0 0 3px var(--kw), 0 0 36px -2px var(--kw), 0 8px 18px rgba(0,0,0,.5) !important; filter: brightness(1.2); }
+.kw-flash { position: fixed; z-index: 99; pointer-events: none; border-radius: 16px; border: 3px solid var(--kw); box-shadow: 0 0 30px var(--kw), inset 0 0 30px color-mix(in srgb, var(--kw) 45%, transparent); animation: kwFlash .8s var(--ease-out) forwards; }
+@keyframes kwFlash { 0% { opacity: 0; transform: scale(.9); } 20% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.22); } }
+
+/* keyword callout: "⚔️ FIRST STRIKE · Strikes first" popping out above a monster */
+.callout {
+  --kw: var(--accent);
+  position: fixed; z-index: 105; pointer-events: none; transform: translate(-50%, -100%); white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px 6px 10px; border-radius: 999px; color: #fff;
+  font-family: var(--tech); font-weight: 700; font-size: 14px; letter-spacing: 1.6px; text-transform: uppercase; line-height: 1;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--kw) 70%, #fff) 0%, var(--kw) 45%, color-mix(in srgb, var(--kw) 55%, #000) 100%);
+  border: 1.5px solid rgba(255,255,255,.55); text-shadow: 0 1px 2px rgba(0,0,0,.7), 0 0 10px rgba(0,0,0,.4);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--kw) 35%, transparent), 0 0 34px -4px var(--kw), 0 12px 30px rgba(0,0,0,.6);
+  animation: calloutIn 1.7s var(--ease-out) both;
+}
+.callout i { font-style: normal; font-size: 19px; filter: drop-shadow(0 0 6px rgba(255,255,255,.6)); }
+.callout small { font-family: var(--body); font-weight: 600; font-size: 12.5px; letter-spacing: .2px; text-transform: none; padding-left: 9px; border-left: 1px solid rgba(255,255,255,.5); opacity: .96; }
+@keyframes calloutIn {
+  0% { opacity: 0; transform: translate(-50%, -60%) scale(.35) rotate(-8deg); filter: brightness(2); }
+  14% { opacity: 1; transform: translate(-50%, -112%) scale(1.14) rotate(2deg); filter: brightness(1.3); }
+  24% { transform: translate(-50%, -108%) scale(1) rotate(0); filter: brightness(1); }
+  72% { opacity: 1; transform: translate(-50%, -116%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -175%) scale(.9); filter: blur(3px); }
+}
+
+/* shared tooltip (hover a chip, badge, term or stat) */
+.tooltip {
+  --kw: var(--accent);
+  position: fixed; z-index: 130; pointer-events: none; max-width: 270px; padding: 10px 13px 11px; border-radius: 12px;
+  background: rgba(10,12,28,.97); border: 1px solid color-mix(in srgb, var(--kw) 70%, transparent); color: #e4e8ff; font-size: 13px; line-height: 1.4;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.04) inset, 0 0 28px -8px var(--kw), 0 18px 40px rgba(0,0,0,.65); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  animation: tipIn .16s var(--ease-out) both;
+}
+.tooltip::after { content: ''; position: absolute; left: var(--arrow-x, 50%); top: 100%; width: 10px; height: 10px; margin: -5px 0 0 -5px; transform: rotate(45deg); background: inherit; border-right: 1px solid color-mix(in srgb, var(--kw) 70%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--kw) 70%, transparent); }
+.tooltip.below::after { top: 0; border: 0; border-left: 1px solid color-mix(in srgb, var(--kw) 70%, transparent); border-top: 1px solid color-mix(in srgb, var(--kw) 70%, transparent); }
+.tooltip-head { display: flex; align-items: center; gap: 7px; font-family: var(--tech); font-weight: 700; font-size: 15px; letter-spacing: 1px; text-transform: uppercase; color: color-mix(in srgb, var(--kw) 80%, #fff); }
+.tooltip-head i { font-style: normal; font-size: 17px; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--kw) 80%, transparent)); }
+.tooltip-hint { margin-top: 2px; font-size: 12px; color: var(--muted); font-style: italic; }
+.tooltip-text { margin-top: 5px; }
+@keyframes tipIn { from { opacity: 0; transform: translateY(5px) scale(.96); } }
+
+/* glossaries with icons */
+.glossary dt { --kw: var(--accent); display: flex; align-items: center; gap: 7px; color: color-mix(in srgb, var(--kw) 80%, #fff); }
+.glossary dt .kw-ico { font-style: normal; font-size: 1.05em; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--kw) 70%, transparent)); }
+.kind-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 16px; }
+.kind-pill { --kw: #888; display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px 5px 8px; border-radius: 999px; font-size: 12.5px; color: #d9deff; background: color-mix(in srgb, var(--kw) 14%, var(--glass)); border: 1px solid color-mix(in srgb, var(--kw) 55%, transparent); }
+.kind-pill b { font-family: var(--tech); text-transform: uppercase; letter-spacing: .8px; color: color-mix(in srgb, var(--kw) 80%, #fff); }
+.kind-pill::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: var(--kw); box-shadow: 0 0 8px var(--kw); }
+
+/* divider sub-line: what the chosen card does / what the attacker's keywords mean */
+.mid-msg b { font-weight: 700; }
+.mid-msg .mid-sub { display: block; margin-top: 4px; font-family: var(--body); font-weight: 500; font-size: 12.5px; letter-spacing: 0; text-transform: none; color: #dfe3ff; max-width: 560px; white-space: normal; line-height: 1.35; }
+.mid-msg .mid-sub .term { white-space: normal; }
+
+/* keyword reference drawer */
+.kw-drawer .kw-list { padding: 6px 12px 16px; }
+.kw-drawer h4 { margin: 12px 4px 8px; font-family: var(--tech); font-weight: 700; letter-spacing: 2px; text-transform: uppercase; font-size: 11px; color: var(--dim); }
+.kw-row { --kw: #888; display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: start; padding: 8px 10px; margin: 4px 0; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--kw) 28%, var(--stroke)); background: linear-gradient(90deg, color-mix(in srgb, var(--kw) 14%, transparent), transparent 60%); animation: logIn .35s var(--ease-out) both; }
+.kw-row .kw-ico { font-style: normal; font-size: 22px; line-height: 1.2; text-align: center; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--kw) 70%, transparent)); }
+.kw-row b { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-family: var(--tech); font-size: 15px; letter-spacing: .6px; text-transform: uppercase; color: color-mix(in srgb, var(--kw) 80%, #fff); }
+.kw-where { font-family: var(--body); font-size: 10.5px; letter-spacing: .5px; text-transform: uppercase; color: var(--accent-ink); background: var(--accent); padding: 1px 7px; border-radius: 999px; }
+.kw-row-hint { font-size: 12px; color: var(--muted); font-style: italic; }
+.kw-row-text { font-size: 12.5px; color: #c9cfe6; margin-top: 2px; }
+.kw-empty { font-size: 13px; padding: 0 4px; }
+
+.floater.small { font-size: 20px; }
+.floater.nitro { color: var(--nitro); font-size: 20px; text-transform: uppercase; letter-spacing: 2px; }
+.toast { max-width: min(92vw, 520px); text-align: center; }
+
+@media (max-width: 900px) {
+  .callout { font-size: 11px; padding: 4px 10px 4px 8px; gap: 6px; }
+  .callout i { font-size: 14px; }
+  .callout small { font-size: 10.5px; padding-left: 6px; }
+  .minion-badges .badge { width: 16px; height: 16px; font-size: 10px; border-radius: 5px; }
+  .minion-bonus { font-size: 9px; padding: 2px 5px 1px; bottom: 14px; }
+  .tooltip { max-width: 230px; font-size: 12px; }
+  .mid-msg .mid-sub { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .callout { opacity: 1; transform: translate(-50%, -110%); }
+  .kw-flash { display: none; }
+}
+.callout.below { transform: translate(-50%, 0); animation-name: calloutInBelow; }
+@keyframes calloutInBelow {
+  0% { opacity: 0; transform: translate(-50%, -40%) scale(.35) rotate(8deg); filter: brightness(2); }
+  14% { opacity: 1; transform: translate(-50%, 12%) scale(1.14) rotate(-2deg); filter: brightness(1.3); }
+  24% { transform: translate(-50%, 8%) scale(1) rotate(0); filter: brightness(1); }
+  72% { opacity: 1; transform: translate(-50%, 16%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, 75%) scale(.9); filter: blur(3px); }
+}

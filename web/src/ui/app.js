@@ -5,9 +5,10 @@ import { renderCard, renderPreview, glossaryFor } from './card-view.js';
 import { startMatch } from './match.js';
 import { deckBuilder } from './deck-builder.js';
 import { decksFor, resolveDeck, randomStarter, isPlayable } from './deck-store.js';
-import { installTilt, installRipples, artSlot, deckArtUrls, removeFx } from './fx.js';
+import { installTilt, installRipples, installTooltips, artSlot, deckArtUrls, removeFx } from './fx.js';
 import { DECKS, CARDS, DECK_SIZE } from '../data/index.js';
 import { KEYWORDS, TERMS, START_HP, BOARD_SLOTS, MAX_HAND, OPENING_HAND } from '../engine/constants.js';
+import { describeTip, glossaryList, kwName, KW_META, KIND_COLORS } from './keywords.js';
 
 const root = document.getElementById('app');
 const prefs = storage.get('metadeck.prefs', { myDeck: 'FPS', oppDeck: 'random' });
@@ -16,6 +17,7 @@ const savePrefs = () => storage.set('metadeck.prefs', prefs);
 
 installTilt();
 installRipples();
+installTooltips(describeTip);
 
 const emblem = deck => h('span', { class: 'chip-emblem', 'aria-hidden': 'true' }, deck.icon);
 
@@ -146,7 +148,7 @@ function gallery(deckId, newOnly = false) {
   const monsters = deck.cards.filter(c => c.type === 'Monster').length;
   const newCount = deck.cards.filter(c => c.isNew).length;
   const deckKeywords = [...new Map(deck.cards.flatMap(c => glossaryFor(CARDS[c.cardId])).map(e => [e[0], e])).values()]
-    .sort((a, b) => a[0].localeCompare(b[0]));
+    .sort((a, b) => kwName(a[0]).localeCompare(kwName(b[0])));
 
   root.replaceChildren(h('main', { class: 'gallery', style: { '--deck': deck.color } },
     h('header', { class: 'page-head' },
@@ -171,8 +173,8 @@ function gallery(deckId, newOnly = false) {
     deckKeywords.length ? h('details', { class: 'deck-keywords rise', open: storage.get('metadeck.kwOpen', true) || null,
       ontoggle: e => storage.set('metadeck.kwOpen', e.target.open) },
       h('summary', null, `Keywords in this deck (${deckKeywords.length})`),
-      h('dl', { class: 'glossary' }, deckKeywords.map(([t, d]) => [h('dt', null, t), h('dd', null, d)]))) : null,
-    h('p', { class: 'muted gallery-hint' }, 'Click a card to see what its keywords mean.'),
+      glossaryList(deckKeywords)) : null,
+    h('p', { class: 'muted gallery-hint' }, 'Hover any keyword or highlighted term for its meaning. Click a card to see everything it does.'),
     h('div', { class: 'card-grid' }, cards.map((c, i) => renderCard(c, {
       classes: 'rise', onclick: () => zoomCard(c),
       attrs: { style: `--i:${Math.min(i, 24)}; --deck:${deck.color}`, role: 'button', tabindex: '0',
@@ -193,7 +195,15 @@ function zoomCard(def) {
 
 function rules() {
   removeFx();
-  const kw = Object.values(KEYWORDS).sort((a, b) => a.name.localeCompare(b.name));
+  const kw = Object.keys(KEYWORDS).sort((a, b) => kwName(a).localeCompare(kwName(b)));
+  const kinds = [
+    ['combat', 'Combat', 'Changes how a fight resolves'],
+    ['defense', 'Defense', 'Protects or absorbs'],
+    ['trigger', 'Trigger', 'Fires when something happens'],
+    ['bonus', 'Bonus', 'Extra Attack while a condition holds'],
+    ['economy', 'Economy', 'Cards, Bandwidth and Nitro'],
+    ['passive', 'Tag', 'A restriction or a plain label'],
+  ];
   root.replaceChildren(h('main', { class: 'rules' },
     h('header', { class: 'page-head' },
       h('button', { class: 'btn ghost small', onclick: menu }, '← Menu'),
@@ -210,9 +220,11 @@ function rules() {
       h('h2', null, 'Quick cards'),
       h('p', null, 'Quick spells can be played on your turn like normal, or from your hand when an enemy monster attacks — paid for with Bandwidth you left unspent on your own turn. If the response removes, hides or suppresses the attacker or its target, the attack fizzles.'),
       h('h2', null, 'Keywords'),
-      h('dl', { class: 'glossary' }, kw.map(k => [h('dt', null, k.name), h('dd', null, k.text)])),
+      h('p', null, 'Keyword chips are colour-coded by what they do. In a match, a keyword announces itself above the monster whenever it fires.'),
+      h('div', { class: 'kind-legend' }, kinds.map(([id, name, blurb]) => h('span', { class: `kind-pill kind-${id}`, style: { '--kw': KIND_COLORS[id] } }, h('b', null, name), blurb))),
+      glossaryList(kw.map(k => [k, KEYWORDS[k].text])),
       h('h2', null, 'Other terms'),
-      h('dl', { class: 'glossary' }, Object.entries(TERMS).map(([t, d]) => [h('dt', null, t), h('dd', null, d)])),
+      glossaryList(Object.entries(TERMS)),
     )));
 }
 

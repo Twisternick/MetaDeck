@@ -316,3 +316,109 @@ export function dealFrom(cardEl, pileRect, delay = 0) {
     { transform: rest, opacity: 1, filter: 'brightness(1)' },
   ], { duration: 520, delay, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
 }
+
+// ------------------------------------------------------------ tooltips
+// Any element with data-kw (a keyword or term id) or data-tip (free text, with data-tip-title)
+// gets a styled tooltip on hover and keyboard focus. Delegated on the document, so re-rendered
+// DOM needs no wiring. `describe(el)` turns an element into { icon, title, text, hint, color }.
+let tipsInstalled = false;
+let hideTip = () => {};
+// Hide the tooltip now (call after re-rendering the DOM under a still pointer).
+export const hideTooltip = () => hideTip();
+export function installTooltips(describe) {
+  if (tipsInstalled) return;
+  tipsInstalled = true;
+  let tip = null;
+  let owner = null;
+  let timer = 0;
+  const hide = () => { clearTimeout(timer); timer = 0; tip?.remove(); tip = null; owner = null; };
+  hideTip = hide;
+  const show = el => {
+    const info = describe(el);
+    if (!info) return;
+    hide();
+    owner = el;
+    // A card in the hand rises and grows on hover; wait for that and sit above the whole card.
+    const handCard = el.closest('.hand.mine .card');
+    const place = () => {
+      if (owner !== el || !el.isConnected) return;
+      tip = h('div', { class: 'tooltip', role: 'tooltip', style: { '--kw': info.color } },
+        h('div', { class: 'tooltip-head' }, info.icon ? h('i', { 'aria-hidden': 'true' }, info.icon) : null, info.title),
+        info.hint ? h('div', { class: 'tooltip-hint' }, info.hint) : null,
+        h('div', { class: 'tooltip-text' }, info.text));
+      document.body.append(tip);
+      position(handCard ?? el);
+    };
+    if (handCard) timer = setTimeout(place, motionOK() ? 340 : 0); else place();
+  };
+  const position = anchor => {
+    const r = anchor.getBoundingClientRect();
+    const w = tip.offsetWidth;
+    const hgt = tip.offsetHeight;
+    let left = r.left + r.width / 2 - w / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - w - 8));
+    let top = r.top - hgt - 12;
+    if (top < 8) { top = r.bottom + 12; tip.classList.add('below'); }
+    tip.style.left = `${left}px`;
+    tip.style.top = `${top}px`;
+    tip.style.setProperty('--arrow-x', `${r.left + r.width / 2 - left}px`);
+  };
+  const target = e => (e.target instanceof Element ? e.target.closest('[data-kw],[data-tip]') : null);
+  document.addEventListener('pointerover', e => {
+    if (e.pointerType === 'touch') return;
+    const el = target(e);
+    if (el === owner) return;
+    if (el) show(el); else hide();
+  }, { passive: true });
+  document.addEventListener('pointerout', e => {
+    if (!owner) return;
+    const to = e.relatedTarget instanceof Element ? e.relatedTarget.closest('[data-kw],[data-tip]') : null;
+    if (to !== owner) hide();
+  }, { passive: true });
+  document.addEventListener('focusin', e => { const el = target(e); if (el) show(el); });
+  document.addEventListener('focusout', hide);
+  document.addEventListener('pointerdown', hide, { capture: true, passive: true });
+  document.addEventListener('scroll', hide, { capture: true, passive: true });
+  window.addEventListener('resize', hide);
+}
+
+// ------------------------------------------------------------ keyword callouts
+// A punchy pill ("⚔️ FIRST STRIKE · Strikes first") that pops out above an element and floats
+// away. `stack` offsets further callouts on the same element so they don't overlap.
+export function keywordCallout(rect, { icon, name, text, color = '#ffc53d', delay = 0, stack = 0 } = {}) {
+  if (!rect) return;
+  const el = h('div', { class: 'callout', 'aria-hidden': 'true', style: { '--kw': color } },
+    icon ? h('i', null, icon) : null,
+    h('span', { class: 'callout-name' }, name),
+    text ? h('small', null, text) : null);
+  // Near the top edge (the enemy hero) the callout drops below the element instead.
+  const below = rect.top - 60 - stack * 36 < 0;
+  if (below) el.classList.add('below');
+  el.style.left = `${rect.left + rect.width / 2}px`;
+  el.style.top = below ? `${rect.bottom + 8 + stack * 36}px` : `${rect.top - 6 - stack * 36}px`;
+  el.style.animationDelay = `${delay}ms`;
+  document.body.append(el);
+  // Keep the pill on screen: it is centred on the element, so clamp that centre.
+  const half = el.offsetWidth / 2;
+  const cx = Math.max(half + 8, Math.min(rect.left + rect.width / 2, window.innerWidth - half - 8));
+  el.style.left = `${cx}px`;
+  setTimeout(() => el.remove(), (motionOK() ? 1700 : 1100) + delay);
+}
+
+// A coloured outline that flares out from an element, plus a short glow on the element itself.
+export function flashRing(el, rect, color = '#ffc53d', delay = 0) {
+  if (!rect) return;
+  setTimeout(() => {
+    if (motionOK()) {
+      const f = h('div', { class: 'kw-flash', 'aria-hidden': 'true', style: { '--kw': color } });
+      f.style.cssText += `left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px`;
+      document.body.append(f);
+      setTimeout(() => f.remove(), 900);
+    }
+    if (el && el.isConnected) {
+      el.style.setProperty('--kw', color);
+      el.classList.add('kw-lit');
+      setTimeout(() => { el.classList.remove('kw-lit'); }, 900);
+    }
+  }, delay);
+}

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createGame, applyAction, legalActions, placeMonster, giveCard, getAttack, getHealth,
-  effectiveCost, findMonster, hasKeyword, decisionPlayer,
+  effectiveCost, findMonster, hasKeyword, decisionPlayer, attackBonuses,
 } from '../src/engine/game.js';
 import { chooseAction } from '../src/engine/ai.js';
 import { DECKS, CARDS, deckList, starterDecks, deckErrors, DECK_SIZE, MAX_COPIES } from '../src/data/index.js';
@@ -218,4 +218,36 @@ test('AI plays complete games with every starter deck', () => {
     while (!s.over && steps++ < 3000) ok(applyAction(s, chooseAction(s)));
     assert.ok(s.over, `${st.name} vs ${opp} finished`);
   }));
+});
+
+test('keywords announce themselves as events the UI can show', () => {
+  const s = setup();
+  const sniper = ready(placeMonster(s, 0, 'FIG_M03_FramePerfectStriker')); // First Strike
+  const victim = placeMonster(s, 1, 'PLA_M02_CoinCollector');
+  s.events.length = 0;
+  ok(applyAction(s, { type: 'attack', uid: sniper.uid, target: victim.uid }));
+  const kw = s.events.filter(e => e.type === 'keyword');
+  assert.ok(kw.some(e => e.keyword === 'FirstStrike' && e.uid === sniper.uid && e.text === 'Strikes first'));
+  assert.ok(kw.some(e => e.keyword === 'FirstStrike' && e.text === 'No retaliation'));
+
+  // Guard blocks a face attack after a pending response window: the fizzle names the Guard.
+  const t = setup();
+  const att = ready(placeMonster(t, 0, 'CCG_M03_MonsterCard'));
+  const guard = placeMonster(t, 1, 'FPS_M07_CoverEngineer');
+  assert.ok(!legalActions(t).some(a => a.type === 'attack' && a.target === 'P1'), 'face attack is illegal while Guard is up');
+  assert.deepEqual(attackBonuses(t, att), []);
+  assert.ok(hasKeyword(guard, 'Guard'));
+});
+
+test('conditional attack bonuses are reported by keyword', () => {
+  const s = setup();
+  const runner = ready(placeMonster(s, 0, 'token_benchwarmer')); // Momentum
+  const other = ready(placeMonster(s, 0, 'CCG_M03_MonsterCard'));
+  placeMonster(s, 1, 'CCG_M03_MonsterCard');
+  assert.deepEqual(attackBonuses(s, runner), []);
+  ok(applyAction(s, { type: 'attack', uid: other.uid, target: 'P1' }));
+  assert.deepEqual(attackBonuses(s, runner), [{ keyword: 'Momentum', amount: 1 }]);
+  s.events.length = 0;
+  ok(applyAction(s, { type: 'attack', uid: runner.uid, target: 'P1' }));
+  assert.ok(s.events.some(e => e.type === 'keyword' && e.keyword === 'Momentum' && e.text === '+1 ATK'));
 });

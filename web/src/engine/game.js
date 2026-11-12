@@ -98,19 +98,30 @@ export function getHealth(m) {
 const alive = m => getHealth(m) > 0;
 const isDamaged = m => m.damage > 0;
 
-export function getAttack(state, m) {
+// The conditional Attack bonuses currently active on a monster: [{ keyword, amount }].
+// These are the keywords whose bonus comes and goes with the game state (not permanent buffs).
+export function attackBonuses(state, m) {
   const owner = P(state, m.owner);
-  let atk = defOf(m).baseAttack + m.mods.reduce((s, x) => s + (x.atk || 0), 0);
-  if (hasKeyword(m, 'Slipstream') && owner.nitro > 0) atk += 1;
-  if (hasKeyword(m, 'Momentum') && state.active === m.owner && owner.attacksThisTurn >= 1) atk += 1;
-  if (hasKeyword(m, 'Clutch') && owner.hp < P(state, opp(m.owner)).hp) atk += 2;
+  const out = [];
+  if (hasKeyword(m, 'Slipstream') && owner.nitro > 0) out.push({ keyword: 'Slipstream', amount: 1 });
+  if (hasKeyword(m, 'Momentum') && state.active === m.owner && owner.attacksThisTurn >= 1) out.push({ keyword: 'Momentum', amount: 1 });
+  if (hasKeyword(m, 'Clutch') && owner.hp < P(state, opp(m.owner)).hp) out.push({ keyword: 'Clutch', amount: 2 });
   if (hasKeyword(m, 'Combo') && state.active === m.owner) {
     const others = owner.playedThisTurn - (m.playedTurn === state.turn ? 1 : 0);
-    atk += Math.min(2, Math.max(0, others));
+    const n = Math.min(2, Math.max(0, others));
+    if (n) out.push({ keyword: 'Combo', amount: n });
   }
+  let inspire = 0;
   for (const ally of monsters(state, m.owner)) {
-    if (ally !== m && hasKeyword(ally, 'Inspire') && alive(ally)) atk += 1;
+    if (ally !== m && hasKeyword(ally, 'Inspire') && alive(ally)) inspire += 1;
   }
+  if (inspire) out.push({ keyword: 'Inspire', amount: inspire });
+  return out;
+}
+
+export function getAttack(state, m) {
+  let atk = defOf(m).baseAttack + m.mods.reduce((s, x) => s + (x.atk || 0), 0);
+  for (const b of attackBonuses(state, m)) atk += b.amount;
   return Math.max(0, atk);
 }
 
@@ -269,6 +280,15 @@ export function applyAction(state, action) {
 const fail = reason => ({ ok: false, reason });
 const OK = { ok: true };
 
+// A keyword did something visible. `ref` is a monster (uid) or a player ({ pid }); `text` is a short
+// caption for the UI callout ("+1/+1", "Blocked", ...).
+function keywordEvent(state, keyword, ref, text = null, extra = {}) {
+  const e = { type: 'keyword', keyword, ...extra };
+  if (ref && ref.uid !== undefined) e.uid = ref.uid; else if (ref && ref.pid !== undefined) e.pid = ref.pid;
+  if (text) e.text = text;
+  state.events.push(e);
+}
+
 function doPlay(state, action, asResponse) {
   const pid = decisionPlayer(state);
   const p = P(state, pid);
@@ -280,22 +300,31 @@ function doPlay(state, action, asResponse) {
   if (info.targets && info.targets.length && !info.targets.includes(target)) return fail('Choose a valid target.');
 
   const def = defOf(card);
-  p.bw -= effectiveCost(state, card);
+  const cost = effectiveCost(state, card);
+  p.bw -= cost;
   p.hand = p.hand.filter(c => c !== card);
   state.events.push({ type: 'play', pid, id: card.id, uid: card.uid });
+  if (cost > def.cost) {
+    const taxer = monsters(state, opp(pid)).find(m => alive(m) && hasKeyword(m, 'Tax'));
+    if (taxer) keywordEvent(state, 'Tax', taxer, `+${cost - def.cost} cost`);
+  }
   log(state, `${says(p, 'play', 'plays')} ${def.displayName}${describeTarget(state, target)}.`);
 
   if (def.type === 'Monster') {
     const m = summon(state, pid, card, { played: true });
     resolveEffects(state, m, 'play', target);
-    if (hasKeyword(m, 'Populate')) summonToken(state, pid, 'token_citizen');
+    if (hasKeyword(m, 'Populate')) {
+      keywordEvent(state, 'Populate', m, 'Summons a Citizen');
+      summonToken(state, pid, 'token_citizen');
+    }
     if (hasKeyword(m, 'Errata')) {
       const victim = pick(state, monsters(state, opp(pid)).filter(alive));
-      if (victim) silence(state, victim);
+      if (victim) { keywordEvent(state, 'Errata', m); silence(state, victim); }
     }
     if (hasKeyword(m, 'Copy')) {
       const copy = newCard(state, card.id, pid);
       p.deck.splice(randInt(state, p.deck.length + 1), 0, copy);
+      keywordEvent(state, 'Copy', m, 'Copy shuffled into deck');
       log(state, `A copy of ${def.displayName} is shuffled into the deck.`);
     }
   } else {
@@ -318,6 +347,12 @@ function doAttack(state, action) {
   const responder = opp(m.owner);
   state.events.push({ type: 'attack', uid: m.uid, target: action.target });
   log(state, `${defOf(m).displayName} attacks ${describeRef(state, action.target)}.`);
+  if (m.summonedTurn === state.turn && hasKeyword(m, 'Rush')) keywordEvent(state, 'Rush', m, 'Attacks right away');
+  if (hasKeyword(m, 'DoubleJump') && hasGuard(state, responder)) {
+    const tgt = refToPid(action.target) === null ? findMonster(state, action.target) : null;
+    if (!tgt || !hasKeyword(tgt, 'Guard')) keywordEvent(state, 'DoubleJump', m, 'Leaps past Guard');
+  }
+  for (const b of attackBonuses(state, m)) keywordEvent(state, b.keyword, m, `+${b.amount} ATK`);
 
   const canRespond = P(state, responder).hand.some(c => playInfoResponseProbe(state, responder, c));
   if (canRespond) {
@@ -350,26 +385,31 @@ function resolvePending(state) {
   cleanup(state);
   if (state.over) return;
   const m = findMonster(state, attacker);
-  const fizzle = why => {
+  const fizzle = (why, keyword = null, ref = null) => {
     if (m) m.attacks++;
-    state.events.push({ type: 'fizzle', uid: attacker });
+    state.events.push({ type: 'fizzle', uid: attacker, why, keyword });
+    if (keyword && ref) keywordEvent(state, keyword, ref, 'Attack fizzles');
     log(state, `The attack fizzles (${why}).`);
   };
   if (!m || !alive(m)) return fizzle('attacker is gone');
-  if (state.turn <= m.suppressedUntil) return fizzle('attacker was suppressed');
+  if (state.turn <= m.suppressedUntil) return fizzle('attacker was suppressed', 'Suppression', m);
   const pid = refToPid(target);
   if (pid !== null) {
-    if (hasGuard(state, pid) && !hasKeyword(m, 'DoubleJump')) return fizzle('a Guard stepped in');
+    if (hasGuard(state, pid) && !hasKeyword(m, 'DoubleJump')) {
+      const g = monsters(state, pid).find(x => alive(x) && hasKeyword(x, 'Guard'));
+      return fizzle('a Guard stepped in', 'Guard', g);
+    }
   } else {
     const d = findMonster(state, target);
     if (!d || !alive(d)) return fizzle('target is gone');
-    if (hasKeyword(d, 'Stealth')) return fizzle('target vanished into Stealth');
+    if (hasKeyword(d, 'Stealth')) return fizzle('target vanished into Stealth', 'Stealth', d);
   }
   resolveAttack(state, m, target);
 }
 
 function resolveAttack(state, att, target) {
   const owner = P(state, att.owner);
+  if (hasKeyword(att, 'Stealth')) keywordEvent(state, 'Stealth', att, 'Revealed');
   removeKeyword(att, 'Stealth');
   const facePid = refToPid(target);
 
@@ -383,7 +423,11 @@ function resolveAttack(state, att, target) {
   }
 
   const def = findMonster(state, target);
-  if (hasKeyword(att, 'Fear')) def.mods.push({ atk: -1, hp: 0, temp: true });
+  if (hasKeyword(att, 'Fear')) {
+    def.mods.push({ atk: -1, hp: 0, temp: true });
+    keywordEvent(state, 'Fear', att);
+    keywordEvent(state, 'Fear', def, '-1 ATK');
+  }
   const aAtk = getAttack(state, att);
   const dAtk = getAttack(state, def);
   att.attacks++;
@@ -391,17 +435,23 @@ function resolveAttack(state, att, target) {
 
   if (hasKeyword(att, 'Headshot') && isDamaged(def)) {
     def.damage = getMaxHealth(def);
+    keywordEvent(state, 'Headshot', att);
     state.events.push({ type: 'damage', uid: def.uid, amount: 'HEADSHOT' });
     log(state, `Headshot! ${defOf(def).displayName} is destroyed.`);
   } else {
     const aFirst = hasKeyword(att, 'FirstStrike');
     const dFirst = hasKeyword(def, 'FirstStrike') || hasKeyword(def, 'Counter');
+    const dKw = hasKeyword(def, 'Counter') ? 'Counter' : 'FirstStrike';
     if (aFirst && !dFirst) {
+      keywordEvent(state, 'FirstStrike', att, 'Strikes first');
       damageMonster(state, att, def, aAtk);
       if (alive(def)) damageMonster(state, def, att, dAtk);
+      else keywordEvent(state, 'FirstStrike', att, 'No retaliation');
     } else if (dFirst && !aFirst) {
+      keywordEvent(state, dKw, def, 'Strikes first');
       damageMonster(state, def, att, dAtk);
       if (alive(att)) damageMonster(state, att, def, aAtk);
+      else keywordEvent(state, dKw, def, 'No retaliation');
     } else {
       damageMonster(state, att, def, aAtk);
       damageMonster(state, def, att, dAtk);
@@ -414,10 +464,12 @@ function afterAttack(state, att, killed) {
   if (!alive(att)) return;
   if (killed && hasKeyword(att, 'Devour')) {
     att.mods.push({ atk: 1, hp: 1 });
+    keywordEvent(state, 'Devour', att, '+1/+1');
+    state.events.push({ type: 'buff', uid: att.uid });
     log(state, `${defOf(att).displayName} devours its prey (+1/+1).`);
   }
-  if (hasKeyword(att, 'Overtake')) gainNitro(state, att.owner, 1);
-  if (hasKeyword(att, 'XP')) gainXP(state, att, 1);
+  if (hasKeyword(att, 'Overtake')) { keywordEvent(state, 'Overtake', att, '+1 Nitro'); gainNitro(state, att.owner, 1); }
+  if (hasKeyword(att, 'XP')) { keywordEvent(state, 'XP', att, '+1 XP'); gainXP(state, att, 1); }
 }
 
 function doEndTurn(state) {
@@ -441,8 +493,10 @@ function doEndTurn(state) {
   }
   const np = P(state, state.active);
   np.maxBw = Math.min(MAX_BANDWIDTH, np.maxBw + 1);
-  np.bw = np.maxBw + monsters(state, np.id).filter(m => hasKeyword(m, 'Generate')).length;
+  const generators = monsters(state, np.id).filter(m => hasKeyword(m, 'Generate'));
+  np.bw = np.maxBw + generators.length;
   state.events.push({ type: 'turn', pid: np.id, turn: state.turn });
+  for (const g of generators) keywordEvent(state, 'Generate', g, '+1 Bandwidth');
 
   if (state.turn > TURN_LIMIT) {
     state.over = true;
@@ -532,7 +586,11 @@ export function draw(state, pid, n, { triggers = true } = {}) {
 function onDraw(state, pid) {
   for (const m of monsters(state, pid)) {
     if (!alive(m)) continue;
-    if (hasKeyword(m, 'Topdeck')) m.mods.push({ atk: 1, hp: 1 });
+    if (hasKeyword(m, 'Topdeck')) {
+      m.mods.push({ atk: 1, hp: 1 });
+      keywordEvent(state, 'Topdeck', m, '+1/+1');
+      state.events.push({ type: 'buff', uid: m.uid });
+    }
     resolveEffects(state, m, 'draw', null);
   }
 }
@@ -543,17 +601,21 @@ function damageMonster(state, src, m, amount) {
   if (amount <= 0 || !findMonster(state, m.uid)) return 0;
   if (hasKeyword(m, 'PoweredUp')) {
     removeKeyword(m, 'PoweredUp');
+    keywordEvent(state, 'PoweredUp', m, 'Blocked');
     state.events.push({ type: 'shield', uid: m.uid });
     return 0;
   }
-  if (hasKeyword(m, 'Fortify')) amount -= 1;
+  if (hasKeyword(m, 'Fortify')) { amount -= 1; keywordEvent(state, 'Fortify', m, '-1 damage'); }
   if (amount <= 0) {
     state.events.push({ type: 'damage', uid: m.uid, amount: 0 });
     return 0;
   }
   m.damage += amount;
   state.events.push({ type: 'damage', uid: m.uid, amount });
-  if (src && src.kw && hasKeyword(src, 'Suppression') && src.owner !== m.owner) suppress(state, m);
+  if (src && src.kw && hasKeyword(src, 'Suppression') && src.owner !== m.owner) {
+    keywordEvent(state, 'Suppression', src);
+    suppress(state, m);
+  }
   return amount;
 }
 
@@ -573,6 +635,7 @@ function cleanup(state) {
       if (hasKeyword(m, 'Checkpoint')) {
         removeKeyword(m, 'Checkpoint');
         m.damage = getMaxHealth(m) - 1;
+        keywordEvent(state, 'Checkpoint', m, 'Survives at 1');
         state.events.push({ type: 'checkpoint', uid: m.uid });
         log(state, `${defOf(m).displayName} hits a Checkpoint and survives at 1 health.`);
         continue;
@@ -588,7 +651,7 @@ function cleanup(state) {
       resolveEffects(state, m, 'death', null);
       if (hasKeyword(m, 'Haunt')) {
         const victim = pick(state, monsters(state, opp(m.owner)).filter(alive));
-        if (victim) damageMonster(state, m, victim, 2);
+        if (victim) { keywordEvent(state, 'Haunt', victim, 'Haunted'); damageMonster(state, m, victim, 2); }
       }
     }
     for (const m of died) {
@@ -628,7 +691,7 @@ function resolveEffects(state, source, trigger, chosen) {
       const p = P(state, source.owner);
       if (p.nitro < e.nitroCost) continue;
       p.nitro -= e.nitroCost;
-      state.events.push({ type: 'nitro', pid: p.id });
+      state.events.push({ type: 'nitro', pid: p.id, amount: -e.nitroCost, boost: true });
     }
     applyEffect(state, source, e, effectTargets(state, source, e, chosen));
   }
@@ -683,8 +746,8 @@ function applyEffect(state, src, e, targets) {
         state.events.push({ type: 'buff', uid: m.uid });
       }
       break;
-    case 'BuffAttackThisTurn': for (const m of mons) m.mods.push({ atk: n, hp: 0, temp: true }); break;
-    case 'DebuffAttack': for (const m of mons) m.mods.push({ atk: -n, hp: 0, temp: true }); break;
+    case 'BuffAttackThisTurn': for (const m of mons) { m.mods.push({ atk: n, hp: 0, temp: true }); state.events.push({ type: 'buff', uid: m.uid, temp: true, text: `+${n} ATK` }); } break;
+    case 'DebuffAttack': for (const m of mons) { m.mods.push({ atk: -n, hp: 0, temp: true }); state.events.push({ type: 'debuff', uid: m.uid, text: `-${n} ATK` }); } break;
     case 'Heal':
       for (const t of players) {
         const tp = P(state, t);
@@ -692,7 +755,11 @@ function applyEffect(state, src, e, targets) {
         tp.hp = Math.min(START_HP, tp.hp + n);
         if (tp.hp > before) state.events.push({ type: 'heal', pid: t, amount: tp.hp - before });
       }
-      for (const m of mons) m.damage = n ? Math.max(0, m.damage - n) : 0;
+      for (const m of mons) {
+        const before = m.damage;
+        m.damage = n ? Math.max(0, m.damage - n) : 0;
+        if (m.damage < before) state.events.push({ type: 'heal', uid: m.uid, amount: before - m.damage });
+      }
       break;
     case 'Destroy':
       for (const m of mons) m.damage = Math.max(m.damage, getMaxHealth(m));
@@ -707,9 +774,9 @@ function applyEffect(state, src, e, targets) {
         if (!m.isToken) addToHand(state, m.owner, m);
       }
       break;
-    case 'GrantKeyword': for (const m of mons) addKeyword(m, e.keyword); break;
-    case 'GrantKeywordThisTurn': for (const m of mons) if (!m.tempKw.includes(e.keyword)) m.tempKw.push(e.keyword); break;
-    case 'RemoveKeyword': for (const m of mons) removeKeyword(m, e.keyword); break;
+    case 'GrantKeyword': for (const m of mons) { addKeyword(m, e.keyword); keywordEvent(state, e.keyword, m, 'Gained'); } break;
+    case 'GrantKeywordThisTurn': for (const m of mons) if (!m.tempKw.includes(e.keyword)) { m.tempKw.push(e.keyword); keywordEvent(state, e.keyword, m, 'This turn'); } break;
+    case 'RemoveKeyword': for (const m of mons) { removeKeyword(m, e.keyword); keywordEvent(state, e.keyword, m, 'Lost'); } break;
     case 'SummonToken': for (let i = 0; i < Math.max(1, n); i++) summonToken(state, pid, e.token); break;
     case 'Revive': {
       if (!p.board.includes(null)) break;
@@ -739,7 +806,7 @@ function applyEffect(state, src, e, targets) {
     case 'RevealHand': P(state, opp(pid)).revealedTurn = state.turn; break;
     case 'GainNitro': gainNitro(state, pid, n); break;
     case 'GainXP': for (const m of mons) gainXP(state, m, n); break;
-    case 'Generate': p.bw += n; break;
+    case 'Generate': p.bw += n; state.events.push({ type: 'bandwidth', pid, amount: n }); break;
     case 'GainMaxBandwidth': p.maxBw = Math.min(MAX_BANDWIDTH, p.maxBw + n); break;
     case 'ShuffleGraveyardIntoDeck':
       p.deck.push(...p.grave);
@@ -781,12 +848,14 @@ function silence(state, m) {
 function suppress(state, m) {
   // Through the end of its controller's next turn.
   m.suppressedUntil = Math.max(m.suppressedUntil, state.turn + (state.active === m.owner ? 2 : 1));
+  state.events.push({ type: 'suppress', uid: m.uid });
+  log(state, `${defOf(m).displayName} is Suppressed.`);
 }
 
 function gainNitro(state, pid, n) {
   const p = P(state, pid);
   p.nitro = Math.max(0, p.nitro + n);
-  state.events.push({ type: 'nitro', pid });
+  state.events.push({ type: 'nitro', pid, amount: n });
 }
 
 function gainXP(state, m, n) {
@@ -794,6 +863,7 @@ function gainXP(state, m, n) {
   if (m.xp >= LEVEL_UP_XP && !m.leveled) {
     m.leveled = true;
     m.mods.push({ atk: LEVEL_UP_BONUS, hp: LEVEL_UP_BONUS });
+    keywordEvent(state, 'XP', m, `Level Up! +${LEVEL_UP_BONUS}/+${LEVEL_UP_BONUS}`);
     state.events.push({ type: 'levelup', uid: m.uid });
     log(state, `${defOf(m).displayName} Levels Up! (+${LEVEL_UP_BONUS}/+${LEVEL_UP_BONUS})`);
   }
