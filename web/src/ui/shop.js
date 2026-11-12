@@ -23,14 +23,15 @@ export function shop(root, { onBack, nav }) {
   const render = () => {
     storage.set('metadeck.shop', prefs);
     const p = profile();
-    body.replaceChildren(
+    body.replaceChildren(...[
       p.season.premium ? null : passBanner(),
       packsSection(),
       h('section', { class: 'rise', style: { '--i': 3 } },
         h('h2', null, 'Cosmetics'),
         h('p', { class: 'muted' }, 'Looks only: nothing here changes how a card plays.'),
         h('div', { class: 'cos-grid' }, COSMETICS.filter(c => c.gems).map((c, i) => cosmeticOffer(c, i)))),
-      gemsSection());
+      gemsSection(),
+    ].filter(Boolean));
   };
 
   // Every purchase is an economy operation (applied by the server when signed in).

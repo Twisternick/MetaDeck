@@ -382,7 +382,7 @@ export function balanceLab(root, { onBack }) {
       stat('Matchup noise', `±${Math.round(report.noise * 100)}%`),
     );
     verdictTable.replaceChildren(
-      stats.gamesPer < 100 ? h('p', { class: 'bl-warn' }, `Only ${stats.gamesPer} games per matchup: treat these verdicts as rough. Use 100 or more before tuning a deck.`) : null,
+      stats.gamesPer < 100 ? h('p', { class: 'bl-warn' }, `Only ${stats.gamesPer} games per matchup: treat these verdicts as rough. Use 100 or more before tuning a deck.`) : '',
       h('table', { class: 'bl-table' },
       h('thead', null, h('tr', null, ['Deck', 'Overall', 'Favored', 'Even', 'Unfavored', 'Best', 'Worst', 'Spread', 'Verdict'].map(t => h('th', null, t)))),
       h('tbody', null, report.decks.map((d, i) => h('tr', { class: 'rise', style: { '--i': i, '--deck': deck(d.id).color } },
@@ -403,7 +403,7 @@ export function balanceLab(root, { onBack }) {
     cardTable.replaceChildren(
       h('div', null, h('h3', null, 'Over-perform their deck'), h('table', { class: 'bl-table' }, head, h('tbody', null, report.cards.slice(0, 12).map(line)))),
       h('div', null, h('h3', null, 'Under-perform their deck'), h('table', { class: 'bl-table' }, head.cloneNode(true), h('tbody', null, report.cards.slice(-12).reverse().map(line)))),
-      report.rare.length ? h('p', { class: 'muted bl-legend' }, `Rarely played (under 15% of games): ${report.rare.join(', ')}.`) : null,
+      report.rare.length ? h('p', { class: 'muted bl-legend' }, `Rarely played (under 15% of games): ${report.rare.join(', ')}.`) : '',
       h('p', { class: 'muted bl-legend' }, 'Δ is the deck’s win rate in games where the card was played, minus the deck’s overall win rate. Expensive cards score high partly because games that reach them run long.'));
   }
 
