@@ -58,7 +58,7 @@ All ten decks finish between 47% and 54%, and the player going first wins 51% of
 
 ## Card changes
 
-Each archetype is now exactly 30 unique cards, and a deck is the whole archetype. That meant 10 new cards each for Fighting and Racing (which had 20), 5 for the 25-card decks, and 5 new FPS cards replacing 5 redundant ones (FPS already had 30). That's 60 new cards in total, marked 🆕 here and **NEW** in the game's gallery.
+Each archetype is now exactly 30 unique cards, and a deck is the whole archetype. That meant 10 new cards each for Fighting and Racing (which had 20), 5 for the 25-card decks, and 5 new FPS cards replacing 5 redundant ones (FPS already had 30). That's 60 new cards in total, marked 🆕 here and **NEW** in the game's gallery. (The decks have since grown to 40 cards each; see [The 40-card expansion](#the-40-card-expansion).)
 
 ### 🎯 FPS
 
@@ -431,3 +431,210 @@ A card game about card games: draw piles of cards, grow Topdeckers, Errata the r
 | Sideboard Specialist | 5 · 5/7 | 5 · 4/5 · Play: Draw 2 cards. |
 | **Ban Hammer** 🆕 | — | 5 · Destroy an enemy monster. |
 | Tournament Winner | 7 · 8/9 · Topdeck | 6 · 6/6 · Topdeck · Play: Draw 2 cards. |
+
+## The 40-card expansion
+
+Every deck grew from 30 to 40 cards: 10 new cards per genre, 100 in total. They are marked **NEW** in the gallery alongside the 60 cards from the first pass. They use only keywords, effects, triggers and conditions the engine already had. No rules changed, and no existing card was touched.
+
+### How they were made
+
+- **Each deck got what it lacked.** FPS got cheap Headshot bodies and a mid-game sweeper; Horror more death value (Plague Rat, Seance Medium, Necromancer); Platformer more Double Jump and Powered Up; RPG more XP sources and gear; Racing more Nitro sinks; Fighting a 0-cost Combo enabler (Jab) and Counter walls; Sports more go-wide and Momentum; Strategy Structures that pressure the enemy hero; City Builder more Districts and District payoffs; Card Game a vanilla joke card (Bulk Common) and late-game Topdeck threats.
+- **Costs follow the stat budget** from the first pass (about `2 × cost + 1` total stats, with keywords and effects paid out of that budget).
+- **Then the simulator tuned them.** The first run put Card Game at 63%. Its new draw cards were part of the reason. The bigger reason is that a 40-card deck takes far longer to run out, so Card Game's heavy drawing stopped costing it fatigue damage. Three tuning passes followed:
+  - **Card Game:** Holo Chase Dragon lost its card draw and went to 6/6, Mythic Rare lost its card draw, Card Collector went to 1/2, Game Store Owner to 2/4, and Burn Spell to 3 Bandwidth.
+  - **Platformer:** Mini-Boss went to 4/5 and Time Trial Ace to 4/3.
+  - **Sports:** Substitution first returned a friendly monster to your hand. The AI never cast it (1% of games), so it now summons a Benchwarmer and draws a card.
+  - **Buffs for the low decks:**
+    - Strategy: Trebuchet down to 4 Bandwidth with Guard, Watchtower to 0/5, Spymaster to 2/2, Grand Strategy down to 3, and Fortress Walls draws a card.
+    - Fighting: Ultimate Combo down to 4, Combo Breaker to 3/5, Jump-In Specialist to 3/3.
+    - Racing: Sponsor Rep to 3/3, Oil Slick down to 1.
+    - Horror: Creeping Dread down to 1, Seance Medium to 2/3.
+    - City Builder: Revenue Agent to 3/5, Bus Driver to 3/3.
+
+### Result (40-card decks)
+
+13,500 AI-vs-AI games (300 per pairing, each deck going first half the time):
+
+```
+
+13500 games in 47.4s · avg length 19.1 turns · draws 0 · first player wins 52%
+
+Deck            Win rate
+Strategy         54%  ██████████████████████
+Platformer       54%  █████████████████████
+Sports           53%  █████████████████████
+CardGame         50%  ████████████████████
+FPS              49%  ████████████████████
+RPG              49%  ████████████████████
+CityBuilder      49%  ███████████████████
+Fighting         48%  ███████████████████
+Racing           48%  ███████████████████
+Horror           47%  ███████████████████
+
+Matchups (row deck's win rate vs column deck)
+                FPS Horror Platfo    RPG Racing Fighti Sports Strate CityBu CardGa
+FPS               ·    55%    46%    48%    54%    57%    53%    33%    50%    45%
+Horror          45%      ·    49%    45%    51%    56%    51%    37%    45%    41%
+Platformer      54%    51%      ·    60%    61%    52%    49%    46%    54%    55%
+RPG             52%    55%    40%      ·    48%    46%    52%    48%    61%    40%
+Racing          46%    49%    39%    52%      ·    51%    42%    46%    47%    57%
+Fighting        43%    44%    48%    54%    49%      ·    51%    39%    50%    57%
+Sports          47%    49%    51%    48%    58%    49%      ·    54%    55%    63%
+Strategy        67%    63%    54%    52%    54%    61%    46%      ·    47%    46%
+CityBuilder     50%    55%    46%    39%    53%    50%    45%    53%      ·    47%
+CardGame        55%    59%    45%    60%    43%    43%    37%    54%    53%      ·
+```
+
+All ten decks finish between 47% and 54%, the same spread as the 30-card decks. The player going first wins 52% of games, and games average 19.1 turns (18.7 before). The new cards' "win rate when played minus deck win rate" ranges from −7% to +11%. The high end is Holo Chase Dragon (a 7-drop, where late-game cards always score high) and Card Collector. On the low end, cheap reactive cards (Creeping Dread, Ultimate Combo, Water Carrier) score low partly because the AI tends to cast them when it is already behind.
+
+### New cards
+
+### 🎯 FPS
+
+| Card | Cost | Stats | Text |
+|---|---|---|---|
+| **Proximity Mine** | 1 | 0/2 | Guard · Death: Deal 2 damage to a random enemy monster. |
+| **Designated Marksman** | 2 | 2/2 | Headshot |
+| **Spec Ops Infiltrator** | 3 | 3/2 | Stealth, Headshot |
+| **Riot Shield Trooper** | 3 | 2/4 | Guard, Suppression |
+| **Loadout Officer** | 4 | 3/4 | Play: Give another friendly monster +2/+1. |
+| **Ghost Sniper** | 5 | 4/3 | First Strike, Headshot · Play: Deal 1 damage to an enemy monster. |
+| **Gunship Pilot** | 6 | 5/5 | Play: Deal 1 damage to all enemy monsters. |
+| **Tactical Reload** | 1 | Spell | Draw a card. If you've attacked this turn, draw a card. |
+| **Ricochet** | 3 | Spell | Deal 2 damage to an enemy monster. Deal 1 damage to a random enemy monster. |
+| **Drone Strike** | 3 | Spell | Summon two 1/1 Drones. Deal 1 damage to a random enemy monster. |
+
+### 👻 Horror
+
+| Card | Cost | Stats | Text |
+|---|---|---|---|
+| **Plague Rat** | 1 | 2/1 | Death: Summon a 1/1 Ghoul with Fear. |
+| **Banshee** | 3 | 3/2 | Stealth, Haunt |
+| **Seance Medium** | 3 | 2/3 | Whenever another friendly monster dies, draw a card. |
+| **Asylum Warden** | 4 | 2/6 | Guard, Fear |
+| **Reanimated Hulk** | 4 | 4/3 | Fear, Checkpoint |
+| **Necromancer** | 5 | 3/4 | Play: Revive your most recently destroyed monster. |
+| **Thing in the Walls** | 6 | 6/5 | Stealth, Devour |
+| **Creeping Dread** | 1 | Spell | Quick · Give all enemy monsters -2 ATK this turn. |
+| **Summoning Circle** | 3 | Spell | Summon three 1/1 Ghouls with Fear. |
+| **Final Girl** | 4 | Spell | Deal 3 damage to an enemy monster. Restore 4 HP to you. |
+
+### ⭐ Platformer
+
+| Card | Cost | Stats | Text |
+|---|---|---|---|
+| **Hop Sprite** | 1 | 1/1 | Powered Up, Double Jump |
+| **Level Designer** | 2 | 2/2 | Play: Give another friendly monster Double Jump. |
+| **Shell Hopper** | 3 | 3/2 | Rush, Double Jump |
+| **Hidden Block Guardian** | 3 | 2/4 | Guard, Powered Up |
+| **Sky Kingdom Knight** | 4 | 4/4 | Double Jump |
+| **Time Trial Ace** | 5 | 4/3 | Rush, Checkpoint |
+| **Mini-Boss** | 5 | 4/5 | Guard |
+| **Coin Trail** | 2 | Spell | Give a friendly monster +1/+1. Draw a card. |
+| **Head Stomp** | 2 | Spell | Deal 2 damage to an enemy monster. |
+| **Continue Screen** | 3 | Spell | Return the last card in your graveyard to your hand. Draw a card. |
+
+### ⚔️ RPG
+
+| Card | Cost | Stats | Text |
+|---|---|---|---|
+| **Novice Cleric** | 1 | 1/2 | Play: Restore 2 HP to you. |
+| **Shadow Thief** | 2 | 2/2 | Stealth, XP |
+| **Blacksmith** | 3 | 2/3 | Play: Equip another friendly monster with +1/+1 and First Strike. |
+| **Berserker** | 4 | 4/3 | Rush, XP |
+| **Paladin** | 4 | 3/5 | Guard, XP |
+| **Party Leader** | 5 | 4/5 | Play: Give your other monsters 1 XP. |
+| **High Priestess** | 5 | 3/6 | Turn end: Restore 2 HP to you. |
+| **Elixir** | 1 | Spell | Quick · Fully heal a friendly monster. Give it 1 XP. |
+| **Lightning Bolt** | 2 | Spell | Deal 3 damage to an enemy monster. |
+| **Level Grind** | 3 | Spell | Give your monsters 1 XP. Draw a card. |
+
+### 🏁 Racing
+
+| Card | Cost | Stats | Text |
+|---|---|---|---|
+| **Kart Rookie** | 1 | 1/2 | Death: Gain 1 Nitro. |
+| **Tire Changer** | 2 | 2/2 | Play: Give another friendly monster +1/+1. Boost 1: give it another +1/+1. |
+| **Sponsor Rep** | 3 | 3/3 | Play: Gain 2 Nitro. |
+| **Getaway Driver** | 3 | 3/3 | Rush · Play: Boost 1: gain Stealth. |
+| **Rally Truck** | 4 | 3/5 | Guard, Slipstream |
+| **Monster Truck** | 5 | 4/6 | Play: Boost 2: deal 2 damage to all enemy monsters. |
+| **Formula Ace** | 6 | 5/4 | Rush, Slipstream, Overtake |
+| **Oil Slick** | 1 | Spell | Quick · Suppress an enemy monster. Boost 1: deal 2 damage to it. |
+| **Lap Record** | 3 | Spell | Draw 2 cards. Boost 2: draw a card. |
+| **Spin Out** | 3 | Spell | Deal 3 damage to an enemy monster. Boost 2: deal 2 more damage to it. |
+
+### 🥊 Fighting
+
+| Card | Cost | Stats | Text |
+|---|---|---|---|
+| **Button Masher** | 1 | 2/1 | Combo |
+| **Kick Boxer** | 2 | 2/2 | First Strike · Play: If you've played another card this turn, gain Rush this turn. |
+| **Sparring Partner** | 2 | 1/4 | Guard, Counter |
+| **Jump-In Specialist** | 3 | 3/3 | Double Jump, Combo |
+| **Mat Wrestler** | 3 | 2/4 | Guard, Counter |
+| **Combo Breaker** | 4 | 3/5 | Counter · Play: Silence an enemy monster. |
+| **Hidden Boss** | 6 | 6/6 | Counter · Play: Deal 2 damage to an enemy monster. |
+| **Jab** | 0 | Spell | Deal 1 damage to an enemy monster. |
+| **Taunt** | 1 | Spell | Give a friendly monster +0/+2 and Guard. |
+| **Ultimate Combo** | 4 | Spell | Deal 3 damage to the enemy player. If you've played 2+ other cards this turn, deal 3 more damage. |
+
+### 🏆 Sports
+
+| Card | Cost | Stats | Text |
+|---|---|---|---|
+| **Water Carrier** | 1 | 1/2 | Turn end: Restore 1 HP to you. |
+| **Cheerleader** | 2 | 1/2 | Inspire |
+| **Underdog** | 2 | 2/3 | Clutch |
+| **Midfielder** | 3 | 3/3 | Momentum · Play: If you've attacked this turn, draw a card. |
+| **Draft Day Pick** | 3 | 2/2 | Play: Summon two 1/1 Benchwarmers with Momentum. |
+| **Linebacker** | 4 | 4/5 | Guard |
+| **Superstar** | 6 | 6/5 | Rush, Momentum |
+| **Substitution** | 2 | Spell | Summon a 1/1 Benchwarmer with Momentum. Draw a card. |
+| **Hail Mary** | 2 | Spell | Deal 2 damage to the enemy player. If your HP is lower than your opponent's, deal 3 more damage. |
+| **Full-Court Press** | 4 | Spell | Summon two 1/1 Benchwarmers with Momentum. Give your monsters Rush this turn. |
+
+### ♟️ Strategy
+
+| Card | Cost | Stats | Text |
+|---|---|---|---|
+| **Pikeman** | 1 | 1/2 | Fortify |
+| **Spymaster** | 2 | 2/2 | Stealth · Play: Reveal your opponent's hand this turn. Draw a card. |
+| **Watchtower** | 2 | 0/5 | Structure · Turn end: Deal 1 damage to a random enemy monster. |
+| **Cavalry Charger** | 3 | 3/3 | Rush |
+| **Logistics Chief** | 4 | 3/4 | Play: Gain an empty Bandwidth crystal. Draw a card. |
+| **Trebuchet** | 4 | 0/6 | Guard, Structure, Fortify · Turn end: Deal 2 damage to the enemy player. |
+| **Field Marshal** | 6 | 5/6 | Inspire, Fortify |
+| **Ambush** | 3 | Spell | Quick · Deal 3 damage to an enemy monster. |
+| **Fortress Walls** | 3 | Spell | Summon two 0/4 Barricades with Guard and Structure. Draw a card. |
+| **Grand Strategy** | 3 | Spell | Gain an empty Bandwidth crystal. Draw 2 cards. |
+
+### 🏙️ City Builder
+
+| Card | Cost | Stats | Text |
+|---|---|---|---|
+| **Busker** | 1 | 2/1 | Death: Summon a 1/1 Citizen. |
+| **Urban Planner** | 2 | 2/2 | Play: Summon a 0/3 District Block with Guard and District. |
+| **Bus Driver** | 3 | 3/3 | Play: Summon a 1/1 Citizen. If you control a District, summon a 1/1 Citizen. |
+| **Fire Station** | 4 | 2/5 | Guard, District · Play: Restore 3 HP to you. |
+| **Revenue Agent** | 4 | 3/5 | Tax · Play: If you control a District, your opponent discards a random card. |
+| **Real Estate Mogul** | 5 | 4/5 | Play: Draw a card. If you control a District, draw a card. |
+| **Skyscraper** | 6 | 4/8 | Guard, District |
+| **Building Permit** | 2 | Spell | Summon a 0/3 District Block with Guard and District. Draw a card. |
+| **Rush Hour** | 2 | Spell | Give your monsters +1 ATK this turn. If you control 3+ monsters, draw a card. |
+| **City Curfew** | 4 | Spell | Suppress all enemy monsters. |
+
+### 🃏 Card Game
+
+| Card | Cost | Stats | Text |
+|---|---|---|---|
+| **Bulk Common** | 1 | 2/2 |  |
+| **Misprint** | 2 | 3/3 | Turn start: Discard a random card. |
+| **Card Collector** | 3 | 1/2 | Topdeck · Play: Draw a card. |
+| **Netdecker** | 3 | 2/3 | Play: Copy a random card in your hand. |
+| **Game Store Owner** | 5 | 2/4 | Turn start: Draw a card. |
+| **Mythic Rare** | 6 | 5/6 | Errata |
+| **Holo Chase Dragon** | 7 | 6/6 | Guard, Topdeck |
+| **Stack Response** | 2 | Spell | Quick · Give an enemy monster -2 ATK this turn. Draw a card. |
+| **Burn Spell** | 3 | Spell | Deal 3 damage to an enemy. |
+| **Board Wipe** | 5 | Spell | Deal 3 damage to all monsters. |

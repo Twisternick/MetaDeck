@@ -1,4 +1,4 @@
-import { M, S, fx, QUICK, NEW } from '../helpers.js';
+import { M, S, fx, QUICK, NEW, QUICK_NEW } from '../helpers.js';
 
 export default {
   id: 'Strategy',
@@ -9,11 +9,14 @@ export default {
   cards: [
     M('STR_M01_ScoutUnit', 'Scout Unit', 1, 2, 1, ['Stealth']),
     M('STR_M02_EconomyAide', 'Economy Aide', 1, 1, 2, ['Generate']),
+    M('STR_M19_Pikeman', 'Pikeman', 1, 1, 2, ['Fortify'], [], NEW),
     M('STR_M03_DefensiveEngineer', 'Defensive Engineer', 2, 1, 3, ['Guard', 'Fortify']),
     M('STR_M04_TechResearcher', 'Tech Researcher', 2, 1, 2, [], [fx('Draw', 1)]),
     M('STR_M05_ExpansionSettler', 'Expansion Settler', 2, 2, 2, ['Generate']),
     M('STR_M06_SupplyOfficer', 'Supply Officer', 3, 2, 3, [], [fx('GainMaxBandwidth', 1)]),
     M('STR_M07_StructureWall', 'Structure Wall', 2, 0, 6, ['Guard', 'Structure']),
+    M('STR_M20_Spymaster', 'Spymaster', 2, 2, 2, ['Stealth'], [fx('RevealHand'), fx('Draw', 1)], NEW),
+    M('STR_M21_Watchtower', 'Watchtower', 2, 0, 5, ['Structure'], [fx('DealDamage', 1, 'RandomEnemyMonster', { trigger: 'turnEnd' })], NEW),
     M('STR_M08_DiplomacyEnvoy', 'Diplomacy Envoy', 3, 2, 3, [], [fx('Suppress', 0, 'EnemyMonster')]),
     M('STR_M09_SiegeCommander', 'Siege Commander', 3, 3, 3, [], [fx('DealDamage', 1, 'EnemyMonster')]),
     M('STR_M10_WarPlanner', 'War Planner', 3, 2, 3, ['Inspire']),
@@ -22,8 +25,12 @@ export default {
     M('STR_M12_GrandTactician', 'Grand Tactician', 4, 4, 4, [], [fx('GrantKeyword', 0, 'OtherFriendlyMonster', { keyword: 'Fortify' })]),
     M('STR_M13_CounterIntelChief', 'Counter-Intel Chief', 4, 3, 4, [], [fx('Silence', 0, 'EnemyMonster')]),
     M('STR_M17_ArtilleryBattery', 'Artillery Battery', 3, 0, 5, ['Structure'], [fx('DealDamage', 2, 'RandomEnemyMonster', { trigger: 'turnEnd' })], NEW),
+    M('STR_M22_CavalryCharger', 'Cavalry Charger', 3, 3, 3, ['Rush'], [], NEW),
+    M('STR_M23_LogisticsChief', 'Logistics Chief', 4, 3, 4, [], [fx('GainMaxBandwidth', 1), fx('Draw', 1)], NEW),
     M('STR_M14_WarCouncilChair', 'War Council Chair', 5, 5, 6, ['Fortify']),
     M('STR_M18_SiegeTower', 'Siege Tower', 5, 3, 5, ['Fortify'], [fx('DealDamage', 2, 'EnemyMonster')], NEW),
+    M('STR_M24_Trebuchet', 'Trebuchet', 4, 0, 6, ['Guard', 'Structure', 'Fortify'], [fx('DealDamage', 2, 'EnemyPlayer', { trigger: 'turnEnd' })], NEW),
+    M('STR_M25_FieldMarshal', 'Field Marshal', 6, 5, 6, ['Inspire', 'Fortify'], [], NEW),
     M('STR_M15_TotalWarEngine', 'Total War Engine', 7, 0, 9, ['Guard', 'Structure'], [
       fx('DealDamage', 2, 'RandomEnemyMonster', { trigger: 'turnEnd' }),
       fx('DealDamage', 2, 'EnemyPlayer', { trigger: 'turnEnd' }),
@@ -39,7 +46,10 @@ export default {
     S('STR_S06_MobilizeArmy', 'Mobilize Army', 3, [fx('SummonToken', 2, 'None', { token: 'token_soldier' })]),
     S('STR_S08_UpgradeTree', 'Upgrade Tree', 4, [fx('Buff', 1, 'AllFriendlyMonsters'), fx('Draw', 1)]),
     S('STR_S09_EconomicBoom', 'Economic Boom', 3, [fx('GainMaxBandwidth', 2)]),
+    S('STR_S13_Ambush', 'Ambush', 3, [fx('DealDamage', 3, 'EnemyMonster')], QUICK_NEW),
+    S('STR_S14_FortressWalls', 'Fortress Walls', 3, [fx('SummonToken', 2, 'None', { token: 'token_barricade' }), fx('Draw', 1)], NEW),
     S('STR_S12_ScorchedEarth', 'Scorched Earth', 4, [fx('DealDamage', 2, 'AllEnemyMonsters')], NEW),
+    S('STR_S15_GrandStrategy', 'Grand Strategy', 3, [fx('GainMaxBandwidth', 1), fx('Draw', 2)], NEW),
     S('STR_S10_TotalWarDoctrine', 'Total War Doctrine', 6, [fx('SummonToken', 2, 'None', { token: 'token_soldier' }), fx('Buff', 2, 'AllFriendlyMonsters')]),
   ],
 };

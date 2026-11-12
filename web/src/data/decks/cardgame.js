@@ -1,4 +1,4 @@
-import { M, S, fx, QUICK, NEW } from '../helpers.js';
+import { M, S, fx, QUICK, NEW, QUICK_NEW } from '../helpers.js';
 
 export default {
   id: 'CardGame',
@@ -9,28 +9,37 @@ export default {
   cards: [
     M('CCG_M01_DrawCard', 'Draw Card', 1, 1, 2, ['Topdeck']),
     M('CCG_M02_TokenSummon', 'Token Summon', 1, 1, 1, [], [fx('SummonToken', 1, 'None', { token: 'token_proxy' })]),
+    M('CCG_M19_BulkCommon', 'Bulk Common', 1, 2, 2, [], [], NEW),
     M('CCG_M03_MonsterCard', 'Monster Card', 2, 2, 3),
     M('CCG_M04_WildCard', 'Wild Card', 2, 2, 1, ['Errata']),
     M('CCG_M05_ReverseCard', 'Reverse Card', 2, 2, 2, ['Copy']),
     M('CCG_M06_SleeveGuardian', 'Sleeve Guardian', 2, 0, 4, ['Guard', 'PoweredUp']),
+    M('CCG_M20_Misprint', 'Misprint', 2, 3, 3, [], [fx('DiscardRandom', 1, 'FriendlyPlayer', { trigger: 'turnStart' })], NEW),
     M('CCG_M07_DeckboxMimic', 'Deckbox Mimic', 3, 3, 4, ['Copy']),
     M('CCG_M08_FoilShowcase', 'Foil Showcase', 3, 2, 4, ['Topdeck']),
     M('CCG_M09_RuleReminder', 'Rule Reminder', 3, 2, 3, ['Errata']),
     M('CCG_M10_RareCard', 'Rare Card', 3, 4, 2, [], [fx('Draw', 1, 'None', { trigger: 'death' })]),
     M('CCG_M16_CardShark', 'Card Shark', 3, 2, 3, [], [fx('DealDamage', 1, 'RandomEnemyMonster', { trigger: 'draw' })], NEW),
     M('CCG_M17_BoosterPack', 'Booster Pack', 3, 1, 3, ['Guard'], [fx('Draw', 2, 'None', { trigger: 'death' })], NEW),
+    M('CCG_M21_CardCollector', 'Card Collector', 3, 1, 2, ['Topdeck'], [fx('Draw', 1)], NEW),
+    M('CCG_M22_Netdecker', 'Netdecker', 3, 2, 3, [], [fx('CopyRandomHandCard', 1)], NEW),
     M('CCG_M11_ReprintBeast', 'Reprint Beast', 4, 4, 4, ['Copy']),
     M('CCG_M12_ComboPiece', 'Combo Piece', 4, 4, 4, [], [fx('Draw', 1)]),
     M('CCG_M13_BannedCard', 'Banned Card', 4, 6, 6, [], [fx('DiscardRandom', 1, 'FriendlyPlayer', { trigger: 'turnStart' })]),
     M('CCG_M18_Judge', 'Judge', 4, 3, 5, ['Guard', 'Errata'], [], NEW),
     M('CCG_M14_SideboardSpecialist', 'Sideboard Specialist', 5, 4, 5, [], [fx('Draw', 2)]),
+    M('CCG_M23_GameStoreOwner', 'Game Store Owner', 5, 2, 4, [], [fx('Draw', 1, 'None', { trigger: 'turnStart' })], NEW),
     M('CCG_M15_TournamentWinner', 'Tournament Winner', 6, 6, 6, ['Topdeck'], [fx('Draw', 2)]),
+    M('CCG_M24_MythicRare', 'Mythic Rare', 6, 5, 6, ['Errata'], [], NEW),
+    M('CCG_M25_HoloChaseDragon', 'Holo Chase Dragon', 7, 6, 6, ['Guard', 'Topdeck'], [], NEW),
 
     S('CCG_S01_Mulligan', 'Mulligan', 1, [fx('DiscardRandom', 1, 'FriendlyPlayer'), fx('Draw', 2)]),
     S('CCG_S02_HandReveal', 'Hand Reveal', 1, [fx('RevealHand'), fx('Draw', 1)]),
     S('CCG_S03_SearchCard', 'Search Card', 1, [fx('Draw', 1)]),
     S('CCG_S04_DiscardCard', 'Discard Card', 2, [fx('DiscardRandom', 1, 'EnemyPlayer')], QUICK),
     S('CCG_S06_CopyCard', 'Copy Card', 2, [fx('CopyRandomHandCard', 1)]),
+    S('CCG_S13_StackResponse', 'Stack Response', 2, [fx('DebuffAttack', 2, 'EnemyMonster'), fx('Draw', 1)], QUICK_NEW),
+    S('CCG_S14_BurnSpell', 'Burn Spell', 3, [fx('DealDamage', 3, 'EnemyCharacter')], NEW),
     S('CCG_S05_ShuffleDeck', 'Shuffle Deck', 3, [fx('ShuffleGraveyardIntoDeck'), fx('Draw', 2)]),
     S('CCG_S07_Errata', 'Errata', 3, [fx('Silence', 0, 'AnyMonster'), fx('Draw', 1)]),
     S('CCG_S09_SideboardSwap', 'Sideboard Swap', 3, [fx('ReturnFromGraveyardToHand'), fx('Draw', 1)]),
@@ -38,5 +47,6 @@ export default {
     S('CCG_S08_Topdeck', 'Topdeck', 3, [fx('Draw', 3)]),
     S('CCG_S10_Reprint', 'Reprint', 4, [fx('Revive')]),
     S('CCG_S12_BanHammer', 'Ban Hammer', 5, [fx('Destroy', 0, 'EnemyMonster')], NEW),
+    S('CCG_S15_BoardWipe', 'Board Wipe', 5, [fx('DealDamage', 3, 'AllMonsters')], NEW),
   ],
 };

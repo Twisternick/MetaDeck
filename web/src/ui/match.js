@@ -20,12 +20,14 @@ import { keywordName } from '../engine/text.js';
 const HUMAN = 0;
 const AI = 1;
 const DRAG_THRESHOLD = 8;
+const LONG_PRESS_MS = 380;
 
-export function startMatch(root, { myDeck, oppDeck, spectate = false, onExit, onRematch }) {
+// myCards / oppCards are deck lists (card ids); without one, that side plays its archetype's whole pool.
+export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate = false, onExit, onRematch }) {
   const me = getDeck(myDeck);
   const them = getDeck(oppDeck);
   const state = createGame({
-    decks: [deckList(me.id), deckList(them.id)],
+    decks: [myCards ?? deckList(me.id), oppCards ?? deckList(them.id)],
     deckIds: [me.id, them.id],
     names: spectate ? [`${me.name} AI`, `${them.name} AI`] : ['You', `${them.name} AI`],
     firstPlayer: Math.random() < 0.5 ? 0 : 1,
@@ -51,10 +53,15 @@ export function startMatch(root, { myDeck, oppDeck, spectate = false, onExit, on
     arrow: null,
     hoverTarget: null,
     inspect: null,
+    zoom: null,            // long-press card zoom (touch)
+    press: null,           // { x0, y0, timer } – a touch held on something zoomable
     reveal: null,          // { el, def } – opponent's card shown in the centre before it resolves
     pointer: { x: 0, y: 0 },
   };
   const aiControls = pid => spectate || pid === AI;
+  // Elements that can be inspected, mapped to what they show: el -> () => [def, inst]
+  const zoomables = new WeakMap();
+  const zoomable = (el, get) => { zoomables.set(el, get); return el; };
 
   root.replaceChildren();
   const view = h('div', { class: 'match' });
@@ -64,7 +71,9 @@ export function startMatch(root, { myDeck, oppDeck, spectate = false, onExit, on
   document.addEventListener('pointermove', onPointerMove, { passive: true });
   document.addEventListener('pointerup', onPointerUp);
   document.addEventListener('pointercancel', onPointerUp);
+  view.addEventListener('pointerdown', onPressStart, true);
   view.addEventListener('pointerdown', onPointerDown);
+  view.addEventListener('contextmenu', onContextMenu);
   window.addEventListener('resize', onResize);
 
   function onKey(e) {
@@ -83,6 +92,7 @@ export function startMatch(root, { myDeck, oppDeck, spectate = false, onExit, on
     ui.exited = true;
     stopArrow();
     hideInspect();
+    endPress();
     hideReveal();
     removeFx();
   }
@@ -319,6 +329,7 @@ export function startMatch(root, { myDeck, oppDeck, spectate = false, onExit, on
 
   function onPointerMove(e) {
     ui.pointer = { x: e.clientX, y: e.clientY };
+    if (ui.press && !ui.zoom && Math.hypot(e.clientX - ui.press.x0, e.clientY - ui.press.y0) > DRAG_THRESHOLD) endPress();
     const d = ui.drag;
     if (d) {
       const dx = e.clientX - d.x0;
@@ -342,6 +353,8 @@ export function startMatch(root, { myDeck, oppDeck, spectate = false, onExit, on
   }
 
   function onPointerUp(e) {
+    if (ui.zoom) suppressNextClick();
+    endPress();
     const d = ui.drag;
     if (!d) return;
     ui.drag = null;
@@ -363,6 +376,48 @@ export function startMatch(root, { myDeck, oppDeck, spectate = false, onExit, on
     const ref = refAt(e.clientX, e.clientY);
     if (ref !== null && ui.targets.includes(ref)) clickTarget(ref);
     else cancel();
+  }
+
+  // Touch: press and hold a card or monster to zoom it; lifting the finger closes it and
+  // cancels the tap or drag it began.
+  function onPressStart(e) {
+    endPress();
+    if (e.pointerType !== 'touch' || !(e.target instanceof Element)) return;
+    let el = e.target;
+    while (el && el !== view && !zoomables.has(el)) el = el.parentElement;
+    const get = el && zoomables.get(el);
+    if (!get) return;
+    ui.press = {
+      x0: e.clientX, y0: e.clientY,
+      timer: setTimeout(() => {
+        const args = ui.press && el.isConnected ? get() : null;
+        if (!args) return;
+        ui.drag = null;
+        navigator.vibrate?.(12);
+        showZoom(...args);
+      }, LONG_PRESS_MS),
+    };
+  }
+  function endPress() {
+    if (ui.press) clearTimeout(ui.press.timer);
+    ui.press = null;
+    ui.zoom?.remove();
+    ui.zoom = null;
+  }
+  function onContextMenu(e) {
+    if (ui.press || ui.zoom) e.preventDefault();
+  }
+  function suppressNextClick() {
+    const stop = e => { e.stopPropagation(); e.preventDefault(); };
+    document.addEventListener('click', stop, { capture: true, once: true });
+    setTimeout(() => document.removeEventListener('click', stop, { capture: true }), 400);
+  }
+  function showZoom(def, inst) {
+    ui.zoom?.remove();
+    const owner = inst ? state.players[inst.owner].deckId : null;
+    ui.zoom = h('div', { class: 'zoom', 'aria-hidden': 'true' },
+      h('div', { class: 'zoom-inner' }, inspectParts(def, inst, { ownerDeckId: owner })));
+    document.body.append(ui.zoom);
   }
 
   function startArrow(color) {
@@ -394,8 +449,14 @@ export function startMatch(root, { myDeck, oppDeck, spectate = false, onExit, on
 
   function showInspect(def, inst, anchor, { tipsOnly = false } = {}) {
     hideInspect();
-    if (ui.drag || window.innerWidth < 900) return;
+    if (ui.drag || ui.zoom || window.innerWidth < 900) return;
     const ownerDeckId = inst ? state.players[inst.owner].deckId : null;
+    const parts = inspectParts(def, inst, { tipsOnly, ownerDeckId });
+    if (!parts.length) return;
+    placeInspect(h('div', { class: `inspect${tipsOnly ? ' tips' : ''}`, role: 'tooltip' }, parts), anchor, tipsOnly);
+  }
+  // The large card (unless only keyword tips are wanted), live status of a monster, and a glossary.
+  function inspectParts(def, inst, { tipsOnly = false, ownerDeckId = null } = {}) {
     const parts = [];
     if (!tipsOnly) parts.push(renderCard(def, { classes: 'large', ownerDeckId, large: true }));
     if (inst) {
@@ -410,8 +471,9 @@ export function startMatch(root, { myDeck, oppDeck, spectate = false, onExit, on
     }
     const gloss = glossaryFor(def, inst);
     if (gloss.length) parts.push(h('dl', { class: 'glossary' }, gloss.map(([t, d]) => [h('dt', null, t), h('dd', null, d)])));
-    if (!parts.length) return;
-    const el = h('div', { class: `inspect${tipsOnly ? ' tips' : ''}`, role: 'tooltip' }, parts);
+    return parts;
+  }
+  function placeInspect(el, anchor, tipsOnly) {
     document.body.append(el);
     ui.inspect = el;
     const r = anchor.getBoundingClientRect();
@@ -683,7 +745,7 @@ export function startMatch(root, { myDeck, oppDeck, spectate = false, onExit, on
     if (!ui.history.length) return null;
     return h('div', { class: 'history', 'aria-label': 'Recently played cards' },
       h('div', { class: 'history-label' }, 'Played'),
-      ui.history.map(({ def, pid, key }) => h('div', {
+      ui.history.map(({ def, pid, key }) => zoomable(h('div', {
         class: `history-tile ${pid === HUMAN ? 'mine' : 'theirs'}`,
         style: { '--deck': (getDeck(def.deckId) ?? getDeck(state.players[pid].deckId)).color },
         'data-key': key,
@@ -691,7 +753,7 @@ export function startMatch(root, { myDeck, oppDeck, spectate = false, onExit, on
         onmouseleave: hideInspect,
       },
         artSlot('', cardArtUrls(def, state.players[pid].deckId), (getDeck(def.deckId) ?? getDeck(state.players[pid].deckId)).icon),
-        h('span', { class: 'cost' }, def.cost))));
+        h('span', { class: 'cost' }, def.cost)), () => [def])));
   }
 
   function renderHeroPanel(pid) {
@@ -742,13 +804,13 @@ export function startMatch(root, { myDeck, oppDeck, spectate = false, onExit, on
         h('span', { class: 'pile-label' }, 'Deck'),
         Array.from({ length: stack }, () => h('div', { class: 'pile-card' }, 'M')),
         h('span', { class: 'pile-count' }, p.deck.length)),
-      h('div', {
+      zoomable(h('div', {
         class: `pile grave${p.grave.length ? '' : ' empty'}`, title: `${p.grave.length} cards in graveyard`, style: { '--deck': deck.color },
         onmouseenter: topGrave ? e => showInspect(topGrave, null, e.currentTarget) : null, onmouseleave: hideInspect,
       },
         h('span', { class: 'pile-label' }, 'Grave'),
         h('div', { class: 'pile-card' }, topGrave ? artSlot('', cardArtUrls(topGrave, p.deckId), deck.icon) : '✖'),
-        h('span', { class: 'pile-count' }, p.grave.length)));
+        h('span', { class: 'pile-count' }, p.grave.length)), () => topGrave && [topGrave]));
   }
 
   function renderHand(pid) {
@@ -770,7 +832,7 @@ export function startMatch(root, { myDeck, oppDeck, spectate = false, onExit, on
           ui.source === card.uid && ui.mode === 'target' ? 'selected' : '',
           !ui.seenHand.has(card.uid) ? 'enter-hand' : '',
         ].join(' ');
-        return renderCard(def, {
+        return zoomable(renderCard(def, {
           cost: effectiveCost(state, card),
           classes,
           ownerDeckId: p.deckId,
@@ -783,7 +845,7 @@ export function startMatch(root, { myDeck, oppDeck, spectate = false, onExit, on
             tabindex: mine ? '0' : null,
             'aria-label': `${def.displayName}${info.ok ? ', playable' : ''}`,
           },
-        });
+        }), () => [def]);
       }));
   }
 
@@ -802,7 +864,7 @@ export function startMatch(root, { myDeck, oppDeck, spectate = false, onExit, on
         state.pending && state.pending.target === m.uid ? 'defending' : '',
         !ui.seenBoard.has(m.uid) ? 'enter' : '',
       ].join(' ');
-      slots.push(h('div', { class: 'slot' }, renderMinion(state, m, {
+      slots.push(h('div', { class: 'slot' }, zoomable(renderMinion(state, m, {
         classes,
         // My own monsters are driven by pointer events (click or drag). Click handlers exist only
         // for picking a target: the browser fires 'click' after 'pointerup', on whatever was
@@ -810,7 +872,7 @@ export function startMatch(root, { myDeck, oppDeck, spectate = false, onExit, on
         onclick: ui.mode !== 'idle' && (pid !== HUMAN || ui.targets.includes(m.uid)) ? () => clickTarget(m.uid) : null,
         onmouseenter: e => showInspect(defOf(m), m, e.currentTarget),
         onmouseleave: hideInspect,
-      })));
+      }), () => [defOf(m), m])));
     }
     return h('div', { class: `board ${pid === HUMAN ? 'mine' : 'theirs'}` }, slots);
   }
