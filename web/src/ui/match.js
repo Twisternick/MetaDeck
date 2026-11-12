@@ -1,6 +1,7 @@
 // The match screen: a full-screen arena rendered from engine state. Cards are dragged from the
 // hand onto the mat to play them; attacks and targeted spells use a targeting arrow.
-// The human is always player 0; player 1 is the AI (or a second AI when spectating).
+// Offline the human is player 0 and player 1 is the AI (or both are AIs when spectating). Online the
+// server runs the game: this screen sends the human's moves and animates the updates it gets back.
 
 import { h, delay } from './dom.js';
 import { renderCard, renderCardBack, renderMinion, glossaryFor, statusLines } from './card-view.js';
@@ -18,16 +19,19 @@ import { BOARD_SLOTS, START_HP, KEYWORDS } from '../engine/constants.js';
 import { rulesLines } from '../engine/text.js';
 import { kwName, kwIcon, kwColor, kwKind, kwText, kwHint, richText, glossaryList } from './keywords.js';
 
-const HUMAN = 0;
-const AI = 1;
 const DRAG_THRESHOLD = 8;
 const LONG_PRESS_MS = 380;
 
 // myCards / oppCards are deck lists (card ids); without one, that side plays its archetype's whole pool.
-export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate = false, onExit, onRematch }) {
-  const me = getDeck(myDeck);
-  const them = getDeck(oppDeck);
-  const state = createGame({
+// online = { seat, state, clock, send(msg), subscribe(fn) } plays a server match instead: state is the
+// server's view for our seat, and onRematch is unused (rematches go through the server).
+// Returns { close } so the caller can tear the screen down (online, when the server restarts the match).
+export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate = false, online = null, onExit, onRematch }) {
+  const HUMAN = online ? online.seat : 0;
+  const OPP = 1 - HUMAN;
+  const me = getDeck(online ? online.state.players[HUMAN].deckId : myDeck);
+  const them = getDeck(online ? online.state.players[OPP].deckId : oppDeck);
+  const state = online ? online.state : createGame({
     decks: [myCards ?? deckList(me.id), oppCards ?? deckList(them.id)],
     deckIds: [me.id, them.id],
     names: spectate ? [`${me.name} AI`, `${them.name} AI`] : ['You', `${them.name} AI`],
@@ -60,8 +64,13 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     reveal: null,          // { el, def } – opponent's card shown in the centre before it resolves
     pointer: { x: 0, y: 0 },
     quietUntil: 0,         // no hover popup until then (while callouts play)
+    waiting: false,        // online: our move is sent and the server hasn't answered yet
+    clock: null,           // online: { ends, total, response } for whoever has to move
+    oppStatus: null,       // online: null | 'away' (disconnected, may come back) | 'left'
+    rematch: [],           // online: seats that asked for a rematch
+    armedLeave: false,     // online: the Leave button was clicked once and now asks to confirm
   };
-  const aiControls = pid => spectate || pid === AI;
+  const aiControls = pid => !online && (spectate || pid === OPP);
   // Elements that can be inspected, mapped to what they show: el -> () => [def, inst]
   const zoomables = new WeakMap();
   const zoomable = (el, get) => { zoomables.set(el, get); return el; };
@@ -78,6 +87,12 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
   view.addEventListener('pointerdown', onPointerDown);
   view.addEventListener('contextmenu', onContextMenu);
   window.addEventListener('resize', onResize);
+  const clockTicker = online ? setInterval(tickClock, 250) : null;
+  // Online: server messages are handled one at a time, so the animations of consecutive moves queue up.
+  let inbox = Promise.resolve();
+  const unsubscribe = online ? online.subscribe(msg => {
+    inbox = inbox.then(() => onServer(msg)).catch(err => console.error(err));
+  }) : null;
 
   function onKey(e) {
     if (e.key === 'Escape') {
@@ -94,6 +109,8 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     document.removeEventListener('pointerup', onPointerUp);
     document.removeEventListener('pointercancel', onPointerUp);
     window.removeEventListener('resize', onResize);
+    unsubscribe?.();
+    clearInterval(clockTicker);
     ui.exited = true;
     stopArrow();
     hideInspect();
@@ -124,7 +141,14 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     setTimeout(() => { if (ui.toast === mine && !ui.drag) { ui.toast = null; render(); } }, 2200);
   }
 
-  async function act(action) {
+  const applyLocal = action => {
+    const res = applyAction(state, action);
+    return res.ok ? { ...res, events: state.events.splice(0) } : res;
+  };
+
+  // Resolve an action and animate it. `apply` changes the state: offline it runs the engine, online
+  // it adopts the state the server sent.
+  async function act(action, apply = applyLocal) {
     stopArrow();
     hideInspect();
     const before = snapshot();
@@ -145,12 +169,12 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     }
     hideReveal();
 
-    const res = applyAction(state, action);
+    const res = apply(action);
     ui.mode = 'idle';
     ui.source = null;
     ui.targets = [];
     if (!res.ok) { toast(res.reason); return false; }
-    const events = state.events.splice(0);
+    const events = res.events;
     if (events.some(e => e.type === 'keyword' || e.type === 'damage')) ui.quietUntil = Date.now() + 1400;
     for (const e of events) {
       if (e.type === 'play' && CARDS[e.id]) {
@@ -233,7 +257,101 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
   }
 
   function humanCanAct() {
-    return !spectate && !state.over && !ui.busy && decisionPlayer(state) === HUMAN;
+    return !spectate && !state.over && !ui.busy && !ui.waiting && decisionPlayer(state) === HUMAN;
+  }
+
+  // A move by the human. Offline it resolves here and the AI answers; online it goes to the server,
+  // whose 'update' comes back through onServer like the opponent's moves.
+  function submit(action) {
+    if (!online) return act(action).then(pump);
+    stopArrow();
+    hideInspect();
+    ui.mode = 'idle';
+    ui.source = null;
+    ui.targets = [];
+    ui.waiting = true;
+    online.send({ t: 'action', action });
+    render();
+  }
+
+  // ------------------------------------------------------------ online
+
+  async function onServer(msg) {
+    if (ui.exited) return;
+    switch (msg.t) {
+      case 'update': {
+        setClock(msg.clock);
+        const mine = msg.actor === HUMAN;
+        if (mine) ui.waiting = false;
+        if (!msg.action) { // forfeit: nothing to animate
+          Object.assign(state, msg.state);
+          render();
+          return;
+        }
+        if (!mine) {
+          // The opponent's card is face-down in our view until the server names it.
+          if (msg.card) revealCard(msg.actor, msg.action.uid, msg.card);
+          ui.busy = true;
+          render();
+          const t = msg.action.type;
+          if (t === 'attack' || t === 'play' || t === 'respond') {
+            highlightIntent(msg.action);
+            await delay(t === 'attack' ? ui.speed * 0.6 : ui.speed * 1.4);
+            if (ui.exited) return;
+          }
+        }
+        await act(msg.action, () => {
+          Object.assign(state, msg.state);
+          return { ok: true, events: msg.events };
+        });
+        ui.busy = false;
+        if (msg.timeout) toast(mine ? 'Out of time.' : "The opponent's clock ran out.");
+        else render();
+        return;
+      }
+      case 'reject':
+        ui.waiting = false;
+        toast(msg.reason);
+        return;
+      case 'opponentAway':
+        ui.oppStatus = 'away';
+        toast('Opponent disconnected. Waiting for them to come back…');
+        return;
+      case 'opponentBack':
+        ui.oppStatus = null;
+        toast('Opponent reconnected.');
+        return;
+      case 'opponentLeft':
+        ui.oppStatus = 'left';
+        render();
+        return;
+      case 'rematch':
+        ui.rematch = msg.seats;
+        render();
+        return;
+    }
+  }
+
+  function revealCard(pid, uid, id) {
+    const hand = state.players[pid].hand;
+    if (hand.some(c => c.uid === uid)) return;
+    const i = hand.findIndex(c => c.hidden);
+    if (i >= 0) hand[i] = { uid, id, owner: pid };
+  }
+
+  function setClock(clock) {
+    ui.clock = clock ? { ends: Date.now() + clock.left, total: clock.total, response: clock.response } : null;
+  }
+
+  // Update the clock pill in place (a full render four times a second would fight the animations).
+  function tickClock() {
+    const pill = view.querySelector('.clock-pill');
+    if (!pill || !ui.clock) return;
+    const left = Math.max(0, ui.clock.ends - Date.now());
+    const secs = Math.ceil(left / 1000);
+    pill.querySelector('b').textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+    pill.style.setProperty('--pct', `${(left / ui.clock.total) * 100}%`);
+    pill.classList.toggle('urgent', secs <= 15);
   }
 
   // Play a card from the hand (after a click or a drop on the mat).
@@ -251,7 +369,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
       startArrow('#34f5a2');
       return;
     }
-    act({ type: asResponse ? 'respond' : 'play', uid: card.uid }).then(pump);
+    submit({ type: asResponse ? 'respond' : 'play', uid: card.uid });
   }
 
   function beginAttack(m) {
@@ -277,7 +395,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     const action = ui.mode === 'attack'
       ? { type: 'attack', uid: ui.source, target: ref }
       : { type: ui.asResponse ? 'respond' : 'play', uid: ui.source, target: ref };
-    act(action).then(pump);
+    submit(action);
   }
 
   // Why a click during targeting did nothing, naming the keyword that is in the way.
@@ -290,19 +408,19 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     const att = findMonster(state, ui.source);
     if (tgt && tgt.owner === HUMAN) return "That's your own monster.";
     if (tgt && hasKeyword(tgt, 'Stealth')) return `${kwIcon('Stealth')} Stealth: it can't be attacked until it attacks.`;
-    const guardUp = state.players[AI].board.some(x => x && hasKeyword(x, 'Guard'));
+    const guardUp = state.players[OPP].board.some(x => x && hasKeyword(x, 'Guard'));
     if (guardUp && att && !hasKeyword(att, 'DoubleJump') && !(tgt && hasKeyword(tgt, 'Guard'))) return `${kwIcon('Guard')} Guard: you must attack a Guard monster first.`;
     return "Can't attack that.";
   }
 
   function endTurn() {
     if (!humanCanAct() || state.pending) return;
-    act({ type: 'end' }).then(pump);
+    submit({ type: 'end' });
   }
 
   function passResponse() {
     if (!humanCanAct() || !state.pending) return;
-    act({ type: 'pass' }).then(pump);
+    submit({ type: 'pass' });
   }
 
   // ------------------------------------------------------------ pointer: drag & drop, arrow
@@ -672,7 +790,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
   // Deal newly drawn cards in from the owner's deck pile.
   function animateDeals() {
     let i = 0;
-    for (const pid of [HUMAN, AI]) {
+    for (const pid of [HUMAN, OPP]) {
       const hand = view.querySelector(pid === HUMAN ? '.hand.mine' : '.hand.theirs');
       const pile = view.querySelector(`.piles.${pid === HUMAN ? 'mine' : 'theirs'} .pile.deck`);
       if (!hand || !pile) continue;
@@ -699,10 +817,10 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
       h('div', { class: `arena${ui.mode === 'attack' ? ' targeting' : ''}`, style: { '--my-deck': me.color, '--their-deck': them.color } },
         h('div', { class: 'zone top' },
           renderHud(),
-          renderHand(AI),
-          h('div', { class: 'corner theirs' }, renderPiles(AI), renderHeroPanel(AI))),
+          renderHand(OPP),
+          h('div', { class: 'corner theirs' }, renderPiles(OPP), renderHeroPanel(OPP))),
         h('div', { class: 'mat' },
-          renderBoard(AI),
+          renderBoard(OPP),
           renderDivider(),
           renderBoard(HUMAN)),
         h('div', { class: 'zone bottom' },
@@ -721,6 +839,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     drawPendingBeam();
     animateDeals();
     announceTurn();
+    if (online) tickClock();
     for (const p of state.players) {
       for (const m of p.board) if (m) ui.seenBoard.add(m.uid);
       for (const c of p.hand) ui.seenHand.add(c.uid);
@@ -763,10 +882,24 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
 
   function renderHud() {
     return h('div', { class: 'hud' },
-      h('button', { class: 'btn ghost small', onclick: exit }, '← Menu'),
+      online && !state.over
+        ? h('button', { class: `btn small ${ui.armedLeave ? 'danger' : 'ghost'}`, onclick: armLeave }, ui.armedLeave ? 'Forfeit & leave?' : '← Leave')
+        : h('button', { class: 'btn ghost small', onclick: exit }, online ? '← Lobby' : '← Menu'),
       h('button', { class: `btn ghost small${ui.logOpen ? ' active' : ''}`, onclick: () => { ui.logOpen = !ui.logOpen; ui.kwOpen = false; render(); }, 'aria-pressed': ui.logOpen ? 'true' : 'false' }, 'Log'),
       h('button', { class: `btn ghost small${ui.kwOpen ? ' active' : ''}`, onclick: () => { ui.kwOpen = !ui.kwOpen; ui.logOpen = false; render(); }, 'aria-pressed': ui.kwOpen ? 'true' : 'false' }, '? Keywords'),
-      h('span', { class: 'turn-pill' }, 'Turn', h('b', null, state.turn)));
+      h('span', { class: 'turn-pill' }, 'Turn', h('b', null, state.turn)),
+      online && ui.clock && !state.over ? h('span', {
+        class: `turn-pill clock-pill${decisionPlayer(state) === HUMAN ? ' mine' : ''}`,
+        title: ui.clock.response ? 'Time left to respond' : 'Time left this turn',
+      }, ui.clock.response ? 'Respond' : decisionPlayer(state) === HUMAN ? 'Your clock' : 'Their clock', h('b', null, '')) : null);
+  }
+
+  // Leaving a running online match forfeits it, so the first click only asks.
+  function armLeave() {
+    if (ui.armedLeave) return exit();
+    ui.armedLeave = true;
+    render();
+    setTimeout(() => { if (ui.armedLeave) { ui.armedLeave = false; render(); } }, 3000);
   }
 
   function renderLogDrawer() {
@@ -963,7 +1096,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     }
     else if (ui.mode === 'attack') {
       const att = findMonster(state, ui.source);
-      const guardUp = state.players[AI].board.some(x => x && hasKeyword(x, 'Guard'));
+      const guardUp = state.players[OPP].board.some(x => x && hasKeyword(x, 'Guard'));
       const notes = [];
       if (att && guardUp && !hasKeyword(att, 'DoubleJump')) notes.push(`${kwIcon('Guard')} Guard is up: only Guard monsters can be attacked`);
       if (att && guardUp && hasKeyword(att, 'DoubleJump')) notes.push(`${kwIcon('DoubleJump')} Double Jump: ignores Guard`);
@@ -973,7 +1106,8 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
       message = [h('b', null, 'Choose what to attack'), notes.length ? h('span', { class: 'mid-sub' }, notes.join(' · ')) : null];
       cls = 'mine';
     }
-    else if (decisionPlayer(state) === AI) { message = state.pending ? 'Opponent is deciding on a response' : 'Opponent is thinking'; thinking = true; }
+    else if (online && ui.oppStatus === 'away') { message = 'Opponent disconnected · waiting for them to reconnect'; thinking = true; }
+    else if (decisionPlayer(state) === OPP) { message = state.pending ? 'Opponent is deciding on a response' : 'Opponent is thinking'; thinking = true; }
     else { message = 'Your turn · drag cards onto the mat · drag monsters to attack'; cls = 'mine'; }
     return h('div', { class: 'divider' }, h('div', { class: `mid-msg ${cls}${thinking ? ' thinking' : ''}` }, message));
   }
@@ -1000,15 +1134,29 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     const draw = state.winner === 'draw';
     const title = draw ? 'Draw' : spectate ? `${state.players[state.winner].name} wins` : won ? 'Victory!' : 'Defeat';
     const cls = draw ? 'draw' : (won || spectate) ? 'won' : '';
+    const forfeitLine = state.log.length && /forfeits\.$/.test(state.log[state.log.length - 1].text) ? state.log[state.log.length - 1].text : null;
     return h('div', { class: 'overlay' },
       h('div', { class: `dialog ${cls}`, role: 'dialog', 'aria-modal': 'true' },
         h('h2', null, title),
-        h('p', { class: 'muted' }, `${me.name} vs ${them.name} · ${state.turn} turns`),
+        h('p', { class: 'muted' }, online
+          ? `${state.players[HUMAN].name} (${me.name}) vs ${state.players[OPP].name} (${them.name}) · ${state.turn} turns`
+          : `${me.name} vs ${them.name} · ${state.turn} turns`),
+        online && forfeitLine ? h('p', { class: 'muted' }, forfeitLine) : null,
         h('div', { class: 'dialog-actions' },
-          h('button', { class: 'btn primary', onclick: () => { teardown(); onRematch(); } }, 'Rematch'),
-          h('button', { class: 'btn ghost', onclick: exit }, 'Main menu'))));
+          online ? renderOnlineRematch() : h('button', { class: 'btn primary', onclick: () => { teardown(); onRematch(); } }, 'Rematch'),
+          h('button', { class: 'btn ghost', onclick: exit }, online ? 'Back to lobby' : 'Main menu'))));
   }
 
+  // Online rematch: both players have to ask; the server then starts a new match in the same room.
+  function renderOnlineRematch() {
+    if (ui.oppStatus === 'left') return h('button', { class: 'btn primary', disabled: true }, 'Opponent left');
+    if (ui.rematch.includes(HUMAN)) return h('button', { class: 'btn primary', disabled: true }, 'Waiting for opponent…');
+    const asked = ui.rematch.includes(OPP);
+    return h('button', { class: `btn primary${asked ? ' pulse' : ''}`, onclick: () => online.send({ t: 'rematch' }) }, asked ? 'Accept rematch' : 'Rematch');
+  }
+
+  setClock(online?.clock);
   render();
-  pump();
+  if (!online) pump();
+  return { close: teardown };
 }

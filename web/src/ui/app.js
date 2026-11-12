@@ -4,6 +4,8 @@ import { h, storage } from './dom.js';
 import { renderCard, renderPreview, glossaryFor } from './card-view.js';
 import { startMatch } from './match.js';
 import { deckBuilder } from './deck-builder.js';
+import { lobby } from './lobby.js';
+import { net } from './net.js';
 import { decksFor, resolveDeck, randomStarter, isPlayable } from './deck-store.js';
 import { installTilt, installRipples, installTooltips, artSlot, deckArtUrls, removeFx } from './fx.js';
 import { DECKS, CARDS, DECK_SIZE } from '../data/index.js';
@@ -130,12 +132,19 @@ function menu() {
         vsSide(opp, 'Opponent', true)),
       h('div', { class: `menu-actions${animate ? ' rise' : ''}`, style: { '--i': 14 } },
         h('button', { class: 'btn primary big', onclick: () => play(false) }, 'Play vs AI'),
+        h('button', { class: 'btn primary big online', onclick: online }, 'Play online'),
         h('button', { class: 'btn ghost', onclick: () => play(true) }, 'Watch AI vs AI'),
         h('button', { class: 'btn ghost', onclick: () => gallery(prefs.myDeck) }, 'Card gallery'),
         h('button', { class: 'btn ghost', onclick: rules }, 'How to play')),
     ));
   };
   render(true);
+}
+
+// Online play with the deck list picked in the menu.
+function online() {
+  const deck = resolveDeck(prefs.myDeck, prefs.lists[prefs.myDeck]);
+  lobby(root, { deck: { archetype: prefs.myDeck, cards: deck.cards, name: deck.name }, onBack: menu });
 }
 
 function gallery(deckId, newOnly = false) {
@@ -228,4 +237,5 @@ function rules() {
     )));
 }
 
-menu();
+// A reload during an online match goes straight back to it (the server keeps it for a while).
+if (net.inMatch) online(); else menu();
