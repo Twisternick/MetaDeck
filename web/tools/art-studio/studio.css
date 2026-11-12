@@ -77,6 +77,22 @@ button { font: inherit; color: inherit; }
 @keyframes drift { to { background-position: 100% 100%; } }
 .badge { position: absolute; top: 8px; right: 8px; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 700; background: rgba(0, 0, 0, .6); color: var(--muted); }
 .thumb.has-img .badge { color: var(--good); }
+.thumb .badge.redo { color: #fff; background: var(--bad); box-shadow: 0 0 14px rgba(255, 77, 109, .6); }
+.flag { padding: 6px 8px; border-radius: 8px; font-size: 12px; line-height: 1.35; color: #ffd9e0; background: rgba(255, 77, 109, .12); border-left: 3px solid var(--bad); }
+.flag b { color: var(--bad); }
+.flag.twin, .flag.unclear { color: #ffe9b8; background: rgba(255, 197, 61, .1); border-left-color: var(--accent); }
+.flag.twin b, .flag.unclear b { color: var(--accent); }
+.flag.theme { color: #e3d9ff; background: rgba(160, 120, 255, .12); border-left-color: #a078ff; }
+.flag.theme b { color: #b89aff; }
+.theme-flag {
+  margin: 10px 20px 0; padding: 12px 16px; border-radius: 12px; color: #e3d9ff; animation: rise .35s cubic-bezier(.2, .8, .2, 1);
+  background: linear-gradient(90deg, rgba(160, 120, 255, .18), rgba(160, 120, 255, .05)); border: 1px solid rgba(160, 120, 255, .45);
+}
+.theme-flag[hidden] { display: none; }
+.theme-flag b { color: #b89aff; margin-right: 4px; }
+.theme-flag small { color: var(--muted); }
+.tab small.flags { color: var(--bad); }
+.tab.flagged.complete small { color: var(--good); }
 
 .info { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
 .name { font-weight: 700; }

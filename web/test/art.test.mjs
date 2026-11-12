@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { allSlots, batchPrompt, batchable, DECK_STYLE, SAVE_PATH } from '../tools/art-studio/slots.js';
+import { REDO, REDO_REASONS, REDO_THEMES } from '../tools/art-studio/redo.js';
 import { DECKS } from '../src/data/index.js';
 import { TOKENS } from '../src/data/tokens.js';
 
@@ -16,6 +17,29 @@ test('every card, token, deck and hero has one art slot with a usable prompt', (
   for (const s of slots) {
     assert.match(`assets/img/${s.key}.webp`, SAVE_PATH, s.key);
     assert.doesNotMatch(s.prompt, /undefined|\[object|\[\w+\]/, s.key);
+  }
+});
+
+test('every image flagged for redoing is a real slot with a known reason, and its prompt says what to fix', () => {
+  const slots = new Map(allSlots().map(s => [s.key, s]));
+  for (const [key, r] of Object.entries(REDO)) {
+    assert.ok(slots.has(key), key);
+    assert.ok(REDO_REASONS[r.why], `${key}: reason ${r.why}`);
+    assert.ok(Number.isInteger(r.bytes) && r.bytes > 0, `${key}: bytes`);
+    assert.ok(slots.get(key).prompt.includes(r.note), `${key}: prompt includes the note`);
+  }
+});
+
+test('a deck flagged for a theme rework flags every image drawn in its style', () => {
+  const slots = allSlots();
+  for (const [deck, t] of Object.entries(REDO_THEMES)) {
+    assert.ok(DECK_STYLE[deck], `${deck} is a deck`);
+    const styled = slots.filter(s => s.style === DECK_STYLE[deck]);
+    assert.deepEqual(Object.keys(t.bytes).sort(), styled.map(s => s.key).sort(), `${deck} flags exactly its styled slots`);
+    for (const s of styled) {
+      assert.ok(s.redo.some(r => r.why === 'theme'), `${s.key} carries the theme flag`);
+      assert.ok(s.prompt.includes(t.note), `${s.key}: prompt includes the theme note`);
+    }
   }
 });
 

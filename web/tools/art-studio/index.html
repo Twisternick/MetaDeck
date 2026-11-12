@@ -21,10 +21,11 @@
       <label title="One image holds 4 cards in a 2×2 grid"><input type="checkbox" id="batchMode" checked> 4 cards per image</label>
       <label title="Opens a copied image as soon as you switch back to this tab"><input type="checkbox" id="autoGrab" checked> Grab copied image on return</label>
       <label><input type="checkbox" id="autoCopy" checked> Copy next prompt after saving</label>
-      <label><input type="checkbox" id="missingOnly" checked> Missing only</label>
+      <label title="Hide images that are done and not flagged for redoing"><input type="checkbox" id="missingOnly" checked> Missing or flagged only</label>
     </div>
   </header>
   <nav class="tabs" id="tabs"></nav>
+  <div class="theme-flag" id="theme" hidden></div>
   <main class="grid" id="grid"></main>
 
   <div class="modal" id="crop" hidden>

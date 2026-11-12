@@ -4,6 +4,7 @@
 import { DECKS } from '../../src/data/index.js';
 import { TOKENS } from '../../src/data/tokens.js';
 import { rulesText } from '../../src/engine/text.js';
+import { REDO, REDO_REASONS, REDO_THEMES } from './redo.js';
 
 // Output size per slot kind. `ask` is the shape requested from the generator; the studio crops it to `w`×`h`.
 export const KINDS = {
@@ -26,19 +27,30 @@ export const DECK_STYLE = {
   RPG: 'Illuminated medieval storybook illustration: flat rich colors, fine ink outlines, gold-leaf details, ornamental vines '
     + 'and stars in the background, deep blue and gold #c08a2e palette. The ornament fills the scene edge to edge: '
     + 'no border, frame or panel around the picture.',
-  Racing: 'Neon synthwave night scene: near-black background, glowing neon outlines, long motion streaks, wet reflective asphalt, '
-    + 'nitro flames. Neon colors are red #d4473a, hot orange and white only: no purple, pink or blue.',
+  Racing: 'Sleek daytime motorsport concept art: bright hard sunlight, hazy pale sky, heat shimmer off the asphalt, crisp reflections '
+    + 'on glossy paint, motion blur on the track behind the subject. Liveries in white, silver and racing red #d4473a. '
+    + 'Usually the vehicle or the moment on track is the subject, shown whole; when a person is shown, frame them with their car '
+    + 'or gear, not as a face close-up. No night scenes, neon glow, flames swirling around the frame, or orange-dominant color.',
   Fighting: 'Anime cel-shading: clean confident line art, flat cel shadows, vivid colors, dynamic foreshortened pose, '
-    + 'energy swirls and impact sparks in orange #e0782a.',
+    + 'energy swirls and impact sparks in orange #e0782a. Every fighter is an original character with their own look: '
+    + 'varied outfits (track suits, street clothes, armor plates, capes, ring gear, uniforms), hairstyles and builds. '
+    + 'Nothing that resembles a famous fighting-game character: no red headband with a torn white gi, no prayer beads, '
+    + 'no glowing hand-held fireball, no red braids with a green leotard.',
   Sports: 'Photo-real sports action shot, like a trading-card photo: frozen motion, bright stadium floodlights, '
-    + 'shallow depth of field with crowd bokeh, bright saturated colors, green #2f9e5b team accents. Celebratory, not gritty.',
+    + 'shallow depth of field with crowd bokeh, bright saturated colors, green #2f9e5b team accents. Celebratory, not gritty. '
+    + 'Show the idea through what happens, not a face: full-body action, wide shots of the play, the ball or gear up close, '
+    + 'the bench, the sideline or the scoreboard moment. Mix sports (soccer, American football, basketball, hockey, baseball) '
+    + 'and players of different ages and builds. No shouting face close-ups, and never the same pose twice.',
   Strategy: 'Bold vintage war-poster illustration: flat geometric shapes, a palette of navy, blue #4364a8, cream and a touch of red, '
     + 'printed paper grain and halftone, heroic low angle, banners and silhouetted armies. Plain sky blocks behind the subject: '
     + 'no sunburst rays and no real-world flags, insignia or political symbols.',
   CityBuilder: 'Isometric tilt-shift miniature diorama: a tiny, detailed model world photographed up close, strong blur at the top '
     + 'and bottom, warm glowing windows at dusk, teal #3f8f8c accents. People look like small painted figurines.',
-  CardGame: 'Holographic foil trading-card art: prismatic rainbow sheen on surfaces, sparkles and light flares, glossy and '
-    + 'high-contrast on a purple #8c56c4 base, playing cards in motion. The foil effect is on the subject and scene, not a frame.',
+  CardGame: 'Glossy painted fantasy art set in a world made of trading cards, on a deep charcoal-black background. '
+    + 'The subject is painted in natural, solid colors with a crisp white rim light, so it pops from the dark. '
+    + 'Holographic foil is an accent only: a prismatic rainbow sheen on the playing cards, sleeves and trim, never over the whole picture. '
+    + 'Purple #8c56c4 appears only in small glints, never as the background or main color. '
+    + 'Creatures, objects and scenes made from cards, boxes and game pieces, not a figure holding up cards.',
 };
 
 // For slots that belong to no deck: the card back and the generic token art.
@@ -67,6 +79,31 @@ const KEYWORD_POSE = {
   Headshot: 'aiming with deadly precision',
 };
 
+// Card names that steer image generators toward a famous character. The note replaces the name's literal
+// reading with an original concept.
+const SUBJECT_NOTE = {
+  FIG_M15_ShotoMaster: 'Draw an original martial-arts master defined by a calm, balanced stance and a long flowing sash, not a fireball thrower.',
+  FIG_M24_HiddenBoss: 'Draw an original secret final opponent, masked or armored, stepping out of shadow.',
+};
+
+// Card Game names describe card-game rules more than things you can picture. Each gets a concrete scene.
+Object.assign(SUBJECT_NOTE, {
+  CCG_M03_MonsterCard: 'Draw a hulking beast clawing its way out of a giant playing card.',
+  CCG_M09_RuleReminder: 'Draw a stern little owl librarian holding up a thick rulebook, pointing at a page.',
+  CCG_M10_RareCard: 'Draw a single gleaming card displayed on a velvet pedestal under a spotlight, guarded by a small knight.',
+  CCG_M11_ReprintBeast: 'Draw a wolf-like beast whose body is built from identical stacked cards, freshly rolling off a printing press.',
+  CCG_M12_ComboPiece: 'Draw a clockwork golem made of interlocking puzzle-piece cards, one missing piece glowing in its chest.',
+  CCG_M19_BulkCommon: 'Draw a cheerful crowd of plain, scruffy card creatures spilling out of a cardboard bulk bin.',
+  CCG_M20_Misprint: 'Draw a card creature whose printed image is smeared and doubled, ink colors misaligned like a bad print.',
+  CCG_M23_GameStoreOwner: 'Draw a friendly shopkeeper behind a counter of display cases and booster boxes, young and aproned.',
+  CCG_M24_MythicRare: 'Draw a radiant winged sphinx rising from a single card on a dark altar.',
+  CCG_S04_DiscardCard: 'Draw a hand of cards with one card torn away and fluttering into a dark pit.',
+  CCG_S07_Errata: 'Draw a giant quill slashing a bold red ink stroke across the face of a giant card, sparks flying.',
+  CCG_S10_Reprint: 'Draw a fallen card creature reforming as fresh copies stream out of a glowing printing press.',
+  CCG_S13_StackResponse: 'Draw a tall tower of stacked cards, the top card flipping to block an incoming blast.',
+  CCG_S15_BoardWipe: 'Draw a game table swept clean by a shockwave, cards and pieces blasting off the edges.',
+});
+
 const scale = cost =>
   cost <= 1 ? 'a small, scrappy' : cost <= 3 ? 'a capable' : cost <= 5 ? 'a powerful' : 'a colossal, legendary';
 
@@ -74,12 +111,13 @@ const words = s => s.replace(/([a-z])([A-Z])/g, '$1 $2');
 
 function cardSubject(card, deck) {
   const world = deck ? `a world inspired by ${words(deck.name)} video games` : 'the same world as its summoner';
+  const note = SUBJECT_NOTE[card.cardId] ? ` ${SUBJECT_NOTE[card.cardId]}` : '';
   if (card.type === 'Spell') {
-    return `Subject: the action or item "${card.displayName}", shown as one dramatic moment in ${world}.`;
+    return `Subject: the action or item "${card.displayName}", shown as one dramatic moment in ${world}.${note}`;
   }
   const poses = card.keywords.map(k => KEYWORD_POSE[k]).filter(Boolean);
   const who = card.isToken ? `a summoned minion, "${card.displayName}"` : `"${card.displayName}", ${scale(card.cost)} character`;
-  return `Subject: ${who} from ${world}${poses.length ? `, ${poses.join(', ')}` : ''}. One clear focal character.`;
+  return `Subject: ${who} from ${world}${poses.length ? `, ${poses.join(', ')}` : ''}. One clear focal character.${note}`;
 }
 
 // The prompt for one image, plus its parts so card prompts can be merged into a batch.
@@ -129,34 +167,51 @@ function tokenDeck(tokenId) {
   return best;
 }
 
-// { key, kind, group, name, sub, w, h, prompt, style, subject, extra } for every slot. `key` is the path
-// under assets/img without extension; the studio saves `<key>.webp`.
+// Every redo.js flag on a slot: its own, plus its deck's when the slot is drawn in a style flagged for rework.
+function redoFlags(key, style) {
+  const flags = REDO[key] ? [REDO[key]] : [];
+  for (const [deck, t] of Object.entries(REDO_THEMES)) {
+    if (DECK_STYLE[deck] === style && t.bytes[key]) flags.push({ why: 'theme', note: t.note, bytes: t.bytes[key] });
+  }
+  return flags;
+}
+
+// For a flagged slot: what was wrong with the last image and how to avoid it this time.
+const redoNote = (key, style) => redoFlags(key, style)
+  .map(r => `The previous image was rejected: ${r.note} ${REDO_REASONS[r.why].fix}`).join(' ');
+const join = (...parts) => parts.filter(Boolean).join(' ');
+
+// { key, kind, group, name, sub, w, h, prompt, style, subject, extra, redo } for every slot. `key` is the path
+// under assets/img without extension; the studio saves `<key>.webp`. `redo` lists the slot's redo.js flags.
 export function allSlots() {
   const slots = [];
   const add = (kind, key, group, name, parts, sub = '') =>
-    slots.push({ key, kind, group, name, sub, w: KINDS[kind].w, h: KINDS[kind].h, ...parts });
+    slots.push({ key, kind, group, name, sub, w: KINDS[kind].w, h: KINDS[kind].h, ...parts, redo: redoFlags(key, parts.style) });
 
   for (const deck of DECKS) {
     const style = DECK_STYLE[deck.id];
     add('deck', `decks/${deck.id}`, deck.id, `${deck.name} — deck art`,
-      prompt('deck', `Subject: key art for the ${words(deck.name)} faction. ${deck.tagline} A wide scene with several characters.`, style),
+      prompt('deck', `Subject: key art for the ${words(deck.name)} faction. ${deck.tagline} A wide scene with several characters.`, style,
+        redoNote(`decks/${deck.id}`, style)),
       'Menu tiles and fallback for cards without art');
     add('hero', `heroes/${deck.id}`, deck.id, `${deck.name} — hero portrait`,
-      prompt('hero', `Subject: the champion of the ${words(deck.name)} faction. Portrait, head and shoulders, looking at the camera.`, style),
+      prompt('hero', `Subject: the champion of the ${words(deck.name)} faction. Portrait, head and shoulders, looking at the camera.`, style,
+        redoNote(`heroes/${deck.id}`, style)),
       'Match screen avatar');
     for (const card of deck.cards) {
       const rules = rulesText(card).replace(/\n/g, ' ');
       add('card', `cards/${card.cardId}`, deck.id, card.displayName,
         prompt('card', cardSubject(card, deck), style,
-          rules ? `What the card does, for mood only (do not draw any text): ${rules}` : ''),
+          join(rules && `What the card does, for mood only (do not draw any text): ${rules}`, redoNote(`cards/${card.cardId}`, style))),
         card.type === 'Spell' ? `Spell · ${card.cost}` : `Monster · ${card.cost} · ${card.baseAttack}/${card.baseHealth}`);
     }
   }
   // A token is drawn in the style of the deck that summons it most, so it matches its summoner on the board.
   for (const t of TOKENS) {
     const deck = tokenDeck(t.cardId);
+    const style = deck ? DECK_STYLE[deck.id] : NEUTRAL_STYLE;
     add('card', `cards/${t.cardId}`, 'Extras', t.displayName,
-      prompt('card', cardSubject(t, deck), deck ? DECK_STYLE[deck.id] : NEUTRAL_STYLE),
+      prompt('card', cardSubject(t, deck), style, redoNote(`cards/${t.cardId}`, style)),
       `Token · ${t.baseAttack}/${t.baseHealth}${deck ? ` · ${deck.name} style` : ''}`);
   }
   add('deck', 'decks/token', 'Extras', 'Generic token art',

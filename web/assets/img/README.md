@@ -28,7 +28,11 @@ Then open http://localhost:5174. The studio lists every slot above, grouped by d
 3. Right-click the result and choose **Copy image**. You can also download it and drop the file on the card, or use **File…**.
 4. Back in the studio, press **Ctrl+V**. Drag to frame the image (scroll to zoom), then press **Enter**.
 
-The studio saves the image as a WebP of the right size, then moves on to the next card that still needs art and copies its prompt. The progress bar and tab counts show what is left. To redo an image, untick **Missing only**.
+The studio saves the image as a WebP of the right size, then moves on to the next card that still needs art and copies its prompt. The progress bar and tab counts show what is left. To redo an image, untick **Missing or flagged only**.
+
+Images flagged for redoing (by an art audit) are listed in `tools/art-studio/redo.js` with the reason. The studio marks them **REDO**, shows the reason under the card, counts them on each tab (⚑) and gathers them all under the **Flagged for redo** tab. Their prompts also say what was wrong with the last image. A flag clears by itself once you save a new image over the flagged one.
+
+When a deck's whole art style doesn't work, `REDO_THEMES` in the same file flags every image drawn in that style, tokens included. The deck's tab then shows a **Theme rework** banner until every one of them is replaced. Change the deck's `DECK_STYLE` first, or the new images will repeat the old problem.
 
 Two options make the loop faster, and both are on by default:
 
@@ -39,6 +43,6 @@ The studio only listens on `127.0.0.1` and can only write `.webp` files inside `
 
 ## Prompts
 
-Prompts are generated from the card data in `tools/art-studio/slots.js`. Every deck has its own art style (`DECK_STYLE`): night-time cinematic realism for FPS, found-footage stills for Horror, pixel art for Platformer, an illuminated storybook for RPG, neon synthwave for Racing, anime for Fighting, sports photography for Sports, a vintage war poster for Strategy, a tilt-shift diorama for City Builder and holographic foil for Card Game. Tokens use the style of the deck that summons them. Each prompt adds shared family rules (one readable focal subject, original designs, no text or frames), a subject built from the card's name, cost and keywords, and the card's rules text as context.
+Prompts are generated from the card data in `tools/art-studio/slots.js`. Every deck has its own art style (`DECK_STYLE`): night-time cinematic realism for FPS, found-footage stills for Horror, pixel art for Platformer, an illuminated storybook for RPG, sunlit daytime motorsport for Racing, anime for Fighting, sports photography for Sports, a vintage war poster for Strategy, a tilt-shift diorama for City Builder and glossy fantasy art with foil accents for Card Game. Tokens use the style of the deck that summons them. Each prompt adds shared family rules (one readable focal subject, original designs, no text or frames), a subject built from the card's name, cost and keywords, and the card's rules text as context.
 
 Keep the styles stable while a set is being made: consistency within a deck matters more than any single image. Generating a deck's cards in one long ChatGPT conversation helps, and so does attaching the style-test panel you picked as a reference ("match this art style").
