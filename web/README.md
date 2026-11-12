@@ -13,6 +13,7 @@ Then open http://localhost:5173. You need Node 20 or newer, and only for the tin
 
 - **Play vs AI**: pick your archetype, then one of its deck lists, and an opponent (or Random). The AI plays a random starter of its archetype.
 - **Deck lists**: every archetype has three starter decks. Use **New deck** (or **Copy & edit** on a starter) to open the deck builder: a deck is 40 cards from one archetype, at most 2 copies of each. You can save an unfinished deck as a draft; only complete decks can be played. Your decks are saved in the browser's local storage.
+- **Play online**: play another person with the deck list you picked. **Quick find** pairs you with the next player who searches. **Private match** creates a room with a 5-letter code for a friend to join (or joins theirs). **Open room** hosts a room that shows up in everyone's lobby list, where anyone can join it. The server runs the match, so neither player can see the other's hand or deck. Turns have a 90-second clock (25 seconds to answer an attack with a Quick card). If you drop or refresh, you have 30 seconds to rejoin before you forfeit. Online play needs `npm start` (or `node serve.mjs` on any host): a static host has no matchmaking.
 - **Watch AI vs AI**: watch two AIs play each other.
 - **Card gallery**: browse all 400 cards. It shows each deck's mana curve and has a "new cards only" filter.
 - **How to play**: the rules and the keyword glossary.
@@ -36,8 +37,10 @@ When the enemy attacks and you have a playable **Quick** card plus unspent Bandw
 | `src/data/starters.js` | The three starter decks per archetype. Each doubles 10 cards from the archetype's pool and cuts 10. `src/data/index.js` has the deck rules (`deckErrors`) and builds the lists (`starterDecks`). |
 | `src/ui/` | Menu, gallery, rules page, deck builder (`deck-builder.js`, with saved decks in `deck-store.js`) and the match screen. `keywords.js` gives every keyword and rules term its icon, colour and tooltip, and wraps rules text so terms are hoverable. `fx.js` holds the visual effects: pointer tilt and holographic glare, art slots with image fallback, attack lunges, impact bursts, death dissolves, spell flights, keyword callouts, tooltips, turn banners and confetti. |
 | `assets/img/` | Artwork slots. Every art area is an image placeholder until a PNG is dropped in; `assets/img/README.md` lists the paths and sizes and suggests prompts for AI image generation. No SVG is used anywhere in the UI. |
+| `serve.mjs`, `server/` | The local server: static files, plus online play over a WebSocket at `/ws`. `server/ws.mjs` is a minimal WebSocket implementation (no dependencies), and `server/lobby.mjs` handles matchmaking (quick queue, open and private rooms), runs each match on the rules engine, redacts each player's view, and keeps the turn clock and reconnect grace period. `src/ui/net.js` and `src/ui/lobby.js` are the client side. |
 | `tools/simulate.mjs` | AI-vs-AI balance simulator, multi-threaded. |
 | `test/engine.test.mjs` | Engine tests (`node:test`). |
+| `test/lobby.test.mjs` | Online play tests: a real server and WebSocket clients for quick find, private and open rooms, hidden information, the turn clock and reconnecting. |
 | `BALANCE.md` | What changed for every card, why, and the simulation results. |
 
 ## Develop
