@@ -5,6 +5,7 @@ import { renderCard, renderPreview, glossaryFor } from './card-view.js';
 import { startMatch } from './match.js';
 import { deckBuilder } from './deck-builder.js';
 import { lobby } from './lobby.js';
+import { balanceLab } from './balance.js';
 import { net } from './net.js';
 import { decksFor, resolveDeck, randomStarter, isPlayable } from './deck-store.js';
 import { installTilt, installRipples, installTooltips, artSlot, deckArtUrls, removeFx } from './fx.js';
@@ -135,7 +136,8 @@ function menu() {
         h('button', { class: 'btn primary big online', onclick: online }, 'Play online'),
         h('button', { class: 'btn ghost', onclick: () => play(true) }, 'Watch AI vs AI'),
         h('button', { class: 'btn ghost', onclick: () => gallery(prefs.myDeck) }, 'Card gallery'),
-        h('button', { class: 'btn ghost', onclick: rules }, 'How to play')),
+        h('button', { class: 'btn ghost', onclick: rules }, 'How to play'),
+        h('button', { class: 'btn ghost', onclick: () => balanceLab(root, { onBack: menu }) }, 'Balance lab')),
     ));
   };
   render(true);

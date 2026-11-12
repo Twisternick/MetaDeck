@@ -18,7 +18,28 @@ const types = {
 
 const lobby = createLobby();
 
+// The Balance lab's "Send stats to Claude" button saves its report here, where Claude can read it.
+const reportFile = path.join(root, 'reports', 'meta-latest.md');
+function saveReport(req, res) {
+  let body = '';
+  req.setEncoding('utf8');
+  req.on('data', chunk => {
+    body += chunk;
+    if (body.length > 1_000_000) { res.writeHead(413).end('Too large'); req.destroy(); }
+  });
+  req.on('end', () => {
+    if (res.writableEnded) return;
+    let markdown;
+    try { ({ markdown } = JSON.parse(body)); } catch { /* handled below */ }
+    if (typeof markdown !== 'string' || !markdown) { res.writeHead(400).end('Expected { markdown }'); return; }
+    fs.mkdirSync(path.dirname(reportFile), { recursive: true });
+    fs.writeFileSync(reportFile, markdown);
+    res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ path: 'web/reports/meta-latest.md' }));
+  });
+}
+
 const server = http.createServer((req, res) => {
+  if (req.method === 'POST' && req.url === '/api/meta-report') { saveReport(req, res); return; }
   const urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname);
   const file = path.normalize(path.join(root, urlPath === '/' ? 'index.html' : urlPath));
   if (!file.startsWith(root)) { res.writeHead(403).end('Forbidden'); return; }
