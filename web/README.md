@@ -13,7 +13,7 @@ Then open http://localhost:5173. You need Node 20 or newer, and only for the tin
 
 - **Play vs AI**: pick your archetype, then one of its deck lists, and an opponent (or Random). The AI plays a random starter of its archetype.
 - **Deck lists**: every archetype has three starter decks. Use **New deck** (or **Copy & edit** on a starter) to open the deck builder: a deck is 40 cards from one archetype, at most 2 copies of each. You can save an unfinished deck as a draft; only complete decks can be played. Your decks are saved in the browser's local storage.
-- **Play online**: play another person with the deck list you picked. **Quick find** pairs you with the next player who searches. **Private match** creates a room with a 5-letter code for a friend to join (or joins theirs). **Open room** hosts a room that shows up in everyone's lobby list, where anyone can join it. The server runs the match, so neither player can see the other's hand or deck. Turns have a 90-second clock (25 seconds to answer an attack with a Quick card). If you drop or refresh, you have 30 seconds to rejoin before you forfeit. Online play needs `npm start` (or `node serve.mjs` on any host): a static host has no matchmaking.
+- **Play online**: play another person with the deck list you picked. **Quick find** pairs you with the next player who searches. **Private match** creates a room with a 5-letter code for a friend to join (or joins theirs). **Open room** hosts a room that shows up in everyone's lobby list, where anyone can join it. The server runs the match, so neither player can see the other's hand or deck. Turns have a 90-second clock (25 seconds to answer an attack with a Quick card). If you drop or refresh, you have 30 seconds to rejoin before you forfeit, and running out the clock on three turns in a row also forfeits. Online play needs `npm start` (or `node serve.mjs` on any host): a static host has no matchmaking. The server treats every client as hostile: it validates every move and deck, shuffles with crypto randomness (so the deck order can't be predicted), serves only the game's own files with a strict Content-Security-Policy, accepts the game socket only from its own page, and rate-limits messages and connections per address. Behind a reverse proxy, set `TRUST_PROXY=1` so those limits see each player's address, and serve it over HTTPS (the socket then uses `wss://` on its own).
 - **Watch AI vs AI**: watch two AIs play each other.
 - **Card gallery**: browse all 400 cards. It shows each deck's mana curve and has a "new cards only" filter.
 - **How to play**: the rules and the keyword glossary.
@@ -42,6 +42,7 @@ When the enemy attacks and you have a playable **Quick** card plus unspent Bandw
 | `tools/simulate.mjs` | AI-vs-AI balance simulator, multi-threaded. |
 | `test/engine.test.mjs` | Engine tests (`node:test`). |
 | `test/lobby.test.mjs` | Online play tests: a real server and WebSocket clients for quick find, private and open rooms, hidden information, the turn clock and reconnecting. |
+| `test/security.test.mjs` | Attacks on the real server: path traversal, the report endpoint, cross-site sockets, malformed frames, floods, connection caps, leaving a match without forfeiting, stalling, and the shuffle. |
 | `BALANCE.md` | What changed for every card, why, and the simulation results. |
 
 ## Develop

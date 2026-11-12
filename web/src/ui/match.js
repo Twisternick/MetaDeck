@@ -67,6 +67,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     waiting: false,        // online: our move is sent and the server hasn't answered yet
     clock: null,           // online: { ends, total, response } for whoever has to move
     oppStatus: null,       // online: null | 'away' (disconnected, may come back) | 'left'
+    awayUntil: null,       // online: when an 'away' opponent forfeits (local time)
     rematch: [],           // online: seats that asked for a rematch
     armedLeave: false,     // online: the Leave button was clicked once and now asks to confirm
   };
@@ -305,7 +306,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
           return { ok: true, events: msg.events };
         });
         ui.busy = false;
-        if (msg.timeout) toast(mine ? 'Out of time.' : "The opponent's clock ran out.");
+        if (msg.timeout) toast(mine ? outOfTime(msg) : "The opponent's clock ran out.");
         else render();
         return;
       }
@@ -313,16 +314,23 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
         ui.waiting = false;
         toast(msg.reason);
         return;
+      case 'error': // e.g. the server throttling a flood of messages
+        ui.waiting = false;
+        toast(msg.message);
+        return;
       case 'opponentAway':
         ui.oppStatus = 'away';
+        ui.awayUntil = Date.now() + (msg.grace ?? 0);
         toast('Opponent disconnected. Waiting for them to come back…');
         return;
       case 'opponentBack':
         ui.oppStatus = null;
+        ui.awayUntil = null;
         toast('Opponent reconnected.');
         return;
       case 'opponentLeft':
         ui.oppStatus = 'left';
+        ui.awayUntil = null;
         render();
         return;
       case 'rematch':
@@ -339,17 +347,31 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     if (i >= 0) hand[i] = { uid, id, owner: pid };
   }
 
+  const fmtClock = ms => {
+    const secs = Math.max(0, Math.ceil(ms / 1000));
+    return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+  };
+
+  // Running out the clock on whole turns in a row forfeits the match, so say how close that is.
+  function outOfTime(msg) {
+    const left = msg.idle && msg.action?.type === 'end' ? msg.idle.limit - msg.idle.missed : null;
+    if (!left || left < 1) return 'Out of time.';
+    return `Out of time. Miss ${left === 1 ? 'one more turn' : `${left} more turns`} in a row and you forfeit.`;
+  }
+
   function setClock(clock) {
     ui.clock = clock ? { ends: Date.now() + clock.left, total: clock.total, response: clock.response } : null;
   }
 
   // Update the clock pill in place (a full render four times a second would fight the animations).
   function tickClock() {
+    const away = view.querySelector('.away-clock');
+    if (away && ui.awayUntil) away.textContent = fmtClock(ui.awayUntil - Date.now());
     const pill = view.querySelector('.clock-pill');
     if (!pill || !ui.clock) return;
     const left = Math.max(0, ui.clock.ends - Date.now());
     const secs = Math.ceil(left / 1000);
-    pill.querySelector('b').textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+    pill.querySelector('b').textContent = fmtClock(left);
     pill.style.setProperty('--pct', `${(left / ui.clock.total) * 100}%`);
     pill.classList.toggle('urgent', secs <= 15);
   }
@@ -1106,7 +1128,10 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
       message = [h('b', null, 'Choose what to attack'), notes.length ? h('span', { class: 'mid-sub' }, notes.join(' · ')) : null];
       cls = 'mine';
     }
-    else if (online && ui.oppStatus === 'away') { message = 'Opponent disconnected · waiting for them to reconnect'; thinking = true; }
+    else if (online && ui.oppStatus === 'away') {
+      message = ['Opponent disconnected · they forfeit if not back in ', h('b', { class: 'away-clock' }, ui.awayUntil ? fmtClock(ui.awayUntil - Date.now()) : '')];
+      thinking = true;
+    }
     else if (decisionPlayer(state) === OPP) { message = state.pending ? 'Opponent is deciding on a response' : 'Opponent is thinking'; thinking = true; }
     else { message = 'Your turn · drag cards onto the mat · drag monsters to attack'; cls = 'mine'; }
     return h('div', { class: 'divider' }, h('div', { class: `mid-msg ${cls}${thinking ? ' thinking' : ''}` }, message));

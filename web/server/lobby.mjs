@@ -11,6 +11,11 @@
 //
 // Players are identified by a token the client keeps in sessionStorage, so a page refresh or a
 // dropped connection can rejoin a running match within the grace period.
+//
+// Anyone can connect, so the lobby treats clients as hostile: every message is validated, each
+// connection is rate limited, each address has a connection cap, decks are shuffled with crypto
+// randomness and the engine's RNG is reseeded before every move (so no outcome can be predicted), and
+// a player who stops taking turns forfeits.
 
 import crypto from 'node:crypto';
 import { createGame, applyAction, decisionPlayer } from '../src/engine/game.js';
@@ -21,27 +26,67 @@ const CODE_LEN = 5;
 const NAME_MAX = 20;
 const ACTIONS = new Set(['play', 'respond', 'attack', 'pass', 'end']);
 
-export function createLobby({ turnMs = 90_000, responseMs = 25_000, graceMs = 30_000 } = {}) {
+export function createLobby({
+  turnMs = 90_000, responseMs = 25_000, graceMs = 30_000,
+  idleTurns = 3,       // turns in a row that run out the clock before the player forfeits
+  helloMs = 10_000,    // a connection has this long to say hello
+  maxPerIp = 16,       // open connections per address
+  rate = { burst: 30, perSec: 12 }, // messages per connection, as a token bucket
+} = {}) {
   const players = new Map(); // token -> player
   const rooms = new Map();   // code -> room
   const queue = [];          // players waiting for a quick match
+  const perIp = new Map();   // address -> open connections
 
   // ------------------------------------------------------------ connections
 
   function connect(ws) {
+    const ip = ws.ip ?? '';
+    const open = (perIp.get(ip) ?? 0) + 1;
+    if (open > maxPerIp) {
+      ws.send({ t: 'error', message: 'Too many connections from your network. Close some MetaDeck tabs and try again.' });
+      ws.close();
+      return;
+    }
+    perIp.set(ip, open);
+
     let player = null;
+    let tokens = rate.burst;
+    let refilled = Date.now();
+    let warned = 0;
+    let dropped = 0;
+    const helloTimer = setTimeout(() => { if (!player) ws.close(); }, helloMs);
+
     ws.on('message', msg => {
-      if (!player) {
-        if (msg.t === 'hello') player = hello(ws, msg);
+      const now = Date.now();
+      tokens = Math.min(rate.burst, tokens + ((now - refilled) / 1000) * rate.perSec);
+      refilled = now;
+      if (tokens < 1) {
+        // Flooding: drop the message, say so at most once a second, and hang up on a client that keeps going.
+        if (++dropped > rate.burst * 4) return ws.close();
+        if (now - warned > 1000) { warned = now; ws.send({ t: 'error', message: 'Slow down: too many messages.' }); }
         return;
       }
-      if (player.ws !== ws) return; // superseded by a newer connection
-      try { handle(player, msg); } catch (err) {
+      tokens--;
+      dropped = Math.max(0, dropped - 1);
+      try {
+        if (!player) {
+          if (msg.t === 'hello') { player = hello(ws, msg); clearTimeout(helloTimer); }
+          return;
+        }
+        if (player.ws !== ws) return; // superseded by a newer connection
+        handle(player, msg);
+      } catch (err) {
         console.error('lobby:', err);
-        send(player, { t: 'error', message: 'Something went wrong on the server.' });
+        if (player) send(player, { t: 'error', message: 'Something went wrong on the server.' });
       }
     });
-    ws.on('close', () => { if (player && player.ws === ws) disconnected(player); });
+    ws.on('close', () => {
+      clearTimeout(helloTimer);
+      const left = (perIp.get(ip) ?? 1) - 1;
+      if (left > 0) perIp.set(ip, left); else perIp.delete(ip);
+      if (player && player.ws === ws) disconnected(player);
+    });
   }
 
   function hello(ws, msg) {
@@ -54,7 +99,7 @@ export function createLobby({ turnMs = 90_000, responseMs = 25_000, graceMs = 30
       player = { token: crypto.randomUUID(), name: '', ws, status: 'idle', room: null, deck: null, graceTimer: null };
       players.set(player.token, player);
     }
-    player.name = cleanName(msg.name) || player.name || `Player ${Math.floor(1000 + Math.random() * 9000)}`;
+    player.name = cleanName(msg.name) || player.name || `Player ${crypto.randomInt(1000, 10000)}`;
     const room = player.room;
     send(player, { t: 'welcome', token: player.token, name: player.name, inMatch: !!room?.game });
 
@@ -78,12 +123,12 @@ export function createLobby({ turnMs = 90_000, responseMs = 25_000, graceMs = 30
     const room = player.room;
     if (player.status === 'playing' && room && room.game && !room.game.over) {
       send(opponentOf(room, player), { t: 'opponentAway', grace: graceMs });
-      player.graceTimer = setTimeout(() => {
+      player.graceTimer = setTimeout(guarded(() => {
         if (player.ws) return;
         forfeit(room, room.seats.indexOf(player), 'disconnected');
         leave(player);
         players.delete(player.token);
-      }, graceMs);
+      }), graceMs);
       return;
     }
     leave(player);
@@ -93,6 +138,11 @@ export function createLobby({ turnMs = 90_000, responseMs = 25_000, graceMs = 30
   // ------------------------------------------------------------ messages
 
   function handle(player, msg) {
+    // Starting something new mid-match would walk out of it without forfeiting.
+    if (['queue', 'host', 'join'].includes(msg.t) && inRunningMatch(player)) {
+      send(player, { t: 'error', message: 'Finish or leave your current match first.' });
+      return;
+    }
     switch (msg.t) {
       case 'name': {
         const name = cleanName(msg.name);
@@ -113,15 +163,15 @@ export function createLobby({ turnMs = 90_000, responseMs = 25_000, graceMs = 30
       case 'action': return act(player, msg.action);
       case 'rematch': return rematch(player);
       case 'leave':
-        if (player.status === 'playing' && player.room?.game && !player.room.game.over) {
-          forfeit(player.room, player.room.seats.indexOf(player), 'left');
-        }
+        if (inRunningMatch(player)) forfeit(player.room, player.room.seats.indexOf(player), 'left');
         leave(player);
         send(player, { t: 'idle' });
         return;
       case 'lobby': return sendLobby(player);
     }
   }
+
+  const inRunningMatch = player => player.status === 'playing' && !!player.room?.game && !player.room.game.over;
 
   function checkDeck(player, deck) {
     const ok = deck && typeof deck === 'object' && getDeck(deck.archetype) && Array.isArray(deck.cards)
@@ -210,7 +260,7 @@ export function createLobby({ turnMs = 90_000, responseMs = 25_000, graceMs = 30
     let code;
     do code = Array.from({ length: CODE_LEN }, () => CODE_CHARS[crypto.randomInt(CODE_CHARS.length)]).join('');
     while (rooms.has(code));
-    const room = { code, visibility, seats: [], game: null, rematch: new Set(), createdAt: Date.now(), timer: null, clock: null };
+    const room = { code, visibility, seats: [], game: null, rematch: new Set(), createdAt: Date.now(), timer: null, clock: null, idle: [0, 0] };
     rooms.set(code, room);
     seat(room, hostPlayer);
     return room;
@@ -251,10 +301,13 @@ export function createLobby({ turnMs = 90_000, responseMs = 25_000, graceMs = 30
       deckIds: [a.deck.archetype, b.deck.archetype],
       names,
       firstPlayer: crypto.randomInt(2),
+      seed: randomSeed(),
+      shuffle: cryptoShuffle,
     });
     room.game.events = [];
     room.rematch.clear();
     room.clock = null;
+    room.idle = [0, 0];
     for (const p of room.seats) p.status = 'playing';
     schedule(room);
     room.seats.forEach((p, i) => send(p, startMessage(room, i)));
@@ -275,6 +328,7 @@ export function createLobby({ turnMs = 90_000, responseMs = 25_000, graceMs = 30
     const card = action.type === 'play' || action.type === 'respond'
       ? game.players[actor].hand.find(c => c.uid === action.uid)?.id ?? null
       : null;
+    game.rng = randomSeed(); // nothing a client has seen can predict this move's random outcomes
     const res = applyAction(game, action);
     if (!res.ok) {
       game.events = [];
@@ -282,12 +336,17 @@ export function createLobby({ turnMs = 90_000, responseMs = 25_000, graceMs = 30
       return;
     }
     const events = game.events.splice(0);
-    schedule(room);
-    const clock = clockFor(room);
+    // Several turns in a row with no move at all: treat the match as abandoned rather than stall the opponent.
+    room.idle[actor] = extra.timeout && action.type === 'end' ? room.idle[actor] + 1 : extra.timeout ? room.idle[actor] : 0;
+    const abandoned = room.idle[actor] >= idleTurns && !game.over;
+    if (!abandoned) schedule(room);
+    const clock = abandoned ? null : clockFor(room);
     room.seats.forEach((p, i) => send(p, {
       t: 'update', actor, action, card, ...extra, clock,
+      ...(extra.timeout ? { idle: { missed: room.idle[actor], limit: idleTurns } } : {}),
       state: view(game, i), events: eventsFor(events, i),
     }));
+    if (abandoned) forfeit(room, actor, 'inactive');
     if (game.over) broadcastLobby();
   }
 
@@ -296,7 +355,8 @@ export function createLobby({ turnMs = 90_000, responseMs = 25_000, graceMs = 30
     if (!game || game.over || seatNo < 0) return;
     game.over = true;
     game.winner = 1 - seatNo;
-    game.log.push({ turn: game.turn, text: `${game.players[seatNo].name} ${why === 'disconnected' ? 'disconnected' : 'left'} and forfeits.` });
+    const how = { disconnected: 'disconnected', inactive: 'stopped taking turns' }[why] ?? 'left';
+    game.log.push({ turn: game.turn, text: `${game.players[seatNo].name} ${how} and forfeits.` });
     clearTimeout(room.timer);
     room.seats.forEach((p, i) => send(p, {
       t: 'update', actor: seatNo, action: null, forfeit: seatNo, clock: null, state: view(game, i), events: [],
@@ -318,10 +378,10 @@ export function createLobby({ turnMs = 90_000, responseMs = 25_000, graceMs = 30
     if (game.pending && c.pendingSince === null) { c.pendingSince = now; c.responseEnds = now + responseMs; }
     if (!game.pending && c.pendingSince !== null) { c.turnEnds += now - c.pendingSince; c.pendingSince = null; c.responseEnds = null; }
     const ends = game.pending ? c.responseEnds : c.turnEnds;
-    room.timer = setTimeout(() => {
+    room.timer = setTimeout(guarded(() => {
       if (room.game !== game || game.over) return;
       apply(room, decisionPlayer(game), { type: game.pending ? 'pass' : 'end' }, { timeout: true });
-    }, Math.max(0, ends - now));
+    }), Math.max(0, ends - now));
   }
 
   function clockFor(room) {
@@ -359,12 +419,15 @@ export function createLobby({ turnMs = 90_000, responseMs = 25_000, graceMs = 30
   // ------------------------------------------------------------ helpers
 
   const send = (player, msg) => { if (player?.ws?.open) player.ws.send(msg); };
+  // Timers run outside any message handler; an exception there must not take the whole server down.
+  const guarded = fn => () => { try { fn(); } catch (err) { console.error('lobby:', err); } };
   const opponentOf = (room, player) => room.seats.find(p => p !== player);
 
   function close() {
     for (const room of rooms.values()) clearTimeout(room.timer);
     for (const p of players.values()) { clearTimeout(p.graceTimer); p.ws?.close(); }
     players.clear();
+    perIp.clear();
     rooms.clear();
     queue.length = 0;
   }
@@ -402,6 +465,24 @@ function cleanAction(raw) {
   return action;
 }
 
+// Names are shown to other players: no control, zero-width or text-direction characters (which can
+// disguise one name as another or flip the text around it), and runs of spaces collapse to one.
 function cleanName(raw) {
-  return typeof raw === 'string' ? raw.replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, NAME_MAX) : '';
+  if (typeof raw !== 'string') return '';
+  return raw.slice(0, 200)
+    .normalize('NFC')
+    .replace(/[\u0000-\u001f\u007f-\u009f<>\u00ad\u034f\u061c\u115f\u1160\u17b4\u17b5\u180e\u200b-\u200f\u202a-\u202e\u2060-\u206f\u3164\ufe00-\ufe0f\ufeff\uffa0]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, NAME_MAX)
+    .trim();
+}
+
+const randomSeed = () => crypto.randomBytes(4).readInt32LE(0);
+
+function cryptoShuffle(list) {
+  for (let i = list.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(i + 1);
+    [list[i], list[j]] = [list[j], list[i]];
+  }
 }

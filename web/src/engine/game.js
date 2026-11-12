@@ -15,7 +15,9 @@ import { pick, randInt, shuffleInPlace } from './rng.js';
 
 // ---------------------------------------------------------------- setup
 
-export function createGame({ decks, names = ['Player 1', 'Player 2'], deckIds = [null, null], seed, firstPlayer = 0 }) {
+// `shuffle(list)` replaces the seeded opening shuffle. The online server shuffles with crypto randomness,
+// so a client can't brute-force the 31-bit seed from its own opening hand and learn the opponent's deck.
+export function createGame({ decks, names = ['Player 1', 'Player 2'], deckIds = [null, null], seed, firstPlayer = 0, shuffle = null }) {
   const state = {
     rng: (seed ?? Math.floor(Math.random() * 2 ** 31)) | 0,
     turn: 1,
@@ -37,7 +39,7 @@ export function createGame({ decks, names = ['Player 1', 'Player 2'], deckIds = 
   for (const pid of [0, 1]) {
     const p = state.players[pid];
     p.deck = decks[pid].map(id => newCard(state, id, pid));
-    shuffleInPlace(state, p.deck);
+    if (shuffle) shuffle(p.deck); else shuffleInPlace(state, p.deck);
   }
 
   const first = state.players[firstPlayer];
