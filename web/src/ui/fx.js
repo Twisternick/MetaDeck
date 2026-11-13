@@ -85,7 +85,9 @@ export function artSlot(className, candidates, emblem, { label = false, alt = ''
     label ? h('span', { class: 'art-tag' }, 'ART') : null);
   if (urls.length) {
     let i = 0;
-    const img = h('img', { alt, loading: 'lazy', decoding: 'async', draggable: 'false' });
+    // Art that has loaded before is decoded synchronously so a re-render never flashes an empty slot.
+    const known = artStatus.get(urls[0]) === 'ok';
+    const img = h('img', { alt, loading: known ? 'eager' : 'lazy', decoding: known ? 'sync' : 'async', draggable: 'false' });
     img.addEventListener('load', () => { artStatus.set(img.getAttribute('src'), 'ok'); box.classList.add('has-img'); });
     img.addEventListener('error', () => {
       artStatus.set(img.getAttribute('src'), 'missing');
@@ -94,7 +96,7 @@ export function artSlot(className, candidates, emblem, { label = false, alt = ''
       else img.remove();
     });
     img.setAttribute('src', urls[0]);
-    if (artStatus.get(urls[0]) === 'ok') box.classList.add('has-img');
+    if (known) box.classList.add('has-img');
     box.append(img);
   }
   box.append(ph, h('div', { class: 'art-shade' }));
@@ -296,9 +298,18 @@ export function removeFx() {
 // A curved chain of glowing dots from a source element to the pointer, with a triangle head.
 export function createArrow(color = '#ff4d6d', count = 16) {
   const L = fxLayer();
-  const dots = Array.from({ length: count }, () => {
+  // Size and opacity depend only on a dot's place in the chain, so they are set once;
+  // moving the pointer then only changes transforms.
+  const sizes = [];
+  const dots = Array.from({ length: count }, (_, i) => {
+    const t = (i + 1) / (count + 1);
+    const size = 5 + 9 * t;
+    sizes.push(size);
     const d = h('i', { class: 'arrow-dot' });
     d.style.setProperty('--c', color);
+    d.style.width = `${size}px`;
+    d.style.height = `${size}px`;
+    d.style.opacity = `${.45 + .55 * t}`;
     L.append(d);
     return d;
   });
@@ -315,10 +326,7 @@ export function createArrow(color = '#ff4d6d', count = 16) {
         const t = (i + 1) / (count + 1);
         const px = (1 - t) ** 2 * a.x + 2 * (1 - t) * t * cx + t * t * x;
         const py = (1 - t) ** 2 * a.y + 2 * (1 - t) * t * cy + t * t * y;
-        const size = 5 + 9 * t;
-        d.style.width = `${size}px`;
-        d.style.height = `${size}px`;
-        d.style.opacity = `${.45 + .55 * t}`;
+        const size = sizes[i];
         d.style.transform = `translate(${(px - size / 2).toFixed(1)}px, ${(py - size / 2).toFixed(1)}px)`;
       });
       const angle = Math.atan2(y - cy, x - cx) * 180 / Math.PI + 90;

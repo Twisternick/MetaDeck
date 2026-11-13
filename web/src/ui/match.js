@@ -86,6 +86,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
   const view = h('div', { class: 'match' });
   root.append(view);
 
+  let arrowFrame = 0;
   document.addEventListener('keydown', onKey);
   document.addEventListener('pointermove', onPointerMove, { passive: true });
   document.addEventListener('pointerup', onPointerUp);
@@ -527,7 +528,13 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
         d.el.style.transform = `translate(${dx}px, ${dy}px) rotate(0deg) scale(1.05)`;
       }
     }
-    if (ui.arrow) updateArrow(e.clientX, e.clientY);
+    // At most one arrow update (hit test + layout reads) per frame, however fast the mouse reports.
+    if (ui.arrow && !arrowFrame) {
+      arrowFrame = requestAnimationFrame(() => {
+        arrowFrame = 0;
+        updateArrow(ui.pointer.x, ui.pointer.y);
+      });
+    }
   }
 
   function onPointerUp(e) {

@@ -127,6 +127,7 @@ export function renderMinion(state, m, { classes = '', onclick, onmouseenter, pr
     bonusTotal ? h('span', { class: 'minion-bonus', 'data-tip': `${bonusTip} — this bonus is active right now.`, 'data-tip-title': '⚡ Attack bonus' }, `+${bonusTotal}`) : null,
     h('span', { class: `stat hp${hp < maxHp ? ' down' : maxHp > def.baseHealth ? ' up' : ''}` }, hp),
     h('div', { class: 'minion-glow', 'aria-hidden': 'true' }),
+    h('div', { class: 'minion-ring', 'aria-hidden': 'true' }),
   );
 }
 
