@@ -3399,3 +3399,13 @@ select.acct-input { appearance: auto; }
   .hub-rank { padding: 16px; }
   .rank-badge.big { font-size: 18px; }
 }
+
+/* ---------------------------------------------------------------- purchases */
+.purchase-dialog { text-align: left; width: min(480px, 100%); display: grid; gap: 10px; }
+.purchase-dialog h2 { text-align: center; }
+.purchase-dialog .setting-row.check { align-items: flex-start; }
+.purchase-list { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 6px; }
+.purchase-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: baseline; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,.04); }
+.purchase-row.reversed b { text-decoration: line-through; opacity: .7; }
+.purchase-status { color: var(--bad); font-weight: 700; }
+.checkout-page h1 { margin-top: 28px; }

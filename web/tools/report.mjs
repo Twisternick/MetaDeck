@@ -50,6 +50,14 @@ const back = (u, from, to) => {
 const old1 = accounts.filter(u => Date.now() - Date.parse(u.created) > 2 * day);
 const old7 = accounts.filter(u => Date.now() - Date.parse(u.created) > 8 * day);
 const pct = (n, of) => (of ? `${Math.round((100 * n) / of)}% (${n} of ${of})` : 'not enough accounts yet');
+// Gem purchases (server/payments.mjs) in the same period: completed, revenue per currency, and reversals.
+const bought = db.prepare(`SELECT status, currency, COUNT(*) AS n, SUM(CAST(amount AS INTEGER)) AS total
+  FROM purchases WHERE created >= ? AND status != 'pending' GROUP BY status, currency`).all(since);
+if (bought.length) {
+  console.log('\nGem purchases');
+  for (const r of bought) console.log(`  ${r.status.padEnd(16)} ${String(r.n).padStart(4)}  ${((r.total ?? 0) / 100).toFixed(2)} ${r.currency ?? ''}`);
+}
+
 console.log(`\nAccounts: ${accounts.length}`);
 console.log(`Back on day 1:     ${pct(old1.filter(u => back(u, 1, 2)).length, old1.length)}`);
 console.log(`Back in days 2–7:  ${pct(old7.filter(u => back(u, 2, 8)).length, old7.length)}`);

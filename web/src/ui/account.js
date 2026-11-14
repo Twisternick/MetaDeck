@@ -261,6 +261,22 @@ export function accountScreen(root, { onBack, nav, mode = 'signin' }) {
     return form;
   }
 
+  // Gem purchases on this account, newest first, with what was charged and any refund.
+  function purchasesPanel() {
+    const list = [...(profile().purchases ?? [])].reverse();
+    if (!list.length) return h('p', { class: 'muted small' }, 'No purchases yet.');
+    const charged = x => (x.paid?.amount && x.paid?.currency
+      ? `${(Number(x.paid.amount) / 100).toFixed(2)} ${x.paid.currency}` : x.test ? 'test, not charged' : `${x.price}`);
+    return h('div', null,
+      h('ul', { class: 'purchase-list' }, list.map(x => h('li', { class: `purchase-row${x.status ? ' reversed' : ''}` },
+        h('b', null, `${x.gems.toLocaleString()} Gems`),
+        h('span', null, charged(x)),
+        h('span', { class: 'muted' }, new Date(x.at).toLocaleDateString()),
+        x.status ? h('span', { class: 'purchase-status' }, x.status === 'chargeback' ? 'Charged back' : x.status === 'partly refunded' ? 'Partly refunded' : 'Refunded') : null))),
+      h('p', { class: 'muted small' }, 'Receipts and invoices come from Paddle by email. For a refund, see the ',
+        h('a', { href: 'legal/refunds.html', target: '_blank', rel: 'noopener' }, 'Refund Policy'), '.'));
+  }
+
   function dataPanel() {
     const submit = h('button', { class: 'btn ghost', type: 'submit' }, 'Download my data');
     const form = h('form', { class: 'acct-form' });
@@ -297,6 +313,7 @@ export function accountScreen(root, { onBack, nav, mode = 'signin' }) {
       panel('password', 'Change password', null, changePasswordForm(me)),
       panel('recovery', 'Recovery code', me.recovery ? 'Saved' : 'Not set up', recoveryForm(me)),
       panel('devices', 'Signed-in devices', devices === 1 ? 'Just this one' : `${devices} devices`, devicesPanel(devices)),
+      panel('purchases', 'Purchases', (profile().purchases ?? []).length ? `${profile().purchases.length}` : null, purchasesPanel()),
       panel('data', 'Your data', null, dataPanel()),
       panel('delete', 'Delete account', null, deleteForm(me)));
   }

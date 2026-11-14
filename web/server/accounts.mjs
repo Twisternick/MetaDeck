@@ -87,6 +87,7 @@ export function createAccounts({ file = null, legacy = null, now = () => new Dat
     forgetMatches1: db.prepare('UPDATE matches SET p1 = NULL WHERE p1 = ?'),
     forgetEvents: db.prepare('DELETE FROM events WHERE user = ?'),
     forgetReports: db.prepare('UPDATE reports SET reporter = NULL WHERE reporter = ?'),
+    forgetPurchases: db.prepare('UPDATE purchases SET user = NULL, user_name = NULL WHERE user = ?'),
     session: db.prepare('SELECT user FROM sessions WHERE hash = ? AND expires >= ?'),
     addSession: db.prepare('INSERT INTO sessions (hash, user, expires) VALUES (?, ?, ?)'),
     dropExpired: db.prepare('DELETE FROM sessions WHERE expires < ?'),
@@ -279,6 +280,7 @@ export function createAccounts({ file = null, legacy = null, now = () => new Dat
         q.forgetMatches1.run(user.key);
         q.forgetEvents.run(user.key);
         q.forgetReports.run(user.key);
+        q.forgetPurchases.run(user.key); // the payment record stays (for accounting), without the account
       });
       cache.delete(user.key);
       return { ok: true };
@@ -328,14 +330,14 @@ export function createAccounts({ file = null, legacy = null, now = () => new Dat
 
     // Apply one economy operation for the signed-in player. `testPurchases` comes from the server
     // (only on this machine), never from the client.
-    act(token, op, args, { testPurchases = false } = {}) {
+    act(token, op, args, { testPurchases = false, country = null } = {}) {
       const user = userFor(token);
       if (!user) return { status: 401, body: { ok: false, reason: 'Please sign in again.' } };
       if (op === 'testPurchase' && !testPurchases) return { status: 403, body: { ok: false, reason: 'Payments are not connected yet.' } };
       // An account's vs-AI results go through the checked replay in server/ai-match.mjs instead.
       if (op === 'recordMatch') return { status: 403, body: { ok: false, reason: 'Match results are checked by the server.' } };
       const profile = profileOf(user);
-      const result = runOp(profile, op, args, { now: now(), rng, testPurchases, online: false });
+      const result = runOp(profile, op, args, { now: now(), rng, testPurchases, online: false, country });
       put(user);
       return { status: 200, body: { ...result, profile } };
     },

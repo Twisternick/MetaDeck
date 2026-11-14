@@ -119,6 +119,7 @@ export function newProfile(now = new Date()) {
     stats: { games: 0, wins: 0 },
     tutorial: false, // finished the tutorial (and got its pack)
     purchases: [],
+    gemDebt: 0, // Gems a refund took back after they were spent (blocks Gem spending until repaid)
     createdAt: now.toISOString(),
   };
   refreshDaily(p, now, () => 0.5, 3);
@@ -132,6 +133,7 @@ export function normalizeProfile(raw, now = new Date(), rng = Math.random) {
   const num = v => (Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0);
   p.gold = num(p.gold); p.gems = num(p.gems); p.dust = num(p.dust); p.pity = num(p.pity);
   p.tutorial = raw.tutorial === true;
+  p.gemDebt = num(raw.gemDebt);
   const cards = {};
   for (const [id, c] of Object.entries(raw.cards ?? {})) {
     if (!CARDS[id]?.deckId) continue;
@@ -288,10 +290,19 @@ export const GEM_BUNDLES = [
   { id: 'gems-7000', gems: 7000, price: 49.99, bonus: '40% bonus' },
 ];
 export const PACK_BUNDLE = { packs: 10, gems: 900 };
+// Where paid random packs are restricted (Belgium treats them as gambling): packs can't be bought with
+// Gems there; Gold packs, cosmetics and the season track are unaffected. The server decides the
+// player's country (Cloudflare's CF-IPCountry header); it's never taken from the browser.
+export const NO_PAID_PACKS = new Set(['BE']);
+// Gem purchases are for adults only (accounts whose birth year makes them 18 or older this year).
+export const PURCHASE_MIN_AGE = 18;
+const DEBT = 'A refund took back Gems you had already spent, so Gem purchases in the shop are paused until your balance is back above zero.';
 export const SEASON_PASS_GEMS = 1000;
 
-export function buyPack(p, kind, currency, count = 1) {
+export function buyPack(p, kind, currency, count = 1, country = null) {
   if (!packPool(kind).length) return { ok: false, reason: 'Unknown pack.' };
+  if (currency === 'gems' && NO_PAID_PACKS.has(country)) return { ok: false, reason: 'Packs can’t be bought with Gems in your country. Gold packs are still available.' };
+  if (currency === 'gems' && p.gemDebt > 0) return { ok: false, reason: DEBT };
   const price = currency === 'gold' ? PACK_GOLD * count
     : count === PACK_BUNDLE.packs ? PACK_BUNDLE.gems : PACK_GEMS * count;
   if (p[currency] < price) return { ok: false, reason: `Not enough ${currency === 'gold' ? 'Gold' : 'Gems'}.` };
@@ -304,6 +315,7 @@ export function buyCosmetic(p, id) {
   const c = cosmetic(id);
   if (!c?.gems) return { ok: false, reason: 'Not for sale.' };
   if (ownsCosmetic(p, id)) return { ok: false, reason: 'Already owned.' };
+  if (p.gemDebt > 0) return { ok: false, reason: DEBT };
   if (p.gems < c.gems) return { ok: false, reason: 'Not enough Gems.' };
   p.gems -= c.gems;
   p.cosmetics.owned.push(id);
@@ -319,19 +331,40 @@ export function equipCosmetic(p, id) {
 
 export function buySeasonPass(p) {
   if (p.season.premium) return { ok: false, reason: 'Already unlocked.' };
+  if (p.gemDebt > 0) return { ok: false, reason: DEBT };
   if (p.gems < SEASON_PASS_GEMS) return { ok: false, reason: 'Not enough Gems.' };
   p.gems -= SEASON_PASS_GEMS;
   p.season.premium = true;
   return { ok: true, price: SEASON_PASS_GEMS };
 }
 
-// Real-money purchases only credit Gems once a payment provider confirms them; this records that credit.
-export function creditGems(p, bundleId, now = new Date(), test = false) {
+// Real-money purchases only credit Gems once the payment provider confirms them (server/payments.mjs);
+// this records that credit. Any debt from an earlier refund is paid off first. `txn` is the provider's
+// transaction id, `paid` what was actually charged ({ amount, currency }).
+export function creditGems(p, bundleId, now = new Date(), test = false, { txn = null, paid = null } = {}) {
   const b = GEM_BUNDLES.find(x => x.id === bundleId);
   if (!b) return { ok: false, reason: 'Unknown bundle.' };
-  p.gems += b.gems;
-  p.purchases.push({ bundle: b.id, gems: b.gems, price: b.price, at: now.toISOString(), test });
+  addGems(p, b.gems);
+  p.purchases.push({ bundle: b.id, gems: b.gems, price: b.price, at: now.toISOString(), test, ...(txn ? { txn } : {}), ...(paid ? { paid } : {}) });
   return { ok: true, gems: b.gems };
+}
+
+// Add Gems, paying off any refund debt first.
+export function addGems(p, n) {
+  const pay = Math.min(p.gemDebt ?? 0, n);
+  p.gemDebt = (p.gemDebt ?? 0) - pay;
+  p.gems += n - pay;
+}
+
+// A refund or chargeback takes back `gems`. What's already been spent becomes debt, which blocks Gem
+// spending until new Gems (bought or earned) pay it off. Marks the purchase as `status`.
+export function takeBackGems(p, gems, txn, status, now = new Date()) {
+  const take = Math.min(p.gems, gems);
+  p.gems -= take;
+  p.gemDebt = (p.gemDebt ?? 0) + (gems - take);
+  const purchase = txn ? p.purchases.find(x => x.txn === txn) : null;
+  if (purchase) { purchase.status = status; purchase.reversedAt = now.toISOString(); }
+  return { taken: take, debt: gems - take };
 }
 
 // ---------------------------------------------------------------- season track
@@ -577,7 +610,7 @@ export const OPS = {
     for (let i = 0; i < n; i++) { takePack(p, kind); packs.push(openPack(p, kind, ctx.rng)); }
     return { ok: true, packs };
   },
-  buyPack: (p, a) => buyPack(p, str(a.kind), a.currency === 'gems' ? 'gems' : 'gold', a.count === PACK_BUNDLE.packs ? PACK_BUNDLE.packs : 1),
+  buyPack: (p, a, ctx) => buyPack(p, str(a.kind), a.currency === 'gems' ? 'gems' : 'gold', a.count === PACK_BUNDLE.packs ? PACK_BUNDLE.packs : 1, ctx.country),
   buyCosmetic: (p, a) => buyCosmetic(p, str(a.id)),
   equip: (p, a) => (equipCosmetic(p, str(a.id)) ? { ok: true } : fail('You don’t own that.')),
   premiumArt: (p, a) => { p.cosmetics.premiumArt = a.on === true; return { ok: true }; },
@@ -619,10 +652,11 @@ export const OPS = {
   testPurchase: (p, a, ctx) => (ctx.testPurchases ? creditGems(p, str(a.bundle), ctx.now, true) : fail('Payments are not connected yet.')),
 };
 
-export function runOp(p, op, args, { now = new Date(), rng = Math.random, testPurchases = false, online = false } = {}) {
+// `country` (an ISO code from the server, or null) applies regional rules such as NO_PAID_PACKS.
+export function runOp(p, op, args, { now = new Date(), rng = Math.random, testPurchases = false, online = false, country = null } = {}) {
   const fn = typeof op === 'string' && Object.hasOwn(OPS, op) ? OPS[op] : null;
   if (!fn) return fail('Unknown action.');
-  const ctx = { now, rng, testPurchases, online };
+  const ctx = { now, rng, testPurchases, online, country };
   refreshDaily(p, now, rng);
   return fn(p, args && typeof args === 'object' ? args : {}, ctx) ?? fail('Something went wrong.');
 }

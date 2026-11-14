@@ -11,6 +11,8 @@
 //   friends   friend requests (pending) and friendships (one accepted row each way)
 //   blocks    who blocked whom: never matched, no requests or challenges
 //   reports   players reported by other players, for the operator (npm run reports)
+//   purchases real-money Gem purchases (server/payments.mjs): kept for accounting even if the account goes
+//   webhook_events  ids of payment webhooks already handled, so a retried one does nothing
 //
 // Schema changes are numbered steps in MIGRATIONS, tracked by PRAGMA user_version: add a step, never
 // edit one that has shipped.
@@ -68,6 +70,14 @@ const MIGRATIONS = [
      reason TEXT NOT NULL, note TEXT, resolved INTEGER NOT NULL DEFAULT 0
    );
    CREATE INDEX reports_open ON reports(resolved, at);`,
+  // 4: real-money purchases.
+  `CREATE TABLE purchases (
+     txn TEXT PRIMARY KEY, user TEXT, user_name TEXT, bundle TEXT NOT NULL, gems INTEGER NOT NULL, status TEXT NOT NULL,
+     amount TEXT, currency TEXT, country TEXT, consent_at TEXT, created TEXT NOT NULL, completed TEXT,
+     gems_back INTEGER NOT NULL DEFAULT 0, reversed TEXT
+   );
+   CREATE INDEX purchases_user ON purchases(user, created);
+   CREATE TABLE webhook_events (id TEXT PRIMARY KEY, at TEXT NOT NULL);`,
 ];
 
 // Open (or create) the database and bring its schema up to date. `file` null or ':memory:' keeps it in memory.

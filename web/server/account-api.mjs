@@ -74,7 +74,7 @@ export function handleAccountApi(req, res, route, ctx) {
     const token = sessionToken(req);
     const me = accounts.me(token);
     const rank = me && ctx.social ? ctx.social.rankOf(accounts.userForToken(token)) : null;
-    return me ? send(res, 200, { ok: true, ...me, rank, testPurchases: ctx.testPurchases(req) }) : send(res, 401, { ok: false, reason: 'Signed out.' });
+    return me ? send(res, 200, { ok: true, ...me, rank, country: ctx.country?.(req) ?? null, testPurchases: ctx.testPurchases(req) }) : send(res, 401, { ok: false, reason: 'Signed out.' });
   }
   if (ctx.social && req.method === 'GET' && ['friends', 'history', 'leaderboard'].includes(route)) {
     const s = ctx.social;
@@ -153,7 +153,7 @@ export function handleAccountApi(req, res, route, ctx) {
       });
     case 'act':
       return readJson(req, res, ({ op, args }) => {
-        const r = accounts.act(sessionToken(req), op, args, { testPurchases: ctx.testPurchases(req) });
+        const r = accounts.act(sessionToken(req), op, args, { testPurchases: ctx.testPurchases(req), country: ctx.country?.(req) ?? null });
         send(res, r.status, r.body);
       });
     case 'aistart':

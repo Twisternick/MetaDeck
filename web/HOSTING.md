@@ -155,6 +155,44 @@ The server copies the database to `BACKUP_DIR` shortly after it starts and then 
   Shows per day: visitors, sign-ups, matches started, matches recorded and packs opened, plus how many new accounts came back on day 1 and in days 2–7. Guests are counted without cookies (a daily-rotating hash), so no cookie banner is needed.
 - The admin tools (`users`, `grant`, `set-password`, `maintenance`, `backup`, `reports`, `moderate`) need the same `DATA_DIR` as the server. Run them from a terminal where you've run `tools\windows\server-env.cmd` first, or set `DATA_DIR` yourself.
 
+## Payments (Gems for real money)
+
+Gem purchases go through [Paddle](https://www.paddle.com), the merchant of record: Paddle sells to the player and handles card details, sales tax and VAT, invoices, refunds and chargebacks, and pays you out. Payments stay off until `DATA_DIR\paddle.json` exists.
+
+1. **Sign up for a sandbox account** at sandbox-vendors.paddle.com. It works like the real one, with test cards.
+2. **Create a product "Gems"** with one price per bundle: $0.99, $4.99, $9.99, $19.99, $49.99 (one-time, matching `GEM_BUNDLES` in `src/data/economy.js`). Note each price's `pri_…` id.
+3. **Developer tools → Authentication:**
+   - Create an **API key** with permission to read and write transactions.
+   - Create a **client-side token**.
+4. **Developer tools → Notifications → New destination:**
+   - **URL:** `https://play.yourdomain.com/api/paddle/webhook`
+   - **Events:** `transaction.completed`, `adjustment.created`, `adjustment.updated`
+
+   Copy its **secret key** (`pdl_ntfset_…`).
+5. **Checkout → Checkout settings:**
+   - Set the **default payment link** to `https://play.yourdomain.com/checkout.html`.
+   - Add your domain to the approved domains.
+6. **Write `DATA_DIR\paddle.json`:**
+
+   ```json
+   {
+     "apiKey": "pdl_sdbx_apikey_…",
+     "clientToken": "test_…",
+     "webhookSecret": "pdl_ntfset_…",
+     "prices": { "gems-100": "pri_…", "gems-550": "pri_…", "gems-1200": "pri_…", "gems-2600": "pri_…", "gems-7000": "pri_…" }
+   }
+   ```
+
+7. **Restart the server.** It logs "Gem purchases are on (Paddle sandbox)".
+8. **Buy a bundle with a test card.** The Gems arrive a few seconds after the checkout closes. Then refund it from the Paddle dashboard and watch them go.
+
+**To go live:**
+- Apply for a live Paddle account. Paddle reviews the site, so the terms, privacy policy and refund policy need to be filled in and published.
+- Repeat steps 2–6 in the live dashboard. A `pdl_live_…` key switches the server to the live API by itself.
+- Keep `paddle.json` out of OneDrive and backups you share: it holds the API key.
+
+`npm run report` shows purchases, revenue and refunds alongside the rest.
+
 ## Limits of a home PC
 
 Card-game traffic is tiny, and with Cloudflare serving the art, one Node process on this PC can handle hundreds of players at once. The weak point is the PC itself: Windows updates, power cuts, and your own use of it (a game hogging the CPU, a reboot).

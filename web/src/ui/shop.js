@@ -1,6 +1,7 @@
 // Shop: packs for Gold or Gems, cosmetics and the premium season track for Gems, and Gem bundles.
-// Real-money payments are not connected yet. On a local or test host a Gem bundle can be credited as a
-// clearly labelled test purchase so the flow can be tried end to end; anywhere else the button is off.
+// With payments set up (server/payments.mjs), Gem bundles are bought through Paddle by signed-in
+// adults. Without them, a local or test host can credit a bundle as a clearly labelled test purchase
+// so the flow can be tried end to end; anywhere else the bundles say they're coming soon.
 
 import { h, storage } from './dom.js';
 import { removeFx, sparkle, motionOK, deckEmblem, currency } from './fx.js';
@@ -13,6 +14,7 @@ import {
 } from '../data/economy.js';
 import { DECKS } from '../data/index.js';
 import { tip } from './tutorial.js';
+import { shopConfig, cachedShopConfig, cantBuy, purchaseDialog, paidPacksBlocked } from './payments.js';
 
 const money = n => `$${n.toFixed(2)}`;
 
@@ -69,7 +71,8 @@ export function shop(root, { onBack, nav }) {
       class: `chip${kind === id ? ' selected' : ''}`, style: { '--deck': color }, onclick: () => { prefs.pack = id; render(); },
     }, deckEmblem(emblem, 'chip-emblem'), label);
     const purchase = (cur, count, label, price) => h('button', {
-      class: `btn ${cur === 'gold' ? 'primary' : 'primary online'}`, disabled: p[cur] < price || null,
+      class: `btn ${cur === 'gold' ? 'primary' : 'primary online'}`, disabled: p[cur] < price || (cur === 'gems' && paidPacksBlocked()) || null,
+      title: cur === 'gems' && paidPacksBlocked() ? 'Packs can’t be bought with Gems in your country. Gold packs are available.' : null,
       onclick: e => buy('buyPack', { kind, currency: cur, count }, () => `${count > 1 ? `${count} packs` : 'Pack'} added`, e.currentTarget),
     }, label, h('span', { class: 'btn-cost' }, currency(cur), ` ${price}`));
     const unopened = p.packs[kind] ?? 0;
@@ -128,6 +131,8 @@ export function shop(root, { onBack, nav }) {
   }
 
   function gemsSection() {
+    const live = cachedShopConfig()?.enabled ? cachedShopConfig() : null;
+    if (live) return liveGems(live);
     const testing = testPurchasesAllowed();
     return h('section', { class: 'rise', style: { '--i': 4 } },
       h('h2', null, 'Gems'),
@@ -147,6 +152,24 @@ export function shop(root, { onBack, nav }) {
         }, testing ? `${money(b.price)} · test` : money(b.price))))));
   }
 
+  // Real Gem bundles, through Paddle.
+  function liveGems(cfg) {
+    const why = cantBuy();
+    const p = profile();
+    return h('section', { class: 'rise', style: { '--i': 4 } },
+      h('h2', null, 'Gems'),
+      cfg.sandbox ? h('p', { class: 'lobby-error' }, 'Sandbox mode: use Paddle’s test cards. Nothing real is charged.') : null,
+      p.gemDebt > 0 ? h('p', { class: 'lobby-error' }, `A refund took back ${p.gemDebt} Gems you had already spent. Gem spending is paused until your balance is above zero again.`) : null,
+      h('p', { class: 'muted' }, why ?? 'Gems buy packs, cosmetics and the premium season track. Prices in US dollars; the checkout shows your local price and tax.'),
+      h('div', { class: 'gem-grid' }, GEM_BUNDLES.filter(b => cfg.bundles.includes(b.id)).map((b, i) => h('div', { class: 'gem-tile rise', style: { '--i': i, '--size': i } },
+        h('div', { class: 'gem-pile', 'aria-hidden': 'true' }, Array.from({ length: Math.min(5, i + 1) }, () => currency('gems'))),
+        h('div', { class: 'gem-amount' }, b.gems.toLocaleString(), ' Gems'),
+        b.bonus ? h('div', { class: 'gem-bonus' }, b.bonus) : null,
+        h('button', { class: 'btn primary small', disabled: why ? true : null, onclick: () => purchaseDialog(b, money(b.price)) }, money(b.price))))),
+      h('p', { class: 'muted small' }, 'Gem purchases are handled by Paddle, our merchant of record. ',
+        h('a', { href: 'legal/refunds.html', target: '_blank', rel: 'noopener' }, 'Refund Policy')));
+  }
+
   root.replaceChildren(h('main', { class: 'shop' },
     h('header', { class: 'page-head' },
       h('button', { class: 'btn ghost small', onclick: onBack }, '← Menu'),
@@ -154,4 +177,5 @@ export function shop(root, { onBack, nav }) {
       walletBar({ nav: { collection: nav.collection, season: nav.season, account: nav.account } })),
     body));
   render();
+  if (!cachedShopConfig()) shopConfig().then(c => { if (c.enabled || c.country) render(); });
 }

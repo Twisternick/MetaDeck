@@ -33,7 +33,7 @@ async function api(path, body) {
 }
 
 function adopt(data) {
-  account = { name: data.name, ...data.info, rank: data.rank ?? null };
+  account = { name: data.name, ...data.info, rank: data.rank ?? null, country: data.country ?? null };
   current = normalizeProfile(data.profile);
   serverTestPurchases = !!data.testPurchases;
   refreshWallets();

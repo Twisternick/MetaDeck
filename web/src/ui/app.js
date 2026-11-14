@@ -16,6 +16,7 @@ import { playerHub } from './players.js';
 import { rankOf } from '../data/ranked.js';
 import { seasonName, rewardLabel } from '../data/economy.js';
 import { seasonSeen } from './profile.js';
+import { returnedFromCheckout, shopConfig } from './payments.js';
 import { installAudio, music } from './audio.js';
 import { settingsDialog } from './settings.js';
 import { tutorial as startTutorial, tutorialSeen, dismissTutorial, tip } from './tutorial.js';
@@ -489,5 +490,6 @@ function titleScreen() {
 // straight back to it (the server keeps it for a while).
 const ready = initAccount().catch(() => {});
 ready.then(() => { const notice = signedIn()?.rank?.notice; if (notice) seasonEnded(notice); });
+ready.then(() => { shopConfig(); returnedFromCheckout(); });
 if (net.inMatch) ready.finally(online);
 else Promise.all([ready, titleScreen()]).then(menu);

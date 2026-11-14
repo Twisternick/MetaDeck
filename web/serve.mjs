@@ -12,7 +12,8 @@
 // admin tools (grant, set-password, users, maintenance) use to talk to it from this machine.
 //
 // Environment: PORT, DATA_DIR, TRUST_PROXY=1, LOG_DIR (default DATA_DIR/logs), BACKUP_DIR (nightly
-// database copies, kept BACKUP_DAYS days, default 14).
+// database copies, kept BACKUP_DAYS days, default 14). Real-money Gem purchases are configured in
+// DATA_DIR/paddle.json (server/payments.mjs).
 
 import http from 'node:http';
 import fs from 'node:fs';
@@ -23,6 +24,7 @@ import { acceptWebSocket } from './server/ws.mjs';
 import { createLobby } from './server/lobby.mjs';
 import { accountsIn } from './server/accounts.mjs';
 import { createSocial } from './server/social.mjs';
+import { createPayments, loadPaddleConfig } from './server/payments.mjs';
 import { loadBlockedNames } from './server/names.mjs';
 import { createAiMatches } from './server/ai-match.mjs';
 import { createTelemetry } from './server/telemetry.mjs';
@@ -42,7 +44,7 @@ const types = {
 };
 // The only paths the game loads, plus the privacy and terms pages. Everything else in web/ (the server,
 // tools, tests, reports) stays private.
-const PUBLIC = [/^\/index\.html$/, /^\/styles\.css$/, /^\/src\//, /^\/assets\//, /^\/legal\/[a-z-]+\.(html|css)$/];
+const PUBLIC = [/^\/index\.html$/, /^\/checkout\.html$/, /^\/styles\.css$/, /^\/src\//, /^\/assets\//, /^\/legal\/[a-z-]+\.(html|css)$/];
 
 const dataDir = path.resolve(process.env.DATA_DIR || path.join(root, 'data'));
 fs.mkdirSync(dataDir, { recursive: true });
@@ -62,6 +64,8 @@ if (/onedrive|dropbox|google drive|icloud/i.test(dataDir)) {
 loadBlockedNames(path.join(dataDir, 'blocked-names.txt'));
 const accounts = accountsIn(dataDir);
 const social = createSocial({ accounts });
+const payments = createPayments({ accounts, config: loadPaddleConfig(path.join(dataDir, 'paddle.json')) });
+if (payments.enabled) console.log(`Gem purchases are on (Paddle ${payments.publicConfig().sandbox ? 'sandbox' : 'live'}).`);
 const aiMatches = createAiMatches({ accounts });
 const telemetry = createTelemetry({ db: accounts.db });
 const lobby = createLobby({ accounts, social });
@@ -107,18 +111,22 @@ if (backupDir) {
   setInterval(runBackup, 6 * 3_600_000).unref();
 }
 
-function securityHeaders(req) {
+// The checkout page (checkout.html) is the only page allowed to load anything from another site: Paddle's
+// checkout script, its frame and its API. The game itself loads nothing from third parties.
+const PADDLE = 'https://*.paddle.com';
+function securityHeaders(req, { checkout = false } = {}) {
   const host = req.headers.host ?? '';
   return {
     'Content-Security-Policy': [
       "default-src 'self'",
-      "script-src 'self'",
+      checkout ? `script-src 'self' ${PADDLE}` : "script-src 'self'",
       "worker-src 'self'",
-      "style-src 'self' 'unsafe-inline'",
-      "font-src 'self'",
-      "img-src 'self' data: blob:",
+      checkout ? `style-src 'self' 'unsafe-inline' ${PADDLE}` : "style-src 'self' 'unsafe-inline'",
+      checkout ? `font-src 'self' ${PADDLE}` : "font-src 'self'",
+      checkout ? `img-src 'self' data: blob: ${PADDLE}` : "img-src 'self' data: blob:",
+      ...(checkout ? [`frame-src ${PADDLE}`] : []),
       "media-src 'self'",
-      `connect-src 'self' ws://${host} wss://${host}`,
+      checkout ? `connect-src 'self' ${PADDLE}` : `connect-src 'self' ws://${host} wss://${host}`,
       "object-src 'none'",
       "base-uri 'none'",
       "form-action 'self'",
@@ -129,7 +137,7 @@ function securityHeaders(req) {
     'Referrer-Policy': 'no-referrer',
     'Cross-Origin-Opener-Policy': 'same-origin',
     'Cross-Origin-Resource-Policy': 'same-origin',
-    'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+    'Permissions-Policy': `camera=(), microphone=(), geolocation=(), payment=(${checkout ? '"https://buy.paddle.com" "https://sandbox-buy.paddle.com"' : ''}), usb=()`,
   };
 }
 
@@ -220,7 +228,7 @@ function serveStatic(req, res) {
     const etag = `W/"${stat.size.toString(36)}-${Math.floor(stat.mtimeMs).toString(36)}"`;
     const media = urlPath.startsWith('/assets/') && !localHost(req.headers.host);
     const headers = {
-      ...securityHeaders(req),
+      ...securityHeaders(req, { checkout: urlPath === '/checkout.html' }),
       ETag: etag,
       'Cache-Control': media ? 'public, max-age=86400, stale-while-revalidate=604800' : 'no-cache',
     };
@@ -241,10 +249,17 @@ const track = (name, data, req, user = null) => {
   catch (err) { console.error('telemetry:', err); return false; }
 };
 
+// The visitor's country, for regional rules (economy.js NO_PAID_PACKS): Cloudflare's CF-IPCountry
+// header, trusted only behind the tunnel (TRUST_PROXY=1). Unknown otherwise.
+const country = req => {
+  const c = trustProxy ? String(req.headers['cf-ipcountry'] ?? '').toUpperCase() : '';
+  return /^[A-Z]{2}$/.test(c) && c !== 'XX' ? c : null;
+};
+
 // Account endpoints. Test purchases (Gems for free, clearly labelled) are only offered to a browser on this
 // machine; a deployed server never grants them.
 const accountCtx = {
-  accounts, social, aiMatches, sameOrigin, clientIp, isAdmin, track,
+  accounts, social, aiMatches, sameOrigin, clientIp, isAdmin, track, country,
   secure: req => !!req.socket.encrypted || (trustProxy && req.headers['x-forwarded-proto'] === 'https'),
   testPurchases: fromThisMachine,
   online: () => lobby.stats(),
@@ -304,6 +319,35 @@ const server = http.createServer((req, res) => {
         return health(res);
       case '/api/version':
         return json(res, 200, { version });
+      case '/api/shop/config':
+        return json(res, 200, { ...payments.publicConfig(), country: country(req) });
+      case '/api/shop/checkout':
+        if (req.method !== 'POST') { res.writeHead(405, { Allow: 'POST' }).end(); return; }
+        if (!sameOrigin(req) || !isJson(req)) return json(res, 403, { ok: false });
+        return readBody(req, res, 4096, body => {
+          payments.checkout(sessionToken(req), body, { country: country(req) })
+            .then(r => json(res, r.status ?? 200, r))
+            .catch(err => { console.error('checkout:', err); json(res, 500, { ok: false, reason: 'Server error.' }); });
+        });
+      case '/api/paddle/webhook': {
+        // From Paddle's servers: no Origin to check; the signature is what counts. The raw body is kept
+        // byte for byte, because the signature covers it exactly.
+        if (req.method !== 'POST') { res.writeHead(405, { Allow: 'POST' }).end(); return; }
+        const chunks = [];
+        let size = 0;
+        req.on('data', c => { size += c.length; if (size > 1_000_000) { res.writeHead(413).end(); req.destroy(); } else chunks.push(c); });
+        req.on('end', () => {
+          if (res.writableEnded) return;
+          try {
+            const r = payments.webhook(Buffer.concat(chunks), req.headers['paddle-signature']);
+            json(res, r.status, r.body);
+          } catch (err) {
+            console.error('paddle webhook:', err); // Paddle retries on an error
+            json(res, 500, { ok: false });
+          }
+        });
+        return;
+      }
       case '/api/event':
       case '/api/client-error':
         if (req.method !== 'POST') { res.writeHead(405, { Allow: 'POST' }).end(); return; }

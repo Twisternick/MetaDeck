@@ -77,6 +77,18 @@ test('the page loads nothing from third parties: fonts are served from here', as
   assert.equal((await request('/legal/../serve.mjs')).status, 404);
 });
 
+test('only the checkout page may load Paddle; payments are off without a configuration', async () => {
+  const page = await request('/checkout.html');
+  assert.equal(page.status, 200);
+  const csp = page.headers['content-security-policy'];
+  assert.match(csp, /script-src 'self' https:\/\/\*\.paddle\.com/);
+  assert.match(csp, /frame-src https:\/\/\*\.paddle\.com/);
+  assert.doesNotMatch((await request('/index.html')).headers['content-security-policy'], /paddle/);
+  assert.equal((await request('/api/shop/config')).json.enabled, false);
+  assert.equal((await request('/api/paddle/webhook', { method: 'POST', body: {} })).status, 404);
+  assert.equal((await request('/api/shop/checkout', { method: 'POST', body: { bundle: 'gems-100' } })).status, 503);
+});
+
 test('health check and version', async () => {
   const h = await request('/healthz');
   assert.equal(h.status, 200);
