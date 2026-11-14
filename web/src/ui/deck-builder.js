@@ -9,6 +9,7 @@ import { getDeck, CARDS, DECK_SIZE, MAX_COPIES, countCards, deckErrors, starterD
 import { saveCustomDeck, deleteCustomDeck } from './deck-store.js';
 import { profile } from './profile.js';
 import { ownedTotal, missingCards, missingDust, bestFinish } from '../data/economy.js';
+import { encodeDeck } from '../data/deck-code.js';
 
 const COST_FILTERS = ['All', 1, 2, 3, 4, 5, 6, '7+'];
 const TYPE_FILTERS = ['All', 'Monster', 'Spell'];
@@ -23,7 +24,7 @@ export function deckBuilder(root, { archetype, deck = null, onBack, onPlay }) {
     id: deck && !deck.starter ? deck.id : null,
     name: deck ? (deck.starter ? `${deck.name} (copy)` : deck.name) : `My ${arch.name} deck`,
     cards: deck ? [...deck.cards] : [],
-    dirty: !!deck?.starter,
+    dirty: !!deck?.starter || !!deck?.imported,
     filters: { q: '', type: 'All', cost: 'All' },
   };
   const pool = arch.cards.map(c => CARDS[c.cardId]).sort(byCost);
@@ -161,6 +162,14 @@ export function deckBuilder(root, { archetype, deck = null, onBack, onPlay }) {
   const errorsEl = h('div', { class: 'deck-errors' });
   const toastEl = h('div', { class: 'builder-toast', role: 'status' });
   const saveBtn = h('button', { class: 'btn ghost', onclick: save }, 'Save');
+  // The deck code, to share the list anywhere (Import code on the menu reads it back).
+  const codeBtn = h('button', {
+    class: 'btn ghost', title: 'Copy a code for this deck list to share it',
+    onclick: () => {
+      const code = encodeDeck(archetype, st.cards);
+      navigator.clipboard?.writeText(code).then(() => flash('Deck code copied.'), () => prompt('Copy this deck code:', code));
+    },
+  }, 'Copy code');
   const playBtn = h('button', { class: 'btn primary', onclick: () => onPlay(save()) }, 'Save & play');
   const deleteBtn = h('button', {
     class: 'btn danger small', onclick: () => {
@@ -260,7 +269,7 @@ export function deckBuilder(root, { archetype, deck = null, onBack, onPlay }) {
         h('div', { class: 'deck-stats' }, curveEl, splitEl),
         panelRows,
         errorsEl,
-        h('div', { class: 'deck-actions' }, starterSelect, saveBtn, playBtn),
+        h('div', { class: 'deck-actions' }, starterSelect, codeBtn, saveBtn, playBtn),
         deleteBtn)),
     toastEl));
   renderPool();

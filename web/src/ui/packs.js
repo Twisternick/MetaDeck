@@ -7,6 +7,7 @@ import { renderCard, renderCardBack } from './card-view.js';
 import { motionOK, confetti, sparkle, screenShake, removeFx, deckEmblem, currency } from './fx.js';
 import { profile, act } from './profile.js';
 import { track } from './telemetry.js';
+import { rankBadge } from './rank-badge.js';
 import { sfx } from './audio.js';
 import { rewardLabel, RARITY, RARITY_ORDER, dustValue, archLevel, ARCH_LEVEL_XP, TIER_XP, seasonTier } from '../data/economy.js';
 import { CARDS, DECKS } from '../data/index.js';
@@ -229,8 +230,9 @@ const pullScore = g => RARITY_ORDER.indexOf(g.rarity) * 2 + (g.holo ? 9 : g.prem
 const cardChip = g => h('span', { class: `sum-chip${g.fresh ? ' fresh' : ''}`, style: { '--glow': rarityColor(g.rarity) } },
   g.holo ? '💠 ' : g.premium ? '🌟 ' : '', CARDS[g.id].displayName, g.count > 1 ? h('b', null, ` ×${g.count}`) : null);
 
-// Game-over rewards: Gold, season XP, quests finished and archetype level-ups.
-export function rewardsPanel(out, deckId) {
+// Game-over rewards: the rank change after a ranked match, Gold, season XP, quests finished and
+// archetype level-ups. `ranked` is { change, before, after } from the server, or null.
+export function rewardsPanel(out, deckId, ranked = null) {
   const p = profile();
   sfx(out?.levelUps?.length ? 'unlock' : 'reward', { delay: 300 });
   if (out?.gold) sfx('coin', { delay: 700 });
@@ -239,7 +241,13 @@ export function rewardsPanel(out, deckId) {
   const lv = archLevel(a.xp);
   const into = lv >= 10 ? ARCH_LEVEL_XP : a.xp % ARCH_LEVEL_XP;
   const tierInto = p.season.xp % TIER_XP;
+  const rankLine = ranked ? h('div', { class: `rank-change${ranked.change > 0 ? ' up' : ranked.change < 0 ? ' down' : ''}` },
+    rankBadge(ranked.after),
+    h('span', null, ranked.change > 0 ? `+${ranked.change} star${ranked.change > 1 ? 's' : ''}${ranked.change > 1 ? ' (win streak!)' : ''}`
+      : ranked.change < 0 ? '−1 star' : ranked.after.stars === ranked.before.stars && ranked.after.games > ranked.before.games && ranked.after.wins === ranked.before.wins ? 'Tier protected: no star lost' : 'No change'),
+    ranked.after.tier !== ranked.before.tier ? h('b', { class: 'rank-up' }, ranked.after.stars > ranked.before.stars ? `Promoted to ${ranked.after.tier}!` : '') : null) : null;
   return h('div', { class: 'rewards' },
+    rankLine,
     h('div', { class: 'reward-row' },
       out.gold ? h('span', { class: 'reward-pill gold' }, currency('gold'), ` +${out.gold}`) : null,
       h('span', { class: 'reward-pill xp' }, `⭐ +${out.xp} season XP`),

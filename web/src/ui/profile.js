@@ -33,7 +33,7 @@ async function api(path, body) {
 }
 
 function adopt(data) {
-  account = { name: data.name, ...data.info };
+  account = { name: data.name, ...data.info, rank: data.rank ?? null };
   current = normalizeProfile(data.profile);
   serverTestPurchases = !!data.testPurchases;
   refreshWallets();
@@ -63,6 +63,32 @@ async function authenticate(path, body) {
 }
 
 // Account management while signed in. A 401 means the session ended elsewhere: drop to guest.
+// Signed-in GET endpoints (friends, history, leaderboard). A 401 drops to guest.
+async function fetchJson(path) {
+  try {
+    const { status, data } = await api(path);
+    if (status === 401) forget();
+    return data;
+  } catch {
+    return { ok: false, reason: 'Can’t reach the server. Check your connection.' };
+  }
+}
+
+// Friends, blocks and reports (server/social.mjs), match history and the ranked leaderboard.
+export const friendsList = () => fetchJson('friends');
+export const matchHistory = () => fetchJson('history');
+export const leaderboard = () => fetchJson('leaderboard');
+export const addFriend = name => manage('friend', { name });
+export const removeFriend = name => manage('unfriend', { name });
+export const blockPlayer = name => manage('block', { name });
+export const unblockPlayer = name => manage('unblock', { name });
+export const reportPlayer = (name, reason, note) => manage('report', { name, reason, note });
+export async function seasonSeen() {
+  const r = await manage('seasonseen');
+  if (r.ok && account?.rank) delete account.rank.notice;
+  return r;
+}
+
 async function manage(path, body = {}) {
   try {
     const { status, data } = await api(path, body);

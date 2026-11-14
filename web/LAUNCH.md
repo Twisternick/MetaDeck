@@ -14,7 +14,7 @@ What MetaDeck still needs before a public launch, and how to build each part on 
 |---|---|---|
 | A. Foundation ✅ built | 5 Accounts & storage, 10 Hosting & operations | Everything else stores data or needs the server to be public. The code is done; setting up this PC (tunnel, startup task, monitor) is in `HOSTING.md`. Email recovery is left for phase D. |
 | B. First impression ✅ built | 1 Tutorial, 2 Sound, 4a Privacy/terms/age gate | What every new player meets in their first five minutes. Still to do: drop sound files into `assets/audio/` (see its README), and fill in the `[bracketed]` details in `legal/privacy.html` and `legal/terms.html`. |
-| C. Retention | 9 History & deck codes, 8 Friends & safety, 7 Ranked | Reasons to come back. Ranked needs the match records from 9. |
+| C. Retention ✅ built | 9 History & deck codes, 8 Friends & safety, 7 Ranked | Reasons to come back. Ranked needs the match records from 9. Left for later: replays, and friend presence outside the online lobby. |
 | **Soft launch** | | |
 | D. Money | 3 Payments, 4b Loot-box and minor rules | Only when Gems are switched on. |
 

@@ -22,6 +22,8 @@ import { fileURLToPath } from 'node:url';
 import { acceptWebSocket } from './server/ws.mjs';
 import { createLobby } from './server/lobby.mjs';
 import { accountsIn } from './server/accounts.mjs';
+import { createSocial } from './server/social.mjs';
+import { loadBlockedNames } from './server/names.mjs';
 import { createAiMatches } from './server/ai-match.mjs';
 import { createTelemetry } from './server/telemetry.mjs';
 import { installLog } from './server/log.mjs';
@@ -57,10 +59,12 @@ if (/onedrive|dropbox|google drive|icloud/i.test(dataDir)) {
   console.warn(`Warning: the data folder ${dataDir} is inside a synced folder. Set DATA_DIR to a folder outside it (see HOSTING.md).`);
 }
 
+loadBlockedNames(path.join(dataDir, 'blocked-names.txt'));
 const accounts = accountsIn(dataDir);
+const social = createSocial({ accounts });
 const aiMatches = createAiMatches({ accounts });
 const telemetry = createTelemetry({ db: accounts.db });
-const lobby = createLobby({ accounts });
+const lobby = createLobby({ accounts, social });
 const adminToken = crypto.randomBytes(24).toString('base64url');
 fs.writeFileSync(path.join(dataDir, 'admin-token'), adminToken, { mode: 0o600 });
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { accounts.close(); process.exit(0); });
@@ -240,7 +244,7 @@ const track = (name, data, req, user = null) => {
 // Account endpoints. Test purchases (Gems for free, clearly labelled) are only offered to a browser on this
 // machine; a deployed server never grants them.
 const accountCtx = {
-  accounts, aiMatches, sameOrigin, clientIp, isAdmin, track,
+  accounts, social, aiMatches, sameOrigin, clientIp, isAdmin, track,
   secure: req => !!req.socket.encrypted || (trustProxy && req.headers['x-forwarded-proto'] === 'https'),
   testPurchases: fromThisMachine,
   online: () => lobby.stats(),
@@ -255,11 +259,17 @@ function health(res) {
 
 // Admin, from this machine with the admin token (tools/maintenance.mjs and tools/backup.mjs):
 //   POST /api/admin/maintenance { minutes, exit }   POST /api/admin/backup   POST /api/admin/ping
+//   POST /api/admin/reports { resolved }   resolve { id }   rename { from, to }   ban { name, on }
 function admin(req, res, route) {
   if (req.method !== 'POST') { res.writeHead(405, { Allow: 'POST' }).end(); return; }
   if (!isAdmin(req)) return json(res, 403, { ok: false, reason: 'Admin only, from this machine.' });
   readBody(req, res, 4096, body => {
     if (route === 'ping') return json(res, 200, { ok: true });
+    // Moderation (tools/moderate.mjs).
+    if (route === 'reports') return json(res, 200, { ok: true, reports: social.reports({ resolved: body?.resolved === true }) });
+    if (route === 'resolve') return json(res, 200, { ok: social.resolveReport(body?.id) });
+    if (route === 'rename') { const r = accounts.rename(body?.from, body?.to); return json(res, r.ok ? 200 : 400, r); }
+    if (route === 'ban') { const r = accounts.setBanned(body?.name, body?.on !== false); return json(res, r.ok ? 200 : 400, r); }
     if (route === 'backup') {
       if (!backupDir) return json(res, 400, { ok: false, reason: 'Set BACKUP_DIR to turn on backups.' });
       const file = runBackup(true);

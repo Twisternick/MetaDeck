@@ -11,6 +11,11 @@ import { decksFor, resolveDeck, randomStarter, isPlayable } from './deck-store.j
 import { profile, act, walletBar, signedIn, initAccount, reload, startAiMatch, finishAiMatch } from './profile.js';
 import { track, installTelemetry, showBanner } from './telemetry.js';
 import { difficultyFor } from '../engine/ai.js';
+import { decodeDeck } from '../data/deck-code.js';
+import { playerHub } from './players.js';
+import { rankOf } from '../data/ranked.js';
+import { seasonName, rewardLabel } from '../data/economy.js';
+import { seasonSeen } from './profile.js';
 import { installAudio, music } from './audio.js';
 import { settingsDialog } from './settings.js';
 import { tutorial as startTutorial, tutorialSeen, dismissTutorial, tip } from './tutorial.js';
@@ -75,10 +80,10 @@ function matchExtras(deckId, online = false, ticket = null) {
     onResult: ({ won, damage, moves }) => {
       track('match_end', { mode: online ? 'online' : 'ai', deck: deckId, won });
       const holder = h('div', { class: 'rewards-holder' }, h('p', { class: 'muted rewards-wait' }, 'Adding up your rewards…'));
-      const show = out => holder.replaceChildren(rewardsPanel(out, deckId));
+      const show = (out, ranked = null) => holder.replaceChildren(rewardsPanel(out, deckId, ranked));
       const note = text => holder.replaceChildren(h('p', { class: 'muted' }, text));
       if (online && signedIn()) {
-        const got = msg => { rewardWaiter = null; pendingRewards = null; reload().then(() => show(msg.out)); };
+        const got = msg => { rewardWaiter = null; pendingRewards = null; reload().then(() => show(msg.out, msg.ranked)); };
         if (pendingRewards) got(pendingRewards); else rewardWaiter = got;
       } else if (online) {
         note('Sign in to earn rewards from online matches.');
@@ -118,6 +123,9 @@ function logo() {
   return title;
 }
 
+// The menu's vs-AI launcher, for screens that offer a match against the AI (the online queue).
+let playVsAI = null;
+
 function menu() {
   removeFx();
   music('music-menu');
@@ -151,6 +159,7 @@ function menu() {
     };
     launch();
   };
+  playVsAI = play;
 
   const deckTile = (deck, i, selected, onclick) => h('button', {
     class: `deck-tile rise${selected ? ' selected' : ''}`, style: { '--deck': deck.color, '--i': i }, onclick,
@@ -164,10 +173,35 @@ function menu() {
       h('span', { class: 'deck-tag' }, deck.tagline)));
 
   const build = (deck = null) => deckBuilder(root, {
-    archetype: prefs.myDeck, deck,
+    archetype: deck?.archetype ?? prefs.myDeck, deck,
     onBack: menu,
     onPlay: saved => { prefs.lists[prefs.myDeck] = saved.key; savePrefs(); menu(); play(false); },
   });
+
+  // Paste a deck code: switch to its archetype and open it in the builder, unsaved.
+  const importCode = () => {
+    const input = h('input', { class: 'acct-input mono', type: 'text', placeholder: 'MD1-…', spellcheck: 'false', autocomplete: 'off', 'aria-label': 'Deck code' });
+    const err = h('p', { class: 'acct-error', role: 'alert' });
+    const close = () => overlay.remove();
+    const go = () => {
+      let deck;
+      try { deck = decodeDeck(input.value); } catch (e) { err.textContent = e.message; input.focus(); return; }
+      close();
+      prefs.myDeck = deck.archetype;
+      savePrefs();
+      build({ ...deck, name: `Imported ${getDeck(deck.archetype).name} deck`, starter: false, imported: true });
+    };
+    const overlay = h('div', { class: 'overlay', onclick: e => { if (e.target === overlay) close(); } },
+      h('form', { class: 'dialog import-dialog', onsubmit: e => { e.preventDefault(); go(); } },
+        h('h2', null, 'Import a deck'),
+        h('p', { class: 'muted' }, 'Paste a deck code someone shared. It opens in the deck builder, so you can see what you own before saving it.'),
+        input, err,
+        h('div', { class: 'dialog-actions' },
+          h('button', { class: 'btn ghost', type: 'button', onclick: close }, 'Cancel'),
+          h('button', { class: 'btn primary', type: 'submit' }, 'Open'))));
+    document.body.append(overlay);
+    input.focus();
+  };
 
   // Craft every card a deck list is missing, if there's Dust for all of them.
   const craftMissing = deck => {
@@ -258,7 +292,11 @@ function menu() {
           h('button', { class: 'list-tile new', onclick: () => build() },
             h('span', { class: 'list-plus', 'aria-hidden': 'true' }, '+'),
             h('span', { class: 'list-name' }, 'New deck'),
-            h('span', { class: 'list-blurb' }, `Build your own from the ${mine.name} cards`)))),
+            h('span', { class: 'list-blurb' }, `Build your own from the ${mine.name} cards`)),
+          h('button', { class: 'list-tile new', onclick: importCode },
+            h('span', { class: 'list-plus', 'aria-hidden': 'true' }, '⇩'),
+            h('span', { class: 'list-name' }, 'Import code'),
+            h('span', { class: 'list-blurb' }, 'Paste a deck code someone shared')))),
       h('section', { class: animate ? 'rise' : '', style: { '--i': 12 } },
         h('h2', null, 'Opponent'),
         h('div', { class: 'chips' },
@@ -283,6 +321,7 @@ function menu() {
         h('button', { class: 'btn ghost', onclick: () => collection(root, { onBack: menu, nav, tab: 'cards', deckId: prefs.myDeck }) }, 'Collection'),
         h('button', { class: 'btn ghost', onclick: nav.shop }, 'Shop'),
         h('button', { class: 'btn ghost', onclick: () => gallery(prefs.myDeck) }, 'Card gallery'),
+        h('button', { class: 'btn ghost', onclick: () => players() }, signedIn()?.rank ? `Profile · ${signedIn().rank.label}` : 'Profile & friends'),
         h('button', { class: 'btn ghost', onclick: rules }, 'How to play'),
         h('button', { class: 'btn ghost', onclick: () => settingsDialog({ onTutorial: tutorial }) }, 'Settings'),
         h('button', { class: 'btn ghost', onclick: () => balanceLab(root, { onBack: menu }) }, 'Balance lab')),
@@ -300,10 +339,32 @@ function tutorial() {
   startTutorial(root, { onExit: menu });
 }
 
-// Online play with the deck list picked in the menu.
-function online() {
+// Online play with the deck list picked in the menu. `challenge` names a friend to challenge on arrival.
+function online({ challenge = null } = {}) {
   const deck = resolveDeck(prefs.myDeck, prefs.lists[prefs.myDeck], usable);
-  lobby(root, { deck: { archetype: prefs.myDeck, cards: deck.cards, name: deck.name }, onBack: menu, matchExtras: () => matchExtras(prefs.myDeck, true) });
+  lobby(root, {
+    deck: { archetype: prefs.myDeck, cards: deck.cards, name: deck.name }, onBack: menu, challenge,
+    matchExtras: () => matchExtras(prefs.myDeck, true),
+    onPlayAI: () => { menu(); playVsAI?.(false); },
+  });
+}
+
+// Rank, match history, the leaderboard and friends.
+function players(tab = 'rank') {
+  playerHub(root, { onBack: menu, nav, tab, onChallenge: name => online({ challenge: name }) });
+}
+
+// The first visit after a ranked season ends: what you reached, and the rewards (already granted).
+function seasonEnded(notice) {
+  const close = () => { overlay.remove(); seasonSeen(); };
+  const overlay = h('div', { class: 'overlay' },
+    h('div', { class: 'dialog won season-end', role: 'dialog', 'aria-modal': 'true' },
+      h('h2', null, 'Season over!'),
+      h('p', null, `In the ${seasonName(notice.season)} you reached `, h('b', null, rankOf(notice.peak).label), '.'),
+      h('div', { class: 'reward-row' }, notice.rewards.map(r => h('span', { class: 'reward-pill gold' }, rewardLabel(r)))),
+      h('p', { class: 'muted' }, 'Your rewards are in your collection. The new season starts you four divisions lower: climb back up!'),
+      h('div', { class: 'dialog-actions' }, h('button', { class: 'btn primary', onclick: close }, 'Collect'))));
+  document.body.append(overlay);
 }
 
 function gallery(deckId, newOnly = false) {
@@ -427,5 +488,6 @@ function titleScreen() {
 // Pick up a signed-in account first, then go to the menu. A reload during an online match goes
 // straight back to it (the server keeps it for a while).
 const ready = initAccount().catch(() => {});
+ready.then(() => { const notice = signedIn()?.rank?.notice; if (notice) seasonEnded(notice); });
 if (net.inMatch) ready.finally(online);
 else Promise.all([ready, titleScreen()]).then(menu);

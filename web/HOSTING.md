@@ -132,6 +132,13 @@ The server copies the database to `BACKUP_DIR` shortly after it starts and then 
 ## Logs, players and numbers
 
 - **Server log:** `DATA_DIR\logs\YYYY-MM-DD.log`, one JSON line per message, kept 30 days. Browser errors from players show up there too, as `client: …`.
+- **Reports and moderation:**
+
+  ```bash
+  npm run reports
+  ```
+
+  Lists open player reports. Deal with them using `npm run moderate -- resolve <id>`, `rename <name> <new name>`, `ban <name>` or `unban <name>`. To block more words in account names, list them one per line in `DATA_DIR\blocked-names.txt` and restart the server.
 - **Players:**
 
   ```bash
@@ -146,7 +153,7 @@ The server copies the database to `BACKUP_DIR` shortly after it starts and then 
   ```
 
   Shows per day: visitors, sign-ups, matches started, matches recorded and packs opened, plus how many new accounts came back on day 1 and in days 2–7. Guests are counted without cookies (a daily-rotating hash), so no cookie banner is needed.
-- The admin tools (`users`, `grant`, `set-password`, `maintenance`, `backup`) need the same `DATA_DIR` as the server. Run them from a terminal where you've run `tools\windows\server-env.cmd` first, or set `DATA_DIR` yourself.
+- The admin tools (`users`, `grant`, `set-password`, `maintenance`, `backup`, `reports`, `moderate`) need the same `DATA_DIR` as the server. Run them from a terminal where you've run `tools\windows\server-env.cmd` first, or set `DATA_DIR` yourself.
 
 ## Limits of a home PC
 

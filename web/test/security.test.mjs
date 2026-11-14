@@ -191,11 +191,18 @@ test('each address has a connection cap', async () => {
   await Promise.all(cs.map(c => c.closed));
 });
 
-test("names can't carry control, zero-width or text-direction characters", async () => {
+test("names can't carry control, zero-width or text-direction characters, or words that aren't allowed", async () => {
   const c = client('x');
   await c.opened;
-  c.send({ t: 'hello', name: '  Ad​min‮\u0007  <b>  Bob﻿   ' });
-  assert.equal((await c.next('welcome')).name, 'Admin b Bob');
+  c.send({ t: 'hello', name: '  Ad​a‮\u0007  <b>  Bob﻿   ' });
+  assert.equal((await c.next('welcome')).name, 'Ada b Bob');
+  // A name that isn't allowed (here: posing as staff) is replaced with a generic one.
+  const d = client('y');
+  await d.opened;
+  d.send({ t: 'hello', name: 'Adm1n' });
+  assert.match((await d.next('welcome')).name, /^Player [0-9]{4}$/);
+  d.close();
+  await d.closed;
   c.close();
   await c.closed;
 });

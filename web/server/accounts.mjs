@@ -20,6 +20,7 @@ import { promisify } from 'node:util';
 import { openDb, transaction } from './db.mjs';
 import { normalizeProfile, runOp } from '../src/data/economy.js';
 import { CARDS, MAX_COPIES } from '../src/data/index.js';
+import { offensiveName } from './names.mjs';
 
 const scrypt = promisify(crypto.scrypt);
 const SESSION_DAYS = 30;
@@ -32,7 +33,9 @@ const SIGNUPS_PER_HOUR = 5;       // new accounts per address
 const CACHE_MAX = 5000;           // accounts kept in memory
 export const MIN_AGE = 13;        // accounts are for players this old or older (COPPA); guests can play at any age
 
-export const nameError = name => (NAME_RE.test(name ?? '') ? null : 'Names are 3–20 letters, digits or underscores.');
+export const nameError = name => (!NAME_RE.test(name ?? '') ? 'Names are 3–20 letters, digits or underscores.'
+  : offensiveName(name) ? 'That name isn’t allowed. Pick another one.' : null);
+export const BANNED = 'This account has been banned for breaking the rules.';
 export const passwordError = pw => (typeof pw === 'string' && pw.length >= PASSWORD_MIN && pw.length <= PASSWORD_MAX
   ? null : `Passwords need at least ${PASSWORD_MIN} characters.`);
 
@@ -72,15 +75,18 @@ export function createAccounts({ file = null, legacy = null, now = () => new Dat
   const db = openDb(file);
   const q = {
     user: db.prepare('SELECT * FROM users WHERE key = ?'),
-    putUser: db.prepare(`INSERT INTO users (key, name, salt, hash, recovery, created, profile, birth_year) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    putUser: db.prepare(`INSERT INTO users (key, name, salt, hash, recovery, created, profile, birth_year, rating, rd, vol, rank, banned)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(key) DO UPDATE SET name = excluded.name, salt = excluded.salt, hash = excluded.hash,
-      recovery = excluded.recovery, profile = excluded.profile, birth_year = excluded.birth_year`),
+      recovery = excluded.recovery, profile = excluded.profile, birth_year = excluded.birth_year,
+      rating = excluded.rating, rd = excluded.rd, vol = excluded.vol, rank = excluded.rank, banned = excluded.banned`),
     userMatches: db.prepare('SELECT at, kind, deck0, deck1, winner, turns, seconds, ending, p0 = ? AS seat0 FROM matches WHERE p0 = ? OR p1 = ? ORDER BY at'),
     userEvents: db.prepare('SELECT at, name, data FROM events WHERE user = ? ORDER BY at'),
     delUser: db.prepare('DELETE FROM users WHERE key = ?'),
     forgetMatches0: db.prepare('UPDATE matches SET p0 = NULL WHERE p0 = ?'),
     forgetMatches1: db.prepare('UPDATE matches SET p1 = NULL WHERE p1 = ?'),
     forgetEvents: db.prepare('DELETE FROM events WHERE user = ?'),
+    forgetReports: db.prepare('UPDATE reports SET reporter = NULL WHERE reporter = ?'),
     session: db.prepare('SELECT user FROM sessions WHERE hash = ? AND expires >= ?'),
     addSession: db.prepare('INSERT INTO sessions (hash, user, expires) VALUES (?, ?, ?)'),
     dropExpired: db.prepare('DELETE FROM sessions WHERE expires < ?'),
@@ -94,17 +100,21 @@ export function createAccounts({ file = null, legacy = null, now = () => new Dat
 
   // ------------------------------------------------------------ storage
   // Loaded accounts by key, least recently used first. A user is { key, name, salt, hash, recovery,
-  // created, profile, birthYear }; `saved` holds its row as last written, so an unchanged account isn't rewritten.
+  // created, profile, birthYear, rating, rd, vol, rank, banned }; `saved` holds its row as last written,
+  // so an unchanged account isn't rewritten. `rating`/`rd`/`vol` are the hidden Glicko-2 rating
+  // (server/rating.mjs) and `rank` the visible ranked state (src/data/ranked.js), or null before ranked play.
   const cache = new Map();
   const saved = new WeakMap();
-  const rowOf = u => [u.key, u.name, u.salt, u.hash, u.recovery ?? null, u.created, JSON.stringify(u.profile), u.birthYear ?? null];
+  const rowOf = u => [u.key, u.name, u.salt, u.hash, u.recovery ?? null, u.created, JSON.stringify(u.profile), u.birthYear ?? null,
+    u.rating ?? 1500, u.rd ?? 350, u.vol ?? 0.06, u.rank ? JSON.stringify(u.rank) : null, u.banned ? 1 : 0];
   function getUser(k) {
     if (typeof k !== 'string') return null;
     let user = cache.get(k);
     if (user) { cache.delete(k); cache.set(k, user); return user; }
     const row = q.user.get(k);
     if (!row) return null;
-    user = { key: row.key, name: row.name, salt: row.salt, hash: row.hash, recovery: row.recovery ?? undefined, created: row.created, profile: JSON.parse(row.profile), birthYear: row.birth_year ?? null };
+    user = { key: row.key, name: row.name, salt: row.salt, hash: row.hash, recovery: row.recovery ?? undefined, created: row.created, profile: JSON.parse(row.profile), birthYear: row.birth_year ?? null,
+      rating: row.rating, rd: row.rd, vol: row.vol, rank: row.rank ? JSON.parse(row.rank) : null, banned: !!row.banned };
     saved.set(user, rowOf(user));
     cache.set(k, user);
     if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value);
@@ -151,7 +161,7 @@ export function createAccounts({ file = null, legacy = null, now = () => new Dat
     if (typeof token !== 'string' || !token) return null;
     const s = q.session.get(sha(token), now().getTime());
     const user = s ? getUser(s.user) : null;
-    return user && !tooYoung(user, now()) ? user : null;
+    return user && !tooYoung(user, now()) && !user.banned ? user : null;
   }
   // Check a signed-in player's password again before a sensitive change. Wrong guesses count toward the
   // same per-address limit as sign-in. Returns null when it's right, or the reason it isn't.
@@ -203,6 +213,7 @@ export function createAccounts({ file = null, legacy = null, now = () => new Dat
         return { ok: false, reason: 'Wrong name or password.' };
       }
       if (tooYoung(user, now())) return { ok: false, reason: TOO_YOUNG };
+      if (user.banned) return { ok: false, reason: BANNED };
       return { ok: true, token: newSession(key(name)), name: user.name };
     },
 
@@ -267,6 +278,7 @@ export function createAccounts({ file = null, legacy = null, now = () => new Dat
         q.forgetMatches0.run(user.key);
         q.forgetMatches1.run(user.key);
         q.forgetEvents.run(user.key);
+        q.forgetReports.run(user.key);
       });
       cache.delete(user.key);
       return { ok: true };
@@ -391,10 +403,44 @@ export function createAccounts({ file = null, legacy = null, now = () => new Dat
       };
     },
 
+    // Admin: ban or unban an account (tools/moderate.mjs). A ban signs it out everywhere.
+    setBanned(name, on = true) {
+      const user = typeof name === 'string' ? getUser(key(name)) : null;
+      if (!user) return { ok: false, reason: `No account named ${name}.` };
+      user.banned = !!on;
+      put(user);
+      if (on) dropSessions(user.key);
+      return { ok: true, name: user.name, banned: user.banned };
+    },
+
+    // Admin: rename an account (tools/moderate.mjs), e.g. for a name that broke the rules. Its key changes
+    // too, so every table that points at the account follows; sessions stay signed in.
+    rename(from, to) {
+      const user = typeof from === 'string' ? getUser(key(from)) : null;
+      if (!user) return { ok: false, reason: `No account named ${from}.` };
+      const bad = !NAME_RE.test(to ?? '') ? 'Names are 3–20 letters, digits or underscores.' : null;
+      if (bad) return { ok: false, reason: bad };
+      const newKey = key(to);
+      if (newKey !== user.key && getUser(newKey)) return { ok: false, reason: 'That name is taken.' };
+      const oldKey = user.key;
+      transaction(db, () => {
+        db.exec('PRAGMA defer_foreign_keys = ON');
+        db.prepare('UPDATE users SET key = ?, name = ? WHERE key = ?').run(newKey, to, oldKey);
+        for (const [table, col] of [['sessions', 'user'], ['tickets', 'user'], ['matches', 'p0'], ['matches', 'p1'], ['events', 'user'],
+          ['friends', 'user'], ['friends', 'friend'], ['blocks', 'user'], ['blocks', 'blocked'], ['reports', 'reporter'], ['reports', 'reported']]) {
+          db.prepare(`UPDATE ${table} SET ${col} = ? WHERE ${col} = ?`).run(newKey, oldKey);
+        }
+      });
+      cache.delete(oldKey);
+      return { ok: true, from: user.name, to };
+    },
+
     names: () => db.prepare('SELECT name FROM users ORDER BY name').all().map(r => r.name),
     // Write the WAL back into the main file (on shutdown, and before a test reads the file).
     flush() { try { db.exec('PRAGMA wal_checkpoint(TRUNCATE)'); } catch { /* in memory, or closed */ } },
     close() { this.flush(); db.close(); },
-    db,
+    db, now, rng,
+    // For server/social.mjs, which builds on the same accounts.
+    userByKey: getUser, userForToken: userFor, save: put, profileOf, sessionsOf: k => devices(k),
   };
 }

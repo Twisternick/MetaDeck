@@ -5,6 +5,14 @@
 //   POST signout
 //   POST birthyear { year }           -> sets the birth year of an account made before sign-up asked for it
 //   GET  export                       -> a download of everything stored about the account (JSON)
+//   GET  friends                      -> { friends: [{ name, presence }], incoming, outgoing, blocked }
+//   POST friend { name }              -> sends a friend request, or accepts theirs
+//   POST unfriend { name }            -> unfriends, cancels or declines
+//   POST block { name } / unblock { name }
+//   POST report { name, reason, note }
+//   GET  history                      -> { matches (latest 50), decks (win rates), rank }
+//   GET  leaderboard                  -> { players: the top 50 of this ranked season }
+//   POST seasonseen                   -> the end-of-season rewards notice has been shown
 //   GET  me                           -> { name, profile, info }, or 401 when signed out
 //   POST newpassword { current, password } -> { signedOut } (other devices signed out; this one stays)
 //   POST recovery { password }        -> { recoveryCode } (replaces the old code)
@@ -56,15 +64,24 @@ function send(res, status, body, headers = {}) {
 const cookie = (token, secure, maxAge = 30 * 86_400) =>
   `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
 
-// ctx: { accounts, aiMatches, track(name, data, req, user), sameOrigin(req), clientIp(req), secure(req), testPurchases(req), isAdmin(req), online() }
+// ctx: { accounts, social, aiMatches, track(name, data, req, user), sameOrigin(req), clientIp(req), secure(req), testPurchases(req), isAdmin(req), online() }
 export function handleAccountApi(req, res, route, ctx) {
   const { accounts } = ctx;
   const post = req.method === 'POST';
   if (post && !ctx.sameOrigin(req)) return send(res, 403, { ok: false, reason: 'Forbidden.' });
 
   if (route === 'me' && req.method === 'GET') {
-    const me = accounts.me(sessionToken(req));
-    return me ? send(res, 200, { ok: true, ...me, testPurchases: ctx.testPurchases(req) }) : send(res, 401, { ok: false, reason: 'Signed out.' });
+    const token = sessionToken(req);
+    const me = accounts.me(token);
+    const rank = me && ctx.social ? ctx.social.rankOf(accounts.userForToken(token)) : null;
+    return me ? send(res, 200, { ok: true, ...me, rank, testPurchases: ctx.testPurchases(req) }) : send(res, 401, { ok: false, reason: 'Signed out.' });
+  }
+  if (ctx.social && req.method === 'GET' && ['friends', 'history', 'leaderboard'].includes(route)) {
+    const s = ctx.social;
+    const r = route === 'friends' ? s.friends(sessionToken(req))
+      : route === 'history' ? s.history(sessionToken(req))
+      : { ok: true, players: s.leaderboard() };
+    return send(res, r.status ?? 200, r);
   }
   if (route === 'export' && req.method === 'GET') {
     const data = accounts.exportData(sessionToken(req));
@@ -101,6 +118,23 @@ export function handleAccountApi(req, res, route, ctx) {
     case 'recovery':
       return readJson(req, res, async ({ password }) => {
         const r = await accounts.newRecoveryCode(sessionToken(req), password, ctx.clientIp(req));
+        send(res, r.status ?? (r.ok ? 200 : 400), r);
+      });
+    case 'friend':
+    case 'unfriend':
+    case 'block':
+    case 'unblock':
+    case 'report':
+    case 'seasonseen':
+      if (!ctx.social) return send(res, 404, { ok: false, reason: 'Not found.' });
+      return readJson(req, res, ({ name, reason, note }) => {
+        const s = ctx.social, token = sessionToken(req);
+        const r = route === 'friend' ? s.addFriend(token, name)
+          : route === 'unfriend' ? s.removeFriend(token, name)
+          : route === 'block' ? s.block(token, name)
+          : route === 'unblock' ? s.unblock(token, name)
+          : route === 'report' ? s.report(token, name, reason, note)
+          : s.seasonSeen(token);
         send(res, r.status ?? (r.ok ? 200 : 400), r);
       });
     case 'birthyear':

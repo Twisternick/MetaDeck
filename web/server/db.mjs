@@ -8,6 +8,9 @@
 //   tickets   the vs-AI match each account is playing (server/ai-match.mjs)
 //   matches   every finished match the server ran or checked, for history, stats and ranked
 //   events    the cookieless analytics funnel (server/telemetry.mjs)
+//   friends   friend requests (pending) and friendships (one accepted row each way)
+//   blocks    who blocked whom: never matched, no requests or challenges
+//   reports   players reported by other players, for the operator (npm run reports)
 //
 // Schema changes are numbered steps in MIGRATIONS, tracked by PRAGMA user_version: add a step, never
 // edit one that has shipped.
@@ -41,6 +44,30 @@ const MIGRATIONS = [
    CREATE INDEX events_name ON events(name, day);`,
   // 2: the birth year asked at sign-up (null for accounts made before the age check).
   `ALTER TABLE users ADD COLUMN birth_year INTEGER;`,
+  // 3: ranked play (hidden Glicko-2 rating, visible rank), bans, friends, blocks and reports.
+  `ALTER TABLE users ADD COLUMN rating REAL NOT NULL DEFAULT 1500;
+   ALTER TABLE users ADD COLUMN rd REAL NOT NULL DEFAULT 350;
+   ALTER TABLE users ADD COLUMN vol REAL NOT NULL DEFAULT 0.06;
+   ALTER TABLE users ADD COLUMN rank TEXT;
+   ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE matches ADD COLUMN rated INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE matches ADD COLUMN stars0 INTEGER;
+   ALTER TABLE matches ADD COLUMN stars1 INTEGER;
+   CREATE TABLE friends (
+     user TEXT NOT NULL REFERENCES users(key) ON DELETE CASCADE, friend TEXT NOT NULL REFERENCES users(key) ON DELETE CASCADE,
+     status TEXT NOT NULL, at TEXT NOT NULL, PRIMARY KEY (user, friend)
+   );
+   CREATE INDEX friends_friend ON friends(friend);
+   CREATE TABLE blocks (
+     user TEXT NOT NULL REFERENCES users(key) ON DELETE CASCADE, blocked TEXT NOT NULL REFERENCES users(key) ON DELETE CASCADE,
+     at TEXT NOT NULL, PRIMARY KEY (user, blocked)
+   );
+   CREATE INDEX blocks_blocked ON blocks(blocked);
+   CREATE TABLE reports (
+     id INTEGER PRIMARY KEY, at TEXT NOT NULL, reporter TEXT, reported TEXT, reported_name TEXT NOT NULL,
+     reason TEXT NOT NULL, note TEXT, resolved INTEGER NOT NULL DEFAULT 0
+   );
+   CREATE INDEX reports_open ON reports(resolved, at);`,
 ];
 
 // Open (or create) the database and bring its schema up to date. `file` null or ':memory:' keeps it in memory.
@@ -80,11 +107,12 @@ export function transaction(db, fn) {
 
 // Record a finished match. `players` are account keys (null for a guest or the AI), `winner` 0, 1 or
 // null for a draw, `ending` how it ended: 'hero' (a hero fell), 'left', 'disconnected' or 'inactive'.
-export function logMatch(db, { kind, players, decks, winner, turns, seconds = null, ending = 'hero', at = new Date() }) {
-  db.prepare(`INSERT INTO matches (at, kind, p0, p1, deck0, deck1, winner, turns, seconds, ending)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+// A ranked match also has `stars`: each seat's rank change. Returns the match's id.
+export function logMatch(db, { kind, players, decks, winner, turns, seconds = null, ending = 'hero', at = new Date(), rated = false, stars = [null, null] }) {
+  return Number(db.prepare(`INSERT INTO matches (at, kind, p0, p1, deck0, deck1, winner, turns, seconds, ending, rated, stars0, stars1)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(at.toISOString(), kind, players[0] ?? null, players[1] ?? null, decks[0], decks[1],
-      winner === 0 || winner === 1 ? winner : null, turns, seconds, ending);
+      winner === 0 || winner === 1 ? winner : null, turns, seconds, ending, rated ? 1 : 0, stars[0] ?? null, stars[1] ?? null).lastInsertRowid);
 }
 
 // Copy the live database to <dir>/metadeck-YYYY-MM-DD.db (a consistent snapshot, safe while the server

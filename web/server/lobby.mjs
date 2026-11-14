@@ -21,6 +21,15 @@
 // bring cards their account owns, and is paid their match rewards by the server when the match ends.
 // Every finished match is written to the database's match history.
 //
+// With `social` (server/social.mjs) as well:
+//   - Quick find pairs players by hidden rating: each waits for an opponent within RATING_WINDOW of
+//     their rating, and the window widens the longer they wait, so a small player base still gets
+//     games. A quick-find match between two signed-in players is ranked.
+//   - Players who blocked each other are never paired and can't join each other's rooms.
+//   - challenge { to, deck } invites a friend who is in the online lobby to a private room; they get
+//     an 'invite' and join it with its code, or decline.
+//   - emote { id } sends one of the preset EMOTES to both seats of a match (no free chat).
+//
 // maintenance(minutes) gets the server ready to restart: everyone is told, no new match can start,
 // and the callback runs once no match is still being played (or after twice the warning, at the latest).
 
@@ -30,6 +39,13 @@ import { getDeck, deckErrors } from '../src/data/index.js';
 import { START_HP } from '../src/engine/constants.js';
 import { missingCards } from '../src/data/economy.js';
 import { logMatch } from './db.mjs';
+import { offensiveName } from './names.mjs';
+
+export const EMOTES = ['hello', 'wellplayed', 'thanks', 'oops', 'wow', 'gg'];
+const EMOTE_GAP_MS = 2500;
+const EMOTES_PER_GAME = 12;
+const RATING_WINDOW = 150;  // rating gap allowed at once
+const RATING_WIDEN = 75;    // more allowed per 10 seconds of waiting
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_LEN = 5;
@@ -43,12 +59,21 @@ export function createLobby({
   maxPerIp = 16,       // open connections per address
   rate = { burst: 30, perSec: 12 }, // messages per connection, as a token bucket
   accounts = null,
+  social = null,
 } = {}) {
   const players = new Map(); // token -> player
   const rooms = new Map();   // code -> room
   const queue = [];          // players waiting for a quick match
   const perIp = new Map();   // address -> open connections
   let closing = null;        // maintenance: { until, done, timer, deadline }
+  const matcher = setInterval(() => guarded(matchQueue)(), 2000);
+  matcher.unref?.();
+  // Where a signed-in player is, for their friends list: 'match', 'lobby', or null when not connected.
+  social?.setPresence(k => {
+    for (const p of players.values()) if (p.ws && p.account?.key === k) return p.status === 'playing' ? 'match' : 'lobby';
+    return null;
+  });
+  const blockedPair = (a, b) => !!(social && a.account && b.account && social.blocked(a.account.key, b.account.key));
 
   // ------------------------------------------------------------ connections
 
@@ -112,7 +137,7 @@ export function createLobby({
       players.set(player.token, player);
     }
     player.account = ws.account ?? player.account ?? null;
-    player.name = player.account?.name || cleanName(msg.name) || player.name || `Player ${crypto.randomInt(1000, 10000)}`;
+    player.name = player.account?.name || guestName(msg.name) || player.name || `Player ${crypto.randomInt(1000, 10000)}`;
     const room = player.room;
     send(player, { t: 'welcome', token: player.token, name: player.name, inMatch: !!room?.game });
 
@@ -163,7 +188,7 @@ export function createLobby({
     }
     switch (msg.t) {
       case 'name': {
-        const name = cleanName(msg.name);
+        const name = guestName(msg.name);
         if (name && player.status !== 'playing' && !player.account) {
           player.name = name;
           send(player, { t: 'welcome', token: player.token, name });
@@ -186,6 +211,9 @@ export function createLobby({
         send(player, { t: 'idle' });
         return;
       case 'lobby': return sendLobby(player);
+      case 'challenge': return challenge(player, msg.to, msg.deck);
+      case 'decline': return decline(player, msg.code);
+      case 'emote': return emote(player, msg.id);
     }
   }
 
@@ -211,31 +239,87 @@ export function createLobby({
     if (!deck) return;
     leave(player);
     player.deck = deck;
-    const other = queue.find(p => p !== player && p.ws);
-    if (other) {
-      queue.splice(queue.indexOf(other), 1);
-      other.status = 'idle';
-      const room = newRoom('quick', other);
-      seat(room, player);
-      startGame(room);
-      return;
-    }
     player.status = 'queued';
     player.queuedAt = Date.now();
+    player.rating = social && player.account ? social.ratingOf(player.account) : 1500;
     queue.push(player);
-    send(player, { t: 'queued', since: player.queuedAt });
-    broadcastLobby();
+    send(player, { t: 'queued', since: player.queuedAt, ranked: !!(social && player.account) });
+    matchQueue();
+    if (player.status === 'queued') broadcastLobby();
   }
 
-  function host(player, rawDeck, visibility) {
+  // Pair waiting players: the longest-waiting first, each with the closest-rated player inside the
+  // wider of the two players' windows. Runs on every new arrival and every two seconds.
+  function matchQueue() {
+    const now = Date.now();
+    const reach = p => RATING_WINDOW + RATING_WIDEN * Math.floor((now - p.queuedAt) / 10_000);
+    for (let i = 0; i < queue.length; i++) {
+      const a = queue[i];
+      if (!a.ws) continue;
+      let best = null;
+      for (const b of queue) {
+        if (b === a || !b.ws || blockedPair(a, b)) continue;
+        const gap = Math.abs(a.rating - b.rating);
+        if (gap <= Math.max(reach(a), reach(b)) && (!best || gap < best.gap)) best = { b, gap };
+      }
+      if (!best) continue;
+      queue.splice(queue.indexOf(a), 1);
+      queue.splice(queue.indexOf(best.b), 1);
+      a.status = 'idle';
+      best.b.status = 'idle';
+      const room = newRoom('quick', a);
+      seat(room, best.b);
+      startGame(room);
+      i = -1;
+    }
+  }
+
+  // Invite a friend who is in the online lobby: a private room, with an 'invite' sent to them.
+  function challenge(player, to, rawDeck) {
+    if (!social || !player.account) return send(player, { t: 'error', message: 'Sign in to challenge your friends.' });
+    const k = typeof to === 'string' ? to.trim().toLowerCase() : '';
+    const friend = [...players.values()].find(p => p.ws && p.account?.key === k);
+    if (!friend || !social.areFriends(player.account.key, k) || blockedPair(player, friend)) {
+      return send(player, { t: 'error', message: `${String(to ?? '').slice(0, 20)} isn’t in the online lobby right now.` });
+    }
+    if (friend.status !== 'idle') return send(player, { t: 'error', message: `${friend.name} is busy right now. Try again in a bit.` });
+    const room = host(player, rawDeck, 'private', { challenge: friend.name });
+    if (!room) return;
+    room.challenged = friend.token;
+    send(friend, { t: 'invite', from: player.name, code: room.code, deckId: player.deck.archetype });
+  }
+
+  function decline(player, rawCode) {
+    const room = rooms.get(String(rawCode ?? '').toUpperCase());
+    if (!room || room.game || room.challenged !== player.token) return;
+    const challenger = room.seats[0];
+    leave(challenger);
+    send(challenger, { t: 'idle' });
+    send(challenger, { t: 'error', message: `${player.name} can’t play right now.` });
+  }
+
+  function emote(player, id) {
+    const room = player.room;
+    if (!room?.game || !EMOTES.includes(id) || player.status !== 'playing') return;
+    const now = Date.now();
+    if (now - (player.lastEmote ?? 0) < EMOTE_GAP_MS) return;
+    if (room.game !== player.emoteGame) { player.emoteGame = room.game; player.emotes = 0; }
+    if (++player.emotes > EMOTES_PER_GAME) return;
+    player.lastEmote = now;
+    const seatNo = room.seats.indexOf(player);
+    for (const p of room.seats) send(p, { t: 'emote', seat: seatNo, id });
+  }
+
+  function host(player, rawDeck, visibility, extra = {}) {
     const deck = checkDeck(player, rawDeck);
     if (!deck) return;
     leave(player);
     player.deck = deck;
     const room = newRoom(visibility, player);
     player.status = 'hosting';
-    send(player, { t: 'hosting', code: room.code, visibility });
+    send(player, { t: 'hosting', code: room.code, visibility, ...extra });
     broadcastLobby();
+    return room;
   }
 
   function join(player, rawCode, rawDeck) {
@@ -247,6 +331,10 @@ export function createLobby({
     }
     if (room.seats[0] === player) {
       send(player, { t: 'error', message: "That's your own room. Share the code with a friend." });
+      return;
+    }
+    if (blockedPair(room.seats[0], player)) {
+      send(player, { t: 'error', message: 'You can’t join that room.' });
       return;
     }
     const deck = checkDeck(player, rawDeck);
@@ -329,6 +417,7 @@ export function createLobby({
     });
     room.game.events = [];
     room.startedAt = Date.now();
+    room.ranked = !!(social && room.visibility === 'quick' && a.account && b.account);
     room.rematch.clear();
     room.clock = null;
     room.idle = [0, 0];
@@ -340,7 +429,7 @@ export function createLobby({
 
   function startMessage(room, seatNo) {
     return {
-      t: 'start', seat: seatNo, code: room.code, visibility: room.visibility,
+      t: 'start', seat: seatNo, code: room.code, visibility: room.visibility, ranked: !!room.ranked,
       state: view(room.game, seatNo), clock: clockFor(room),
       opponent: room.seats[1 - seatNo] ? { name: room.seats[1 - seatNo].name, deckId: room.seats[1 - seatNo].deck.archetype } : null,
     };
@@ -379,9 +468,12 @@ export function createLobby({
     const game = room.game;
     if (!accounts || !game?.over || game.paid) return;
     game.paid = true;
+    const winner = game.winner === 0 || game.winner === 1 ? game.winner : null;
+    const ranked = room.ranked ? social.recordRanked(room.seats[0].account, room.seats[1].account, winner) : null;
     logMatch(accounts.db, {
       kind: 'online', players: room.seats.map(p => p.account?.key ?? null), decks: game.players.map(p => p.deckId),
-      winner: game.winner, turns: game.turn, seconds: Math.round((Date.now() - room.startedAt) / 1000), ending: game.ending ?? 'hero',
+      winner, turns: game.turn, seconds: Math.round((Date.now() - room.startedAt) / 1000), ending: game.ending ?? 'hero',
+      rated: !!ranked, stars: ranked ? ranked.map(r => r.change) : [null, null],
     });
     room.seats.forEach((p, i) => {
       if (!p.account) return;
@@ -389,7 +481,7 @@ export function createLobby({
         deckId: game.players[i].deckId, won: game.winner === i,
         damage: START_HP - Math.max(0, game.players[1 - i].hp),
       });
-      if (out) send(p, { t: 'rewards', out, deckId: game.players[i].deckId });
+      if (out) send(p, { t: 'rewards', out, deckId: game.players[i].deckId, ranked: ranked?.[i] ?? null, rankedSkipped: !!room.ranked && !ranked });
     });
   }
 
@@ -502,6 +594,7 @@ export function createLobby({
 
   function close() {
     clearTimeout(closing?.timer);
+    clearInterval(matcher);
     for (const room of rooms.values()) clearTimeout(room.timer);
     for (const p of players.values()) { clearTimeout(p.graceTimer); p.ws?.close(); }
     players.clear();
@@ -542,6 +635,12 @@ export function cleanAction(raw) {
   if (Number.isInteger(raw.target) || (typeof raw.target === 'string' && /^P[01]$/.test(raw.target))) action.target = raw.target;
   if (raw.boost === true) action.boost = true;
   return action;
+}
+
+// A guest's chosen name, cleaned, or '' when it's empty or not allowed (server/names.mjs).
+function guestName(raw) {
+  const name = cleanName(raw);
+  return name && !offensiveName(name) ? name : '';
 }
 
 // Names are shown to other players: no control, zero-width or text-direction characters (which can

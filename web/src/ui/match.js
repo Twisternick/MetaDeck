@@ -20,6 +20,11 @@ import { BOARD_SLOTS, START_HP, KEYWORDS } from '../engine/constants.js';
 import { rulesLines } from '../engine/text.js';
 import { kwName, kwIcon, kwColor, kwKind, kwText, kwHint, richText, glossaryList } from './keywords.js';
 import { sfx, music, playEvents } from './audio.js';
+import { reportDialog } from './report.js';
+
+// The preset emotes for online matches (the server only relays these ids: server/lobby.mjs EMOTES).
+const EMOTES = { hello: '👋 Hello!', wellplayed: '👏 Well played', thanks: '🙏 Thanks', oops: '😅 Oops', wow: '😮 Wow!', gg: '🤝 Good game' };
+const EMOTE_MS = 2600;
 
 const DRAG_THRESHOLD = 8;
 const LONG_PRESS_MS = 380;
@@ -89,6 +94,9 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     oppStatus: null,       // online: null | 'away' (disconnected, may come back) | 'left'
     awayUntil: null,       // online: when an 'away' opponent forfeits (local time)
     rematch: [],           // online: seats that asked for a rematch
+    bubbles: [null, null], // online: { text, until } – an emote showing by each hero
+    emoteOpen: false,      // online: the emote picker is open
+    muted: false,          // online: the opponent's emotes are hidden
     armedLeave: false,     // online: the Leave button was clicked once and now asks to confirm
   };
   const aiControls = pid => !online && (spectate || pid === OPP);
@@ -376,6 +384,14 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
         ui.rematch = msg.seats;
         render();
         return;
+      case 'emote': {
+        if (!EMOTES[msg.id] || (ui.muted && msg.seat !== HUMAN)) return;
+        ui.bubbles[msg.seat] = { text: EMOTES[msg.id], until: Date.now() + EMOTE_MS };
+        if (msg.seat !== HUMAN) sfx('keyword');
+        if (!ui.busy) render();
+        setTimeout(() => { if (!ui.exited && !ui.busy) render(); }, EMOTE_MS + 50);
+        return;
+      }
     }
   }
 
@@ -1014,6 +1030,12 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
       }
     }
     ui.firstRender = false;
+    // Emote bubbles by each hero.
+    for (const pid of [0, 1]) {
+      const b = ui.bubbles[pid];
+      if (!b || b.until < Date.now()) { ui.bubbles[pid] = null; continue; }
+      view.querySelector(`.hero-panel.${pid === HUMAN ? 'mine' : 'theirs'}`)?.append(h('div', { class: 'emote-bubble', role: 'status' }, b.text));
+    }
     script?.after?.(state, view, { refresh: render });
   }
 
@@ -1049,6 +1071,12 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
       h('button', { class: `btn ghost small${ui.logOpen ? ' active' : ''}`, onclick: () => { ui.logOpen = !ui.logOpen; ui.kwOpen = false; render(); }, 'aria-pressed': ui.logOpen ? 'true' : 'false' }, 'Log'),
       h('button', { class: `btn ghost small${ui.kwOpen ? ' active' : ''}`, onclick: () => { ui.kwOpen = !ui.kwOpen; ui.logOpen = false; render(); }, 'aria-pressed': ui.kwOpen ? 'true' : 'false' }, '? Keywords'),
       h('span', { class: 'turn-pill' }, 'Turn', h('b', null, state.turn)),
+      online ? h('span', { class: 'emote-wrap' },
+        h('button', { class: `btn ghost small${ui.emoteOpen ? ' active' : ''}`, 'aria-label': 'Emotes', 'aria-expanded': String(ui.emoteOpen), onclick: () => { ui.emoteOpen = !ui.emoteOpen; render(); } }, '😀'),
+        ui.emoteOpen ? h('div', { class: 'emote-picker', role: 'menu' },
+          Object.entries(EMOTES).map(([id, text]) => h('button', { class: 'emote-choice', role: 'menuitem', onclick: () => { online.send({ t: 'emote', id }); ui.emoteOpen = false; render(); } }, text)),
+          h('button', { class: 'emote-choice mute', role: 'menuitemcheckbox', 'aria-checked': String(ui.muted), onclick: () => { ui.muted = !ui.muted; ui.bubbles[OPP] = null; ui.emoteOpen = false; render(); } },
+            ui.muted ? '🔈 Unmute opponent' : '🔇 Mute opponent')) : null) : null,
       online && ui.clock && !state.over ? h('span', {
         class: `turn-pill clock-pill${decisionPlayer(state) === HUMAN ? ' mine' : ''}`,
         title: ui.clock.response ? 'Time left to respond' : 'Time left this turn',
@@ -1345,7 +1373,8 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
         ui.rewards?.render ? ui.rewards.render() : null,
         h('div', { class: 'dialog-actions' },
           online ? renderOnlineRematch() : h('button', { class: 'btn primary', onclick: () => { teardown(); onRematch(); } }, 'Rematch'),
-          h('button', { class: 'btn ghost', onclick: exit }, online ? 'Back to lobby' : 'Main menu'))));
+          h('button', { class: 'btn ghost', onclick: exit }, online ? 'Back to lobby' : 'Main menu')),
+        online ? h('button', { class: 'linkish report-link', onclick: () => reportDialog(state.players[OPP].name) }, `Report ${state.players[OPP].name}`) : null));
   }
 
   // Online rematch: both players have to ask; the server then starts a new match in the same room.
