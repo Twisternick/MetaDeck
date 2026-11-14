@@ -32,7 +32,7 @@ export default {
     M('FPS_M18_DroneCommander', 'Drone Commander', 5, 3, 5, ['Drone'], [fx('SummonToken', 2, 'None', { token: 'token_drone' })]),
     M('FPS_M29_GhostSniper', 'Ghost Sniper', 5, 4, 3, ['FirstStrike', 'Headshot'], [fx('DealDamage', 1, 'EnemyMonster')], NEW),
     M('FPS_M19_JuggernautExoSuit', 'Juggernaut Exo-Suit', 6, 5, 7, ['Guard']),
-    M('FPS_M30_GunshipPilot', 'Gunship Pilot', 6, 5, 5, [], [fx('DealDamage', 1, 'AllEnemyMonsters')], NEW),
+    M('FPS_M30_GunshipPilot', 'Gunship Pilot', 6, 4, 5, [], [fx('DealDamage', 1, 'AllEnemyMonsters')], NEW),
     M('FPS_M20_TitanOperator', 'Titan Operator', 7, 7, 7, ['Suppression']),
 
     S('FPS_S02_SmokeScreen', 'Smoke Screen', 1, [fx('GrantKeywordThisTurn', 0, 'FriendlyMonster', { keyword: 'Stealth' })], QUICK),

@@ -2,17 +2,30 @@
 // In batch mode one image holds four cards in a 2×2 grid; the studio splits it back into cards.
 import { DECKS } from '../../src/data/index.js';
 import { allSlots, batchable, batchPrompt, BATCH } from './slots.js';
+import { REDO_REASONS, REDO_THEMES } from './redo.js';
 
 const $ = id => document.getElementById(id);
 const slots = allSlots();
 const deckOf = Object.fromEntries(DECKS.map(d => [d.id, d]));
-const groups = [...DECKS.map(d => ({ id: d.id, name: d.name, icon: d.icon, color: d.color })),
-  { id: 'Extras', name: 'Tokens & extras', icon: '✨', color: '#9aa3c7' }];
+const FLAGGED = 'Flagged';
+const ALL = 'All'; // every slot in every group, filtered by Show like a deck tab
+const groups = [{ id: ALL, name: 'All', icon: '🗂️', color: '#eef1ff' }, ...DECKS.map(d => ({ id: d.id, name: d.name, icon: d.icon, color: d.color })),
+  { id: 'Extras', name: 'Tokens & extras', icon: '✨', color: '#9aa3c7' },
+  { id: 'Cosmetics', name: 'Card backs & arenas', icon: '🎴', color: '#ffc53d' },
+  { id: FLAGGED, name: 'Flagged for redo', icon: '⚑', color: '#ff4d6d' }];
 const colorOf = g => deckOf[g]?.color ?? '#9aa3c7';
 const iconOf = g => deckOf[g]?.icon ?? '✨';
 const PANELS = BATCH.cols * BATCH.rows;
 
 let done = new Set();
+let sizes = {};          // key -> size in bytes of the image on disk
+// Flagged in redo.js and not yet replaced: no image, or still the exact file that was flagged.
+const flagged = s => s.redo.length > 0 && (!done.has(s.key) || s.redo.some(r => sizes[s.key] === r.bytes));
+const needsWork = s => !done.has(s.key) || flagged(s);
+// The Show filter on deck tabs: images with no file yet, those plus flagged ones, or everything.
+const SHOW = { missing: s => !done.has(s.key), todo: needsWork, all: () => true };
+const shown = s => SHOW[$('show').value](s);
+const inGroup = (s, g) => (g === ALL || (g === FLAGGED ? flagged(s) : s.group === g));
 let group = DECKS[0].id;
 let batch = [];          // slots the next pasted image is for, in panel order
 const stamp = new Map(); // key -> cache-buster after a save
@@ -42,8 +55,9 @@ const el = (tag, attrs = {}, ...kids) => {
 
 // ------------------------------------------------------------ rendering
 function thumb(slot) {
-  const box = el('div', { class: `thumb${slot.kind === 'back' ? ' tall' : ''}`, style: `--ar:${slot.w}/${slot.h}` },
-    el('div', { class: 'ph' }, iconOf(slot.group)), el('span', { class: 'badge' }, done.has(slot.key) ? 'DONE' : 'NEEDED'));
+  const box = el('div', { class: `thumb${slot.h > slot.w ? ' tall' : ''}${slot.fit ? ' clear' : ''}`, style: `--ar:${slot.w}/${slot.h}` },
+    el('div', { class: 'ph' }, iconOf(slot.group)),
+    el('span', { class: `badge${flagged(slot) ? ' redo' : ''}` }, !done.has(slot.key) ? 'NEEDED' : flagged(slot) ? 'REDO' : 'DONE'));
   if (done.has(slot.key)) {
     const v = stamp.get(slot.key) ?? '';
     const img = el('img', { alt: '', loading: 'lazy', src: `/assets/img/${slot.key}.webp?v=${v}` });
@@ -63,6 +77,8 @@ function slotView(slot, i) {
     el('div', { class: 'info' },
       el('div', { class: 'name' }, slot.name),
       el('div', { class: 'sub' }, slot.sub),
+      flagged(slot) ? slot.redo.map(r => el('div', { class: `flag ${r.why}` },
+        el('b', {}, `⚑ ${REDO_REASONS[r.why].label}`), ` ${r.note}`)) : null,
       el('div', { class: 'key' }, `${slot.key}.webp · ${slot.w}×${slot.h}`),
       el('details', {}, el('summary', {}, 'Prompt'), el('pre', {}, slot.prompt)),
       el('div', { class: 'row' },
@@ -77,39 +93,64 @@ function slotView(slot, i) {
 }
 
 const inBatch = s => batch.some(b => b.key === s.key);
-const visible = () => slots.filter(s => s.group === group && (!$('missingOnly').checked || !done.has(s.key) || inBatch(s)));
+const visible = () => slots.filter(s => (inGroup(s, group) || (group === FLAGGED && inBatch(s)))
+  && (group === FLAGGED || shown(s) || inBatch(s)));
 
 function renderTabs() {
   $('tabs').replaceChildren(...groups.map(g => {
-    const all = slots.filter(s => s.group === g.id);
-    const n = all.filter(s => done.has(s.key)).length;
+    const on = g.id === group ? ' on' : '';
+    if (g.id === FLAGGED) {
+      const n = slots.filter(flagged).length;
+      return el('button', {
+        class: `tab flagged${on}${n ? '' : ' complete'}`, style: `--c:${g.color}`, title: 'Images the art audit flagged for redoing',
+        onclick: () => { group = g.id; setPref('group', group); render(); },
+      }, `${g.icon} ${g.name}`, el('small', {}, `${n}`));
+    }
+    const all = slots.filter(s => inGroup(s, g.id));
+    const n = all.filter(s => !needsWork(s)).length;
+    const flags = all.filter(flagged).length;
     return el('button', {
-      class: `tab${g.id === group ? ' on' : ''}${n === all.length ? ' complete' : ''}`, style: `--c:${g.color}`,
+      class: `tab${on}${n === all.length ? ' complete' : ''}`, style: `--c:${g.color}`,
       onclick: () => { group = g.id; setPref('group', group); render(); },
-    }, `${g.icon} ${g.name}`, el('small', {}, `${n}/${all.length}`));
+    }, `${g.icon} ${g.name}`, el('small', {}, `${n}/${all.length}`), flags ? el('small', { class: 'flags' }, `⚑${flags}`) : null);
   }));
-  const total = slots.filter(s => done.has(s.key)).length;
+  const total = slots.filter(s => !needsWork(s)).length;
+  const flags = slots.filter(s => done.has(s.key) && flagged(s)).length;
   $('bar').style.width = `${(total / slots.length) * 100}%`;
-  $('count').textContent = `${total} / ${slots.length} images`;
+  $('count').textContent = `${total} / ${slots.length} images${flags ? ` · ${flags} to redo` : ''}`;
 }
 
 function render() {
   views.clear();
   renderTabs();
   const list = visible();
+  // A deck whose whole style is flagged gets a banner while any of its images still need redoing.
+  const theme = REDO_THEMES[group];
+  const left = theme ? slots.filter(s => s.group === group && s.redo.some(r => r.why === 'theme') && flagged(s)).length : 0;
+  $('theme').hidden = !left;
+  if (left) {
+    $('theme').replaceChildren(el('b', {}, '⚑ Theme rework'),
+      ` This deck's whole art style is flagged for reworking: ${theme.note} `, el('small', {}, `${left} images still to redo.`));
+  }
   $('grid').replaceChildren(...(list.length ? list.map(slotView)
-    : [el('p', { class: 'sub' }, 'Every image in this group is done. Untick "Missing only" to redo one.')]));
+    : [el('p', { class: 'sub' }, group === FLAGGED ? 'Nothing is flagged for redoing.'
+      : $('show').value === 'missing' ? 'Every image in this group has a file. Show flagged ones or everything to redo one.'
+      : 'Every image in this group is done. Show everything to redo one.')]));
   activate(batch);
 }
 
 // ------------------------------------------------------------ batches
-// `slot` plus, in batch mode, the next missing cards after it in the same group and art style.
+// What the current tab is working through: flagged images on the Flagged tab, else what the Show filter
+// lists (missing or flagged ones when it shows everything).
+const wanted = s => (group === FLAGGED ? flagged(s) : $('show').value === 'missing' ? !done.has(s.key) : needsWork(s));
+
+// `slot` plus, in batch mode, the next wanted cards after it in the same group and art style.
 function batchFor(slot) {
   if (!$('batchMode').checked || slot.kind !== 'card') return [slot];
   const order = slots.filter(s => s.group === slot.group);
   const start = order.indexOf(slot);
   const rest = order.slice(start + 1).concat(order.slice(0, start))
-    .filter(s => !done.has(s.key) && batchable(slot, s));
+    .filter(s => wanted(s) && batchable(slot, s));
   return [slot, ...rest].slice(0, PANELS);
 }
 
@@ -190,7 +231,8 @@ window.addEventListener('focus', grabClipboard);
 let img = null;
 let cells = [];
 
-const coverScale = c => Math.max(c.slot.w / c.src.w, c.slot.h / c.src.h);
+// Art fills its slot edge to edge; a transparent logo is fitted whole instead, so nothing gets clipped.
+const coverScale = c => (c.slot.fit ? Math.min : Math.max)(c.slot.w / c.src.w, c.slot.h / c.src.h);
 
 function clampPan(c) {
   const s = coverScale(c) * c.zoom;
@@ -280,6 +322,7 @@ async function saveCrop() {
       const res = await fetch(`/api/art?path=${encodeURIComponent(`assets/img/${c.slot.key}.webp`)}`, { method: 'PUT', body: blob });
       if (!res.ok) { toast(`Save failed for ${c.slot.name}: ${await res.text()}`, true); return; }
       done.add(c.slot.key);
+      sizes[c.slot.key] = blob.size;
       stamp.set(c.slot.key, Date.now());
       saved.push(c.slot);
     }
@@ -291,10 +334,10 @@ async function saveCrop() {
   }
 }
 
-// Move on to the next missing slot in this group, and hand its prompt to the clipboard.
+// Move on to the next wanted slot in this tab, and hand its prompt to the clipboard.
 async function nextBatch(after, saved) {
-  const order = slots.filter(s => s.group === after.group);
-  const next = order.slice(order.indexOf(after) + 1).concat(order).find(s => !done.has(s.key));
+  const order = group === FLAGGED || group === ALL ? slots : slots.filter(s => s.group === after.group);
+  const next = order.slice(order.indexOf(after) + 1).concat(order).find(wanted);
   batch = next ? batchFor(next) : [];
   render();
   for (const s of saved) views.get(s.key)?.classList.add('saved');
@@ -319,7 +362,15 @@ document.addEventListener('keydown', e => {
 });
 
 // ------------------------------------------------------------ start
-for (const id of ['missingOnly', 'autoCopy', 'batchMode', 'autoGrab']) {
+// The old "Missing or flagged only" checkbox, unticked, meant Show: everything.
+$('show').value = pref('show', pref('missingOnly', 'true') === 'false' ? 'all' : 'todo');
+if (!$('show').value) $('show').value = 'todo';
+$('show').addEventListener('change', () => {
+  setPref('show', $('show').value);
+  if (batch.length) batch = batchFor(batch[0]);
+  render();
+});
+for (const id of ['autoCopy', 'batchMode', 'autoGrab']) {
   $(id).checked = pref(id, 'true') === 'true';
   $(id).addEventListener('change', () => {
     setPref(id, $(id).checked);
@@ -328,5 +379,6 @@ for (const id of ['missingOnly', 'autoCopy', 'batchMode', 'autoGrab']) {
   });
 }
 group = groups.some(g => g.id === pref('group')) ? pref('group') : group;
-done = new Set(await (await fetch('/api/existing')).json());
+sizes = await (await fetch('/api/existing')).json();
+done = new Set(Object.keys(sizes));
 render();

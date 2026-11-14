@@ -18,15 +18,18 @@ const types = {
 const ART_DIRS = ['cards', 'decks', 'heroes', 'ui'];
 const MAX_BYTES = 8 * 1024 * 1024;
 
-// Slot keys (e.g. "cards/RPG_M01_LevelOneAdventurer") that already have a .webp or .png.
+// { slot key: file size in bytes } for every slot (e.g. "cards/RPG_M01_LevelOneAdventurer") that already has
+// a .webp or .png. The studio compares sizes with redo.js to tell a flagged image from its replacement.
 function existingArt() {
-  const keys = new Set();
+  const sizes = {};
   for (const dir of ART_DIRS) {
     const full = path.join(root, 'assets/img', dir);
     if (!fs.existsSync(full)) continue;
-    for (const f of fs.readdirSync(full)) if (/\.(webp|png)$/.test(f)) keys.add(`${dir}/${f.replace(/\.\w+$/, '')}`);
+    for (const f of fs.readdirSync(full).sort((a, b) => a.endsWith('.webp') - b.endsWith('.webp'))) {
+      if (/\.(webp|png)$/.test(f)) sizes[`${dir}/${f.replace(/\.\w+$/, '')}`] = fs.statSync(path.join(full, f)).size;
+    }
   }
-  return [...keys];
+  return sizes;
 }
 
 function saveArt(req, res, rel) {

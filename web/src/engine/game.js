@@ -15,7 +15,9 @@ import { pick, randInt, shuffleInPlace } from './rng.js';
 
 // ---------------------------------------------------------------- setup
 
-export function createGame({ decks, names = ['Player 1', 'Player 2'], deckIds = [null, null], seed, firstPlayer = 0 }) {
+// `shuffle(list)` replaces the seeded opening shuffle. The online server shuffles with crypto randomness,
+// so a client can't brute-force the 31-bit seed from its own opening hand and learn the opponent's deck.
+export function createGame({ decks, names = ['Player 1', 'Player 2'], deckIds = [null, null], seed, firstPlayer = 0, shuffle = null }) {
   const state = {
     rng: (seed ?? Math.floor(Math.random() * 2 ** 31)) | 0,
     turn: 1,
@@ -37,7 +39,7 @@ export function createGame({ decks, names = ['Player 1', 'Player 2'], deckIds = 
   for (const pid of [0, 1]) {
     const p = state.players[pid];
     p.deck = decks[pid].map(id => newCard(state, id, pid));
-    shuffleInPlace(state, p.deck);
+    if (shuffle) shuffle(p.deck); else shuffleInPlace(state, p.deck);
   }
 
   const first = state.players[firstPlayer];
@@ -96,6 +98,8 @@ export function getHealth(m) {
 }
 
 const alive = m => getHealth(m) > 0;
+// Will this monster still be on the board after cleanup? (Checkpoint saves it from lethal damage.)
+const survives = m => alive(m) || hasKeyword(m, 'Checkpoint');
 const isDamaged = m => m.damage > 0;
 
 // The conditional Attack bonuses currently active on a monster: [{ keyword, amount }].
@@ -123,6 +127,11 @@ export function getAttack(state, m) {
   let atk = defOf(m).baseAttack + m.mods.reduce((s, x) => s + (x.atk || 0), 0);
   for (const b of attackBonuses(state, m)) atk += b.amount;
   return Math.max(0, atk);
+}
+
+// A side's board power: total ATK + health of its monsters. Used by the snowball check.
+export function boardPower(state, pid) {
+  return monsters(state, pid).reduce((t, m) => t + getAttack(state, m) + getHealth(m), 0);
 }
 
 export function effectiveCost(state, card) {
@@ -153,6 +162,14 @@ function checkCondition(state, pid, cond) {
 // The chosen-target effects of a card's play trigger. All of them share one target.
 export function chosenEffects(def) {
   return def.effects.filter(e => (e.trigger || 'play') === 'play' && CHOSEN_TARGETINGS.has(e.targeting));
+}
+
+// Boost: the Nitro a card's optional play effects cost (0 when it has none). The player chooses to Boost
+// when playing it ({ boost: true } on the action); without that, the boosted effects are skipped.
+export const boostCost = def => def.effects.reduce((n, e) => n + ((e.trigger || 'play') === 'play' && e.nitroCost ? e.nitroCost : 0), 0);
+export function canBoost(state, pid, card) {
+  const cost = boostCost(defOf(card));
+  return cost > 0 && P(state, pid).nitro >= cost;
 }
 
 export const playerRef = pid => `P${pid}`;
@@ -213,7 +230,9 @@ export function attackInfo(state, m) {
   return { ok: true };
 }
 
-const hasGuard = (state, pid) => monsters(state, pid).some(m => alive(m) && hasKeyword(m, 'Guard'));
+// A Stealthed Guard can't be attacked, so it doesn't force attacks onto itself either.
+const isGuarding = m => alive(m) && hasKeyword(m, 'Guard') && !hasKeyword(m, 'Stealth');
+export const hasGuard = (state, pid) => monsters(state, pid).some(isGuarding);
 
 // Legal attack targets for a monster that can attack (Guard / Stealth / Double Jump rules).
 export function attackTargets(state, m) {
@@ -235,8 +254,11 @@ export function legalActions(state) {
   const p = P(state, pid);
   const actions = [];
   const expand = (type, card, info) => {
-    if (info.targets && info.targets.length) for (const t of info.targets) actions.push({ type, uid: card.uid, target: t });
-    else actions.push({ type, uid: card.uid });
+    const variants = canBoost(state, pid, card) ? [{}, { boost: true }] : [{}];
+    for (const extra of variants) {
+      if (info.targets && info.targets.length) for (const t of info.targets) actions.push({ type, uid: card.uid, target: t, ...extra });
+      else actions.push({ type, uid: card.uid, ...extra });
+    }
   };
 
   if (state.pending) {
@@ -298,6 +320,8 @@ function doPlay(state, action, asResponse) {
   if (!info.ok) return info;
   const target = action.target ?? null;
   if (info.targets && info.targets.length && !info.targets.includes(target)) return fail('Choose a valid target.');
+  const boost = action.boost === true;
+  if (boost && !canBoost(state, pid, card)) return fail('Not enough Nitro to Boost.');
 
   const def = defOf(card);
   const cost = effectiveCost(state, card);
@@ -312,23 +336,23 @@ function doPlay(state, action, asResponse) {
 
   if (def.type === 'Monster') {
     const m = summon(state, pid, card, { played: true });
-    resolveEffects(state, m, 'play', target);
-    if (hasKeyword(m, 'Populate')) {
+    resolveEffects(state, m, 'play', target, boost);
+    if (hasKeyword(m, 'Populate') && summonToken(state, pid, 'token_citizen')) {
       keywordEvent(state, 'Populate', m, 'Summons a Citizen');
-      summonToken(state, pid, 'token_citizen');
     }
     if (hasKeyword(m, 'Errata')) {
-      const victim = pick(state, monsters(state, opp(pid)).filter(alive));
+      const victim = pick(state, monsters(state, opp(pid)).filter(e => alive(e) && !e.silenced));
       if (victim) { keywordEvent(state, 'Errata', m); silence(state, victim); }
     }
     if (hasKeyword(m, 'Copy')) {
+      // The deck is drawn from the end, so this lands somewhere in the top 3 cards.
       const copy = newCard(state, card.id, pid);
-      p.deck.splice(randInt(state, p.deck.length + 1), 0, copy);
-      keywordEvent(state, 'Copy', m, 'Copy shuffled into deck');
-      log(state, `A copy of ${def.displayName} is shuffled into the deck.`);
+      p.deck.splice(p.deck.length - randInt(state, Math.min(3, p.deck.length + 1)), 0, copy);
+      keywordEvent(state, 'Copy', m, 'Copy shuffled near the top');
+      log(state, `A copy of ${def.displayName} is shuffled into the top of the deck.`);
     }
   } else {
-    resolveEffects(state, card, 'play', target);
+    resolveEffects(state, card, 'play', target, boost);
     p.grave.push(strip(card));
   }
   if (!asResponse) p.playedThisTurn++;
@@ -396,7 +420,7 @@ function resolvePending(state) {
   const pid = refToPid(target);
   if (pid !== null) {
     if (hasGuard(state, pid) && !hasKeyword(m, 'DoubleJump')) {
-      const g = monsters(state, pid).find(x => alive(x) && hasKeyword(x, 'Guard'));
+      const g = monsters(state, pid).find(isGuarding);
       return fizzle('a Guard stepped in', 'Guard', g);
     }
   } else {
@@ -457,11 +481,11 @@ function resolveAttack(state, att, target) {
       damageMonster(state, def, att, dAtk);
     }
   }
-  afterAttack(state, att, !alive(def));
+  afterAttack(state, att, !survives(def));
 }
 
 function afterAttack(state, att, killed) {
-  if (!alive(att)) return;
+  if (!survives(att)) return;
   if (killed && hasKeyword(att, 'Devour')) {
     att.mods.push({ atk: 1, hp: 1 });
     keywordEvent(state, 'Devour', att, '+1/+1');
@@ -469,7 +493,7 @@ function afterAttack(state, att, killed) {
     log(state, `${defOf(att).displayName} devours its prey (+1/+1).`);
   }
   if (hasKeyword(att, 'Overtake')) { keywordEvent(state, 'Overtake', att, '+1 Nitro'); gainNitro(state, att.owner, 1); }
-  if (hasKeyword(att, 'XP')) { keywordEvent(state, 'XP', att, '+1 XP'); gainXP(state, att, 1); }
+  if (hasKeyword(att, 'XP') && !att.leveled) { keywordEvent(state, 'XP', att, '+1 XP'); gainXP(state, att, 1); }
 }
 
 function doEndTurn(state) {
@@ -504,7 +528,7 @@ function doEndTurn(state) {
     log(state, 'Turn limit reached — the match is a draw.');
     return OK;
   }
-  draw(state, np.id, 1);
+  draw(state, np.id, 1, { triggers: false }); // Topdeck and draw triggers count only extra draws
   runTriggers(state, np.id, 'turnStart');
   return OK;
 }
@@ -680,7 +704,8 @@ function runTriggers(state, pid, trigger) {
   }
 }
 
-function resolveEffects(state, source, trigger, chosen) {
+// `boost`: the player chose to Boost this play, so play effects with a Nitro cost run (and are paid for).
+function resolveEffects(state, source, trigger, chosen, boost = false) {
   const def = defOf(source);
   for (const e of def.effects) {
     if (state.over) return;
@@ -688,6 +713,7 @@ function resolveEffects(state, source, trigger, chosen) {
     if (trigger !== 'play' && source.silenced) continue;
     if (!checkCondition(state, source.owner, e.cond)) continue;
     if (e.nitroCost) {
+      if (trigger === 'play' && !boost) continue;
       const p = P(state, source.owner);
       if (p.nitro < e.nitroCost) continue;
       p.nitro -= e.nitroCost;
@@ -813,9 +839,10 @@ function applyEffect(state, src, e, targets) {
       p.grave = [];
       shuffleInPlace(state, p.deck);
       break;
-    case 'CopyRandomHandCard': {
+    case 'CopyBestHandCard': {
       for (let i = 0; i < Math.max(1, n); i++) {
-        const original = pick(state, p.hand);
+        const top = Math.max(...p.hand.map(c => defOf(c).cost));
+        const original = pick(state, p.hand.filter(c => defOf(c).cost === top));
         if (original) addToHand(state, pid, newCard(state, original.id, pid));
       }
       break;

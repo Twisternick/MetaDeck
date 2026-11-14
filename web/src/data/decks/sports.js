@@ -45,7 +45,7 @@ export default {
     S('SPO_S14_HailMary', 'Hail Mary', 2, [fx('DealDamage', 2, 'EnemyPlayer'), fx('DealDamage', 3, 'EnemyPlayer', { cond: 'HealthLessThanOpponent' })], NEW),
     S('SPO_S08_ComebackSeason', 'Comeback Season', 3, [fx('Heal', 5, 'FriendlyPlayer'), fx('Draw', 1, 'None', { cond: 'HealthLessThanOpponent' })]),
     S('SPO_S11_HalftimeSpeech', 'Halftime Speech', 3, [fx('BuffAttackThisTurn', 1, 'AllFriendlyMonsters'), fx('Draw', 1)], NEW),
-    S('SPO_S09_OvertimePush', 'Overtime Push', 4, [fx('Buff', 2, 'AllFriendlyMonsters')]),
+    S('SPO_S09_OvertimePush', 'Overtime Push', 5, [fx('Buff', 2, 'AllFriendlyMonsters')]),
     S('SPO_S15_FullCourtPress', 'Full-Court Press', 4, [fx('SummonToken', 2, 'None', { token: 'token_benchwarmer' }), fx('GrantKeywordThisTurn', 0, 'AllFriendlyMonsters', { keyword: 'Rush' })], NEW),
     S('SPO_S12_RedCard', 'Red Card', 5, [fx('Destroy', 0, 'EnemyMonster')], NEW),
   ],

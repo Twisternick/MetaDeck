@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>MetaDeck Art Studio</title>
-  <link rel="icon" href="/assets/img/ui/favicon.png">
+  <link rel="icon" type="image/png" href="icon.png">
   <link rel="stylesheet" href="studio.css">
 </head>
 <body>
@@ -21,10 +21,16 @@
       <label title="One image holds 4 cards in a 2×2 grid"><input type="checkbox" id="batchMode" checked> 4 cards per image</label>
       <label title="Opens a copied image as soon as you switch back to this tab"><input type="checkbox" id="autoGrab" checked> Grab copied image on return</label>
       <label><input type="checkbox" id="autoCopy" checked> Copy next prompt after saving</label>
-      <label><input type="checkbox" id="missingOnly" checked> Missing only</label>
+      <label title="Which images each deck tab lists, and which one saving moves on to">Show
+        <select id="show">
+          <option value="missing">Missing only</option>
+          <option value="todo" selected>Missing or flagged</option>
+          <option value="all">Everything</option>
+        </select></label>
     </div>
   </header>
   <nav class="tabs" id="tabs"></nav>
+  <div class="theme-flag" id="theme" hidden></div>
   <main class="grid" id="grid"></main>
 
   <div class="modal" id="crop" hidden>

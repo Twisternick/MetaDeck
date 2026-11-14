@@ -5,14 +5,23 @@
 import { h, delay, storage } from './dom.js';
 import { net } from './net.js';
 import { startMatch } from './match.js';
-import { artSlot, deckArtUrls, removeFx, motionOK } from './fx.js';
+import { artSlot, deckArtUrls, deckEmblem, removeFx, motionOK } from './fx.js';
 import { getDeck } from '../data/index.js';
+import { tip } from './tutorial.js';
+import { signedIn } from './profile.js';
+import { rankBadge } from './rank-badge.js';
+import { sfx } from './audio.js';
+
+const AI_OFFER_MS = 60_000; // waiting this long in quick find offers a match against the AI meanwhile
 
 const NAME_KEY = 'metadeck.netName';
 
-// deck = { archetype, name, cards } – the list picked in the main menu.
-export function lobby(root, { deck, onBack }) {
+// deck = { archetype, name, cards } – the list picked in the main menu. matchExtras() gives the
+// cosmetics and onResult (rewards) for each match. `challenge` is a friend's name to challenge as soon
+// as we're connected (from the Profile screen); onPlayAI leaves the queue for a match against the AI.
+export function lobby(root, { deck, onBack, matchExtras = () => ({}), challenge = null, onPlayAI = null }) {
   removeFx();
+  tip('lobby', 'Quick find pairs you with the next player who searches. Private match gives you a code to share with a friend.');
   const s = {
     phase: 'connecting',   // connecting | offline | idle | queued | hosting | match
     name: storage.get(NAME_KEY, ''),
@@ -23,6 +32,9 @@ export function lobby(root, { deck, onBack }) {
     joinCode: '',
     error: null,
     copied: false,
+    ranked: false,         // queued for a ranked match
+    invites: [],           // friends' challenges: { from, code, deckId }
+    challenge,             // a friend to challenge once connected
   };
   let match = null;        // the running match screen
   let buffer = null;       // server messages that arrive between 'start' and the match subscribing
@@ -52,6 +64,7 @@ export function lobby(root, { deck, onBack }) {
         s.name = msg.name;
         storage.set(NAME_KEY, msg.name);
         if (s.phase === 'connecting' || s.phase === 'offline') s.phase = 'idle';
+        if (s.challenge && s.phase === 'idle') { net.send({ t: 'challenge', to: s.challenge, deck: deckMsg() }); s.challenge = null; }
         if (!match) render();
         return;
       case 'lobby':
@@ -62,11 +75,18 @@ export function lobby(root, { deck, onBack }) {
       case 'queued':
         s.phase = 'queued';
         s.since = msg.since + s.skew;
+        s.ranked = !!msg.ranked;
+        setTimeout(() => { if (s.phase === 'queued' && !match) render(); }, AI_OFFER_MS + 200);
         render();
+        return;
+      case 'invite':
+        if (!s.invites.some(i => i.code === msg.code)) s.invites.push({ from: msg.from, code: msg.code, deckId: msg.deckId });
+        sfx('alert');
+        if (!match) render();
         return;
       case 'hosting':
         s.phase = 'hosting';
-        s.hosting = { code: msg.code, visibility: msg.visibility };
+        s.hosting = { code: msg.code, visibility: msg.visibility, challenge: msg.challenge ?? null };
         s.since = Date.now();
         s.copied = false;
         render();
@@ -103,7 +123,7 @@ export function lobby(root, { deck, onBack }) {
     const go = () => {
       if (exited) return;
       match?.close();
-      match = startMatch(root, { online, onExit: backToLobby });
+      match = startMatch(root, { online, onExit: backToLobby, ...matchExtras() });
     };
     if (match || msg.resumed) go(); else splash(msg).then(go);
   }
@@ -189,7 +209,7 @@ export function lobby(root, { deck, onBack }) {
             onkeydown: e => { if (e.key === 'Enter') e.target.blur(); },
           })),
         h('div', { class: 'lobby-deck' },
-          artSlot('', deckArtUrls(mine.id), mine.icon),
+          artSlot('', deckArtUrls(mine.id), deckEmblem(mine)),
           h('div', null,
             h('div', { class: 'vs-sub' }, 'Your deck'),
             h('div', { class: 'vs-name' }, mine.name),
@@ -197,13 +217,21 @@ export function lobby(root, { deck, onBack }) {
           h('button', { class: 'btn ghost small', onclick: leave }, 'Change'))),
 
       s.error ? h('div', { class: 'lobby-error', role: 'alert' }, s.error) : null,
+      s.invites.length ? h('section', { class: 'invites' }, s.invites.map(inv => h('div', { class: 'invite-card rise', style: { '--deck': getDeck(inv.deckId)?.color } },
+        deckEmblem(getDeck(inv.deckId)),
+        h('div', { class: 'invite-text' }, h('b', null, inv.from), ' challenges you to a friendly match', h('small', null, `They’re playing ${getDeck(inv.deckId)?.name ?? ''}`)),
+        h('button', { class: 'btn primary small', disabled: !ready || null, onclick: () => { s.invites = s.invites.filter(i => i !== inv); join(inv.code); } }, 'Play'),
+        h('button', { class: 'btn ghost small', onclick: () => { s.invites = s.invites.filter(i => i !== inv); net.send({ t: 'decline', code: inv.code }); render(); } }, 'Not now')))) : null,
       s.phase === 'offline' ? h('div', { class: 'lobby-error', role: 'alert' },
         "Can't reach the MetaDeck server. Online play needs the game served by ", h('code', null, 'npm start'), ' (a static host has no matchmaking). Still trying…') : null,
 
       s.phase === 'queued' || s.phase === 'hosting' ? renderWaiting() : h('section', { class: 'modes' },
         modeTile({
-          i: 1, cls: 'quick', icon: '⚡', title: 'Quick find', blurb: 'Get paired with the next player who is searching.',
-          body: h('button', { class: 'btn primary big', disabled: !ready || null, onclick: quickFind }, 'Find match'),
+          i: 1, cls: 'quick', icon: '⚡', title: signedIn() ? 'Ranked' : 'Quick find',
+          blurb: signedIn() ? 'Get paired with a player of similar skill. Win stars to climb from Bronze to Meta.' : 'Get paired with the next player who is searching. Sign in to play ranked.',
+          body: h('div', { class: 'mode-stack' },
+            signedIn()?.rank ? rankBadge(signedIn().rank) : null,
+            h('button', { class: 'btn primary big', disabled: !ready || null, onclick: quickFind }, 'Find match')),
         }),
         modeTile({
           i: 2, cls: 'private', icon: '🔒', title: 'Private match', blurb: 'Create a room with a code, or join a friend with theirs.',
@@ -243,20 +271,24 @@ export function lobby(root, { deck, onBack }) {
       h('div', { class: 'radar', 'aria-hidden': 'true' },
         h('i', { class: 'radar-ring' }), h('i', { class: 'radar-ring' }), h('i', { class: 'radar-ring' }),
         h('i', { class: 'radar-sweep' }),
-        h('span', { class: 'radar-core' }, getDeck(deck.archetype).icon)),
+        h('span', { class: 'radar-core' }, deckEmblem(getDeck(deck.archetype)))),
       h('div', { class: 'waiting-body' },
-        h('div', { class: 'vs-sub' }, quick ? 'Quick find' : priv ? 'Private room' : 'Open room'),
-        h('h2', { class: 'waiting-title' }, quick ? 'Searching for an opponent' : 'Waiting for a challenger', h('span', { class: 'dots' })),
+        h('div', { class: 'vs-sub' }, quick ? (s.ranked ? 'Ranked' : 'Quick find') : s.hosting.challenge ? 'Friendly challenge' : priv ? 'Private room' : 'Open room'),
+        h('h2', { class: 'waiting-title' }, quick ? 'Searching for an opponent' : s.hosting.challenge ? `Waiting for ${s.hosting.challenge}` : 'Waiting for a challenger', h('span', { class: 'dots' })),
         quick ? null : h('div', { class: 'room-code' },
           h('span', { class: 'room-code-label' }, 'Room code'),
           h('span', { class: 'room-code-chars' }, [...s.hosting.code].map((c, i) => h('b', { style: { '--i': i } }, c))),
           h('button', { class: 'btn ghost small', onclick: copyCode }, s.copied ? 'Copied ✓' : 'Copy')),
         h('p', { class: 'muted' }, quick
-          ? 'You’ll be paired with the next player who searches.'
+          ? (s.ranked ? 'You’ll be paired with a player close to your skill; the search widens the longer you wait.' : 'You’ll be paired with the next player who searches.')
+          : s.hosting.challenge ? `${s.hosting.challenge} has your invite. The match starts when they accept.`
           : priv ? 'Send this code to a friend. They join from Private match.' : 'Your room is listed in everyone’s lobby. Friends can also join with the code.'),
         h('div', { class: 'waiting-foot' },
           h('span', { class: 'turn-pill' }, 'Waiting', h('b', { 'data-since': s.since }, '0:00')),
-          h('button', { class: 'btn danger', onclick: cancel }, quick ? 'Stop searching' : 'Close room'))));
+          h('button', { class: 'btn danger', onclick: cancel }, quick ? 'Stop searching' : 'Close room')),
+        quick && onPlayAI && Date.now() - s.since > AI_OFFER_MS ? h('div', { class: 'ai-offer' },
+          h('span', null, 'Not many players around right now.'),
+          h('button', { class: 'btn ghost small', onclick: () => { cancel(); leave(); onPlayAI(); } }, 'Play the AI instead')) : null));
   }
 
   function renderRooms(ready) {
@@ -271,7 +303,7 @@ export function lobby(root, { deck, onBack }) {
       const d = getDeck(r.deckId);
       const own = r.code === ownCode;
       return h('div', { class: `room-tile rise${own ? ' own' : ''}`, style: { '--deck': d.color, '--i': Math.min(i, 12) } },
-        artSlot('', deckArtUrls(d.id), d.icon),
+        artSlot('', deckArtUrls(d.id), deckEmblem(d)),
         h('div', { class: 'room-info' },
           h('div', { class: 'room-host' }, r.host),
           h('div', { class: 'room-deck' }, d.name),
@@ -286,7 +318,7 @@ export function lobby(root, { deck, onBack }) {
     const mineDeck = getDeck(msg.state.players[msg.seat].deckId);
     const theirDeck = getDeck(msg.state.players[1 - msg.seat].deckId);
     const side = (d, name, cls) => h('div', { class: `found-side ${cls}`, style: { '--deck': d.color } },
-      artSlot('', deckArtUrls(d.id), d.icon),
+      artSlot('', deckArtUrls(d.id), deckEmblem(d)),
       h('div', { class: 'found-name' }, name),
       h('div', { class: 'found-deck' }, d.name));
     const el = h('div', { class: 'match-found', role: 'status' },

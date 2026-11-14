@@ -667,3 +667,96 @@ RPG             47%          1        4         4     CityBuilder 58%   CardGame
 ```
 
 Horror is now at 51%. It beats Fighting (60%) and Sports (58%), and still loses to Strategy and Card Game. RPG's 47% in this run is run-to-run noise: two more 9,000-game RPG runs came out at 49% with the change, against 50% without it.
+
+## Starter variant pass: Copy Combo, Topdeck, Final Round, Nitro Fuel
+
+The first all-variants report (435,000 games, 1,000 per matchup) had three clear problems: Copy Combo at 19.5% (no favored matchup), Topdeck Tempo at 64% riding Card Game's draw cards, and Final Round (36%) and Nitro Fuel (37.5%) losing almost everything.
+
+**Topdeck only counts extra draws.** Topdeck and "Whenever you draw" triggers used to fire on the normal draw at the start of each turn, so a 1-mana Draw Card grew +1/+1 every turn for free. They now count only cards drawn by effects. That is the whole draw nerf: Topdeck Tempo went from 64% to 55% with no card changes.
+
+**Copy Combo** cut every good card in its archetype and doubled under-statted Copy bodies, and its copies went back into a 40-card deck where they were rarely seen again. Changes:
+
+| Card | Before | After |
+|---|---|---|
+| Copy (keyword) | Shuffle a copy into your deck. | Shuffle a copy into the top 3 cards of your deck. |
+| Copy Card | 2 · Copy a random card in your hand. | 2 · Copy the most expensive card in your hand. Draw a card. |
+| Netdecker | 3 · 2/3 · Play: Copy a random card in your hand. | 3 · 3/3 · Play: Copy the most expensive card in your hand. |
+| Token Summon | 1 · 1/1 · Play: Summon a 1/1 Proxy. | 1 · 1/2 · Play: Summon a 1/1 Proxy. |
+| Reverse Card | 2 · 2/2 · Copy | 2 · 2/3 · Copy |
+| Reprint Beast | 4 · 4/4 · Copy | 4 · 4/5 · Copy |
+| Misprint | 2 · 3/3 · Turn start: discard a random card. | 2 · 3/3 · Play: discard a random card. |
+| Proxy Swarm | 3 · Summon three 1/1 Proxies. | 2 · Summon three 1/1 Proxies. |
+
+The list now doubles Tournament Winner and Holo Chase Dragon, the cards worth copying, plus Errata, Judge and Sleeve Guardian to survive the early turns. It cuts Misprint and Banned Card.
+
+**Final Round** was billed as "survive the early rounds" but cut every Guard and Counter fighter. It now doubles Counter Specialist, Footsies Expert, Sparring Partner, Hidden Boss and Grand Master alongside its finishers, and cuts the cheap Combo attackers. Sudden Death now deals 2 damage to you instead of 5 (still 5 to the enemy).
+
+**Nitro Fuel** doubled six Nitro generators and cut most of the cards that spend Nitro. It now doubles the Boost payoffs (Monster Truck, Spin Out, Photo Finish, Rocket Dragster, Podium Finish) cuts Kart Rookie, and drops Rally Navigator, Hover Champion, Hard Brake and Drafting Line to one copy each.
+
+Result, 130,500 games (300 per matchup, all 30 variants):
+
+| Variant | Before | After |
+|---|---|---|
+| Topdeck Tempo | 64.1% | 55% |
+| Nitro Fuel | 37.5% | 49% |
+| Final Round | 36.3% | 46% |
+| Copy Combo | 19.5% | 45% |
+
+The whole field now runs 42% to 62%, against 19.5% to 64% before. Everyone else's rate fell about a point, since Copy Combo is no longer a free win. Blitzkrieg (62%) and Overwatch (59%) are now the outliers at the top, and Warp Zone (42%) at the bottom.
+
+## Snowball pass
+
+The first report with the snowball check (1,087,500 games, 2,500 per matchup) showed that early leads decided too much. The side ahead at turn 8 won 76% of games, against a target of 65–72%, and 23 of the 30 variants were tagged Snowbally. The five decks over 55% were mostly the ones that convert leads best (Team Spirit, Drag Strip, Blitzkrieg), so the global fix came first.
+
+**Starting HP is now 35 (was 30).** Each of these levers was tried at 100 games per matchup:
+
+| Lever | Leader wins at turn 8 | Problem |
+|---|---|---|
+| None (baseline) | 77% | |
+| Underdog: draw an extra card when the enemy has 2+ more monsters | 74% | Crushed go-wide decks (Drone Network 23%, Boomtown 35%) and lifted Racing to 70%. |
+| Underdog: draw an extra card when 8+ behind on board ATK + health | 75% | Extra cards mostly fed aggro decks that empty their hand (Drag Strip 70%). |
+| Rush can't hit the enemy player on its first turn | 75% | Drag Strip fell to 37%. |
+| **35 starting HP** | **72%** | None. First player win rate also fell from 52% to 50%. |
+
+More HP gives the side that's behind more turns to stabilize, and it doesn't single out any one theme.
+
+**Targeted changes**:
+
+| Card or list | Before | After | Why |
+|---|---|---|---|
+| Total War Doctrine | 6 mana | 7 mana | Blitzkrieg's and Economy's top finisher |
+| Grand Strategy | 3 mana | 4 mana | Ramp plus draw 2 at 3 mana carried Economy |
+| Cavalry Charger | 3 · 3/3 · Rush | 3 · 3/2 · Rush | Blitzkrieg |
+| Overtime Push | 4 mana | 5 mana | Same cost as Golden Age now; Team Spirit's board-wide buff |
+| Gunship Pilot | 6 · 5/5 | 6 · 4/5 | Overwatch |
+| Draw Card | 1 · 1/2 · Topdeck | 1 · 1/1 · Topdeck | Topdeck Tempo |
+| Foil Showcase | 3 · 2/4 · Topdeck | 3 · 2/3 · Topdeck | Topdeck Tempo |
+| Overwatch list | 2× Airstrike, 2× Overwatch Sentry | 2× Demolition Expert, 2× Respawn Specialist | Overwatch won from behind 42% of the time, twice the field. HP doesn't touch that. |
+| Topdeck Tempo list | 2× Topdeck | 2× Monster Card | |
+| Fortress list | 2× Structure Wall | 2× Total War Engine | Fortress converted only 59% of its leads. It needed a finisher, not more walls. |
+| Red Tape list | 2× Tax Hike, 2× Zoning Law | 2× Golden Age, 2× Real Estate Mogul | Discard and stalls don't win games. These turn a stalled board into a win. |
+| Warp Zone list | 2× Bounce Pad, 2× Coin Trail | 2× Final Boss, 2× Mini-Boss | "Draw into the boss" now has bosses to draw |
+
+**Card stats now compare like with like.** The card tables used to compare a card's win rate when played with its deck's overall win rate. That flattered expensive cards, because a game has to last before you can cast a 7-drop. It also punished catch-up cards like Comeback Season, which you play because you're losing. Each play is now compared with the deck's win rate in games that reached the same turn, on the same player's turn, with the same lead (ahead, even or behind). The code is in `src/engine/card-stats.js`, shared by the Balance lab and `tools/simulate.mjs`. With this change, Comeback Season (-18%) and Shuffle Deck (+19%) both dropped out of the outlier lists.
+
+Result, 130,500 games (300 per matchup, all 30 variants):
+
+```
+Leader wins: turn 6 68% · turn 8 72% · turn 12 74% · 4.6 lead changes per game (was 4.2)
+First player wins 50% · avg length 21.1 turns (was 19.5)
+
+Variant              Before   After
+Blitzkrieg           61.2%    58%
+Overwatch            58.4%    58%
+Topdeck Tempo        54.8%    56%
+Banlist Control      48.4%    56%
+Warp Zone            42.2%    55%
+Economy              56.5%    55%
+Team Spirit          58.0%    53%
+Red Tape             43.5%    52%
+Drag Strip           57.2%    51%
+Fortress             47.5%    50%
+Drone Network        43.7%    42%
+```
+
+The field now runs from 42% to 58%, against 42% to 61% before. The snowball check is at the top of its target band. Still open: Blitzkrieg and Overwatch at 58%, and Drone Network (42%), Defensive Line (44%) and Last Survivor (44%) at the bottom.

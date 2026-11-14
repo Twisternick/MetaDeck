@@ -32,10 +32,11 @@ export const isPlayable = deck => deckErrors(deck.archetype, deck.cards).length 
 // Every deck list for an archetype: starters first, then the player's own.
 export const decksFor = archetype => [...starterDecks(archetype), ...customDecks().filter(d => d.archetype === archetype)];
 
-// The deck behind a key, falling back to the archetype's first starter if it's gone or not playable.
-export function resolveDeck(archetype, key) {
+// The deck behind a key, falling back to the archetype's first starter (the free core set, which every
+// player owns) if it's gone or `usable` rejects it.
+export function resolveDeck(archetype, key, usable = isPlayable) {
   const found = decksFor(archetype).find(d => d.key === key);
-  return found && isPlayable(found) ? found : starterDecks(archetype)[0];
+  return found && usable(found) ? found : starterDecks(archetype)[0];
 }
 
 export const randomStarter = archetype => {

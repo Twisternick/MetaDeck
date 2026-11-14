@@ -7,6 +7,34 @@ import { h } from './dom.js';
 export const motionOK = () => !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const rand = (a, b) => a + Math.random() * (b - a);
 
+// ------------------------------------------------------------ card text fit
+// The card frame's text box is a fixed window, so rules text that would spill out of it steps its font
+// down (via --fit) until it fits. Runs on every card added to the page, once per frame.
+let fitInstalled = false;
+export function installCardFit() {
+  if (fitInstalled) return;
+  fitInstalled = true;
+  const pending = new Set();
+  const fit = body => {
+    if (!body.isConnected || !body.clientHeight) return;
+    let scale = 1;
+    body.dataset.fit = '';
+    body.style.setProperty('--fit', scale);
+    while (body.scrollHeight > body.clientHeight + 1 && scale > .6) {
+      scale -= .07;
+      body.style.setProperty('--fit', scale.toFixed(2));
+    }
+  };
+  new MutationObserver(records => {
+    for (const r of records) for (const n of r.addedNodes) {
+      if (!(n instanceof Element)) continue;
+      if (n.matches('.card-body')) pending.add(n);
+      n.querySelectorAll('.card-body').forEach(b => pending.add(b));
+    }
+    if (pending.size) requestAnimationFrame(() => { pending.forEach(fit); pending.clear(); });
+  }).observe(document.body, { childList: true, subtree: true });
+}
+
 // ------------------------------------------------------------ pointer tilt
 // Any element with data-tilt="<max degrees>" tilts toward the pointer and gets
 // --mx/--my (pointer position in %) for glare and foil effects.
@@ -21,6 +49,8 @@ export function installTilt() {
     el.classList.remove('tilting');
     el.style.removeProperty('--rx');
     el.style.removeProperty('--ry');
+    el.style.removeProperty('--px');
+    el.style.removeProperty('--py');
   };
   const apply = () => {
     frame = 0;
@@ -34,6 +64,9 @@ export function installTilt() {
     current.style.setProperty('--my', `${(py * 100).toFixed(1)}%`);
     current.style.setProperty('--ry', `${((px - .5) * max).toFixed(2)}deg`);
     current.style.setProperty('--rx', `${((.5 - py) * max).toFixed(2)}deg`);
+    // The same offset unitless, -0.5..0.5 from the centre, for parallax layers (hologram art).
+    current.style.setProperty('--px', (px - .5).toFixed(3));
+    current.style.setProperty('--py', (py - .5).toFixed(3));
   };
   document.addEventListener('pointermove', e => {
     if (!motionOK() || e.pointerType === 'touch') return;
@@ -48,6 +81,24 @@ export function installTilt() {
     if (!frame) frame = requestAnimationFrame(apply);
   }, { passive: true });
   document.addEventListener('pointerleave', () => { if (current) { reset(current); current = null; } });
+}
+
+// ------------------------------------------------------------ entrance settle
+// Entrance cascades (.rise) play once per screen. The first input on a screen marks the root
+// `settled`, so re-renders after an action (picking, filtering, buying) show the new state at
+// once instead of dealing everything in again. Swapping in a different screen un-settles it.
+let settleInstalled = false;
+export function installSettle(root) {
+  if (settleInstalled) return;
+  settleInstalled = true;
+  let screen = null;
+  new MutationObserver(() => {
+    const kind = root.firstElementChild?.classList[0] ?? null;
+    if (kind !== screen) { screen = kind; root.classList.remove('settled'); }
+  }).observe(root, { childList: true });
+  const settle = () => root.classList.add('settled');
+  addEventListener('pointerdown', settle, true);
+  addEventListener('keydown', settle, true);
 }
 
 // ------------------------------------------------------------ button ripples
@@ -70,31 +121,50 @@ export function installRipples() {
 // ------------------------------------------------------------ art slots
 // An art slot shows the first image in `candidates` that loads; until then (or if none
 // exists) it shows an animated placeholder with the deck emblem. Missing images are
-// remembered so re-renders never re-request them.
+// remembered so re-renders never re-request them, until the tab regains focus (art may
+// have been added in the Art Studio meanwhile).
 const artStatus = new Map(); // url -> 'ok' | 'missing'
+window.addEventListener('focus', () => {
+  for (const [url, status] of artStatus) if (status === 'missing') artStatus.delete(url);
+});
 
 export function artSlot(className, candidates, emblem, { label = false, alt = '' } = {}) {
-  const urls = candidates.filter(u => u && artStatus.get(u) !== 'missing');
   const box = h('div', { class: `art ${className}` });
   const ph = h('div', { class: 'art-ph', 'aria-hidden': 'true' },
     h('span', { class: 'art-emblem' }, emblem),
     label ? h('span', { class: 'art-tag' }, 'ART') : null);
-  if (urls.length) {
-    let i = 0;
-    const img = h('img', { alt, loading: 'lazy', decoding: 'async', draggable: 'false' });
-    img.addEventListener('load', () => { artStatus.set(img.getAttribute('src'), 'ok'); box.classList.add('has-img'); });
-    img.addEventListener('error', () => {
-      artStatus.set(img.getAttribute('src'), 'missing');
-      i += 1;
-      if (i < urls.length) img.setAttribute('src', urls[i]);
-      else img.remove();
-    });
-    img.setAttribute('src', urls[0]);
-    if (artStatus.get(urls[0]) === 'ok') box.classList.add('has-img');
-    box.append(img);
-  }
+  loadArt(box, candidates, alt);
   box.append(ph, h('div', { class: 'art-shade' }));
   return box;
+}
+
+// A deck's emblem icon (ui/emblem-<deckId>), sized by the surrounding font size like the emoji it
+// replaces. The emoji stays underneath until the image loads, and for decks without one.
+export function deckEmblem(deck, className = '') {
+  const box = h('span', { class: `emblem ${className}`.trim(), 'aria-hidden': 'true', style: deck?.color ? { '--deck': deck.color } : null },
+    h('span', { class: 'emblem-glyph' }, deck?.icon ?? '🎴'));
+  if (deck?.id) loadArt(box, emblemUrls(deck.id));
+  return box;
+}
+
+// Appends an <img> that tries each candidate in turn and adds .has-img to `box` once one loads.
+function loadArt(box, candidates, alt = '') {
+  const urls = candidates.filter(u => u && artStatus.get(u) !== 'missing');
+  if (!urls.length) return;
+  let i = 0;
+  // Art that has loaded before is decoded synchronously so a re-render never flashes an empty slot.
+  const known = artStatus.get(urls[0]) === 'ok';
+  const img = h('img', { alt, loading: known ? 'eager' : 'lazy', decoding: known ? 'sync' : 'async', draggable: 'false' });
+  img.addEventListener('load', () => { artStatus.set(img.getAttribute('src'), 'ok'); box.classList.add('has-img'); });
+  img.addEventListener('error', () => {
+    artStatus.set(img.getAttribute('src'), 'missing');
+    i += 1;
+    if (i < urls.length) img.setAttribute('src', urls[i]);
+    else img.remove();
+  });
+  img.setAttribute('src', urls[0]);
+  if (known) box.classList.add('has-img');
+  box.append(img);
 }
 
 // Each slot is tried as .webp (what the Art Studio saves), then .png.
@@ -104,6 +174,13 @@ export const cardArtUrls = (def, ownerDeckId) =>
 export const deckArtUrls = deckId => imgUrls(`decks/${deckId}`);
 export const heroArtUrls = deckId => [...imgUrls(`heroes/${deckId}`), ...imgUrls(`decks/${deckId}`)];
 export const cardBackUrls = () => imgUrls('ui/card-back');
+export const backSkinUrls = name => imgUrls(`ui/back-${name}`);
+export const logoUrls = () => imgUrls('ui/logo');
+export const emblemUrls = deckId => imgUrls(`ui/emblem-${deckId}`);
+const fxSplatUrls = () => imgUrls('ui/fx-splat');
+
+// A painted currency icon (ui/icon-gold, -gems, -dust) to sit inline before an amount.
+export const currency = kind => h('i', { class: `cur ${kind}`, 'aria-hidden': 'true' });
 
 // ------------------------------------------------------------ fx layer
 let layer = null;
@@ -116,11 +193,26 @@ function fxLayer() {
 }
 const center = rect => ({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
 
+// One painted effect (ui/fx-<name>: spark, ring, arc) that bursts out from a point and fades.
+export function sprite(x, y, name, { size = 160, spin = 0, duration = 560, delay = 0 } = {}) {
+  if (!motionOK()) return;
+  const s = h('i', { class: `fx-sprite fx-${name}` });
+  s.style.cssText = `left:${x - size / 2}px;top:${y - size / 2}px;width:${size}px;height:${size}px`;
+  fxLayer().append(s);
+  s.animate([
+    { transform: `scale(.25) rotate(${-spin}deg)`, opacity: 0 },
+    { transform: 'scale(.8) rotate(0deg)', opacity: 1, offset: .25 },
+    { transform: `scale(1.25) rotate(${spin}deg)`, opacity: 0 },
+  ], { duration, delay, easing: 'cubic-bezier(.16,1,.3,1)', fill: 'both' }).onfinish = () => s.remove();
+}
+
 // A shockwave ring plus a spray of sparks at a point.
 export function impact(rect, color = '#ff4d6d', { sparks = 14, size = 1 } = {}) {
   if (!motionOK() || !rect) return;
   const L = fxLayer();
   const { x, y } = center(rect);
+  sprite(x, y, 'ring', { size: 150 * size, duration: 520 });
+  sprite(x, y, 'spark', { size: 130 * size, spin: rand(-25, 25), duration: 620 });
   const ring = h('i', { class: 'ring' });
   ring.style.cssText = `left:${x - 10}px;top:${y - 10}px;--c:${color}`;
   L.append(ring);
@@ -140,6 +232,79 @@ export function impact(rect, color = '#ff4d6d', { sparks = 14, size = 1 } = {}) 
       { transform: `translate(${Math.cos(a) * d}px, ${Math.sin(a) * d + 20}px) scale(0)`, opacity: 0 },
     ], { duration: rand(400, 750), easing: 'cubic-bezier(.2,.7,.3,1)', fill: 'forwards' }).onfinish = () => s.remove();
   }
+}
+
+// An irregular burst outline (a clip-path polygon in %), so no two splats are the same shape.
+function burstShape(spikes = Math.round(rand(10, 13))) {
+  const pts = [];
+  for (let i = 0; i < spikes * 2; i++) {
+    const a = (i / (spikes * 2)) * Math.PI * 2 + rand(-.08, .08);
+    const r = i % 2 ? rand(.31, .37) : rand(.43, .5);
+    pts.push(`${(50 + Math.cos(a) * r * 100).toFixed(1)}% ${(50 + Math.sin(a) * r * 100).toFixed(1)}%`);
+  }
+  return `polygon(${pts.join(',')})`;
+}
+
+// A gold-rimmed burst with the number stamped on it that slams onto what was hit and holds there
+// long enough to read. Red for damage, green for heals, gold for a headshot. Painted art
+// (ui/fx-splat) replaces the CSS burst when it exists.
+// `follow` returns the element that was hit (looked up fresh, as re-renders replace it): the splat
+// rides along with it, so an attacker springing back from its lunge carries its splat home.
+export function damageSplat(rect, text, { gold = false, heal = false, delay = 0, follow = null } = {}) {
+  if (!rect) return;
+  const size = Math.max(70, Math.min(124, Math.min(rect.width, rect.height) * .76));
+  const wide = String(text).length > 3;
+  // Kept on screen: heroes sit in the corners.
+  const half = wide ? size * 1.05 : size / 2;
+  const splat = h('div', { class: `dmg-splat${gold ? ' gold' : heal ? ' heal' : ''}${wide ? ' wide' : ''}` },
+    h('i', { class: 'splat-rays' }), h('i', { class: 'splat-rim' }), h('i', { class: 'splat-core' }), h('b', null, text));
+  splat.style.cssText = `--s:${size}px;--shape:${burstShape()};--delay:${delay}ms`;
+  const place = r => {
+    splat.style.left = `${Math.max(half + 6, Math.min(window.innerWidth - half - 6, center(r).x))}px`;
+    splat.style.top = `${Math.max(size / 2 + 6, Math.min(window.innerHeight - size / 2 - 6, center(r).y))}px`;
+  };
+  place(rect);
+  loadArt(splat, fxSplatUrls());
+  fxLayer().append(splat);
+  if (follow) {
+    // Once the target is gone (it died), the splat stays where it last was.
+    const track = () => {
+      if (!splat.isConnected) return;
+      const el = follow();
+      if (el?.isConnected) place(el.getBoundingClientRect());
+      requestAnimationFrame(track);
+    };
+    requestAnimationFrame(track);
+  }
+  const life = 1300;
+  if (!motionOK()) { setTimeout(() => splat.remove(), delay + life); return; }
+  const tilt = rand(-12, 12);
+  // Eased per step, not as a whole, so the hold really holds: slam in, settle, ~0.8 s still, lift away.
+  splat.animate([
+    { transform: `translate(-50%,-50%) scale(2.4) rotate(${tilt - 18}deg)`, opacity: 0, easing: 'cubic-bezier(.5,0,.9,.5)' },
+    { transform: `translate(-50%,-50%) scale(.8) rotate(${tilt}deg)`, opacity: 1, offset: .08, easing: 'cubic-bezier(.2,1.8,.4,1)' },
+    { transform: `translate(-50%,-50%) scale(1) rotate(${tilt}deg)`, offset: .2 },
+    { transform: `translate(-50%,-50%) scale(1) rotate(${tilt}deg)`, opacity: 1, offset: .82, easing: 'cubic-bezier(.5,0,.8,.6)' },
+    { transform: `translate(-50%,-85%) scale(.78) rotate(${tilt}deg)`, opacity: 0 },
+  ], { duration: life, delay, fill: 'both' }).onfinish = () => splat.remove();
+}
+
+// Shake the whole arena; strength 1 is a light knock, 3 a heavy blow.
+export function screenShake(el, strength = 1) {
+  if (!motionOK() || !el) return;
+  const a = 3 + strength * 4;
+  const frames = [0, 1, -1, .8, -.6, .4, -.2, 0].map((k, i) => ({
+    transform: `translate(${(k * a).toFixed(1)}px, ${(i % 2 ? -1 : 1) * k * a * .5}px)`,
+  }));
+  el.animate(frames, { duration: 360 + strength * 60, easing: 'ease-out' });
+}
+
+// Red pulse from the screen edges: the player's own hero just took damage.
+export function hurtVignette() {
+  const v = h('div', { class: 'hurt-vignette' });
+  fxLayer().append(v);
+  if (!motionOK()) { setTimeout(() => v.remove(), 500); return; }
+  v.animate([{ opacity: 0 }, { opacity: 1, offset: .15 }, { opacity: 0 }], { duration: 750, easing: 'ease-out' }).onfinish = () => v.remove();
 }
 
 // Soft rising motes for heals and buffs.
@@ -193,6 +358,7 @@ export function castFly(cardEl, fromRect, toRect, color = '#a78bfa') {
     { transform: `translate(${dx}px, ${dy}px) scale(2.2)`, opacity: 0, filter: 'brightness(3) blur(10px)' },
   ], { duration: 760, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' }).onfinish = () => {
     g.remove();
+    sprite(to.x, to.y, 'arc', { size: 260, spin: rand(-40, 40), duration: 700 });
     impact({ left: to.x - 20, top: to.y - 20, width: 40, height: 40 }, color, { sparks: 22, size: 1.6 });
   };
 }
@@ -250,9 +416,18 @@ export function removeFx() {
 // A curved chain of glowing dots from a source element to the pointer, with a triangle head.
 export function createArrow(color = '#ff4d6d', count = 16) {
   const L = fxLayer();
-  const dots = Array.from({ length: count }, () => {
+  // Size and opacity depend only on a dot's place in the chain, so they are set once;
+  // moving the pointer then only changes transforms.
+  const sizes = [];
+  const dots = Array.from({ length: count }, (_, i) => {
+    const t = (i + 1) / (count + 1);
+    const size = 5 + 9 * t;
+    sizes.push(size);
     const d = h('i', { class: 'arrow-dot' });
     d.style.setProperty('--c', color);
+    d.style.width = `${size}px`;
+    d.style.height = `${size}px`;
+    d.style.opacity = `${.45 + .55 * t}`;
     L.append(d);
     return d;
   });
@@ -269,10 +444,7 @@ export function createArrow(color = '#ff4d6d', count = 16) {
         const t = (i + 1) / (count + 1);
         const px = (1 - t) ** 2 * a.x + 2 * (1 - t) * t * cx + t * t * x;
         const py = (1 - t) ** 2 * a.y + 2 * (1 - t) * t * cy + t * t * y;
-        const size = 5 + 9 * t;
-        d.style.width = `${size}px`;
-        d.style.height = `${size}px`;
-        d.style.opacity = `${.45 + .55 * t}`;
+        const size = sizes[i];
         d.style.transform = `translate(${(px - size / 2).toFixed(1)}px, ${(py - size / 2).toFixed(1)}px)`;
       });
       const angle = Math.atan2(y - cy, x - cx) * 180 / Math.PI + 90;
