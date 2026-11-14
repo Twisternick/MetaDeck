@@ -117,6 +117,7 @@ export function newProfile(now = new Date()) {
     season: { id: seasonKey(now), xp: 0, premium: false, claimed: { free: [], premium: [] } },
     cosmetics: { owned: [], back: 'back:classic', arena: 'arena:standard', premiumArt: true },
     stats: { games: 0, wins: 0 },
+    tutorial: false, // finished the tutorial (and got its pack)
     purchases: [],
     createdAt: now.toISOString(),
   };
@@ -130,6 +131,7 @@ export function normalizeProfile(raw, now = new Date(), rng = Math.random) {
   const p = { ...newProfile(now), ...raw };
   const num = v => (Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0);
   p.gold = num(p.gold); p.gems = num(p.gems); p.dust = num(p.dust); p.pity = num(p.pity);
+  p.tutorial = raw.tutorial === true;
   const cards = {};
   for (const [id, c] of Object.entries(raw.cards ?? {})) {
     if (!CARDS[id]?.deckId) continue;
@@ -546,7 +548,8 @@ export function rewardLabel(r) {
 // profile (so a browser can't hand itself Gold or cards), and a guest's browser applies the same ones
 // to its local profile. `a` is untrusted input from the client; `ctx` is { now, rng, testPurchases }.
 // Each returns { ok: true, ... } or { ok: false, reason }.
-export const MIN_MATCH_GAP_MS = 15_000; // a reported vs-AI match can't come faster than this
+export const MIN_MATCH_GAP_MS = 15_000;
+export const TUTORIAL_REWARD = { type: 'pack', kind: 'any', n: 1 }; // a reported vs-AI match can't come faster than this
 
 const fail = reason => ({ ok: false, reason });
 const str = v => (typeof v === 'string' && v.length <= 100 ? v : '');
@@ -605,6 +608,13 @@ export const OPS = {
     p.lastMatchAt = ctx.now.toISOString();
     const damage = Math.max(0, Math.min(60, Math.floor(Number(a.damage) || 0)));
     return { ok: true, out: recordMatch(p, { deckId: a.deckId, won: a.won === true, damage, online: !!ctx.online }, ctx.now, ctx.rng) };
+  },
+  // The tutorial's reward, once per profile. The tutorial runs in the browser, so this is taken on
+  // trust; it's worth one pack, and only ever once.
+  finishTutorial: (p, a, ctx) => {
+    if (p.tutorial) return fail('You already finished the tutorial.');
+    p.tutorial = true;
+    return { ok: true, reward: grantReward(p, TUTORIAL_REWARD, ctx.rng) };
   },
   testPurchase: (p, a, ctx) => (ctx.testPurchases ? creditGems(p, str(a.bundle), ctx.now, true) : fail('Payments are not connected yet.')),
 };

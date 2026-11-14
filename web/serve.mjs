@@ -38,8 +38,9 @@ const types = {
   '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8',
   '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg',
 };
-// The only paths the game loads. Everything else in web/ (the server, tools, tests, reports) stays private.
-const PUBLIC = [/^\/index\.html$/, /^\/styles\.css$/, /^\/src\//, /^\/assets\//];
+// The only paths the game loads, plus the privacy and terms pages. Everything else in web/ (the server,
+// tools, tests, reports) stays private.
+const PUBLIC = [/^\/index\.html$/, /^\/styles\.css$/, /^\/src\//, /^\/assets\//, /^\/legal\/[a-z-]+\.(html|css)$/];
 
 const dataDir = path.resolve(process.env.DATA_DIR || path.join(root, 'data'));
 fs.mkdirSync(dataDir, { recursive: true });
@@ -109,8 +110,8 @@ function securityHeaders(req) {
       "default-src 'self'",
       "script-src 'self'",
       "worker-src 'self'",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "font-src 'self' https://fonts.gstatic.com",
+      "style-src 'self' 'unsafe-inline'",
+      "font-src 'self'",
       "img-src 'self' data: blob:",
       "media-src 'self'",
       `connect-src 'self' ws://${host} wss://${host}`,

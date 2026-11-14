@@ -7,6 +7,7 @@ import { net } from './net.js';
 import { startMatch } from './match.js';
 import { artSlot, deckArtUrls, deckEmblem, removeFx, motionOK } from './fx.js';
 import { getDeck } from '../data/index.js';
+import { tip } from './tutorial.js';
 
 const NAME_KEY = 'metadeck.netName';
 
@@ -14,6 +15,7 @@ const NAME_KEY = 'metadeck.netName';
 // cosmetics and onResult (rewards) for each match.
 export function lobby(root, { deck, onBack, matchExtras = () => ({}) }) {
   removeFx();
+  tip('lobby', 'Quick find pairs you with the next player who searches. Private match gives you a code to share with a friend.');
   const s = {
     phase: 'connecting',   // connecting | offline | idle | queued | hosting | match
     name: storage.get(NAME_KEY, ''),

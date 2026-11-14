@@ -57,6 +57,7 @@ after(() => {
 let ip = 0;
 async function call(route, body, { cookie, headers = {} } = {}) {
   if (route === 'signup' && !headers['x-test-ip']) headers = { ...headers, 'x-test-ip': `10.1.0.${++ip}` };
+  if (route === 'signup' && body && !('birthYear' in body)) body = { ...body, birthYear: 2000 };
   const res = await fetch(`${base}/api/account/${route}`, body === undefined
     ? { headers: { ...(cookie ? { cookie } : {}), ...headers } }
     : { method: 'POST', headers: { 'Content-Type': 'application/json', ...(cookie ? { cookie } : {}), ...headers }, body: JSON.stringify(body) });
@@ -122,8 +123,8 @@ function playDealt(deal, start) {
   const game = createGame({ decks: [deal.myCards, deal.oppCards], deckIds: [deal.myDeck, deal.oppDeck], seed: start.seed, firstPlayer: start.firstPlayer });
   const moves = [];
   while (!game.over) {
-    const action = chooseAction(game);
     const human = decisionPlayer(game) === 0;
+    const action = chooseAction(game, { difficulty: human ? 'normal' : start.difficulty });
     assert.equal(applyAction(game, action).ok, true);
     if (human) moves.push(action);
   }
@@ -140,6 +141,7 @@ test('vs-AI matches are paid only from the server replay', async () => {
 
   const start = await call('aistart', deal, { cookie });
   assert.equal(start.body.ok, true);
+  assert.equal(start.body.difficulty, 'easy', 'a new account starts on easy');
   const { moves, won } = playDealt(deal, start.body);
   const fin = await call('aifinish', { ticket: start.body.ticket, moves }, { cookie });
   assert.equal(fin.body.ok, true, fin.body.reason);
@@ -172,10 +174,47 @@ test('vs-AI decks must be legal and owned', async () => {
   assert.equal((await call('aistart', { myDeck: 'FPS', myCards: starterDecks('FPS')[0].cards, oppDeck: 'Horror', oppCards: theirs.cards })).status, 401);
 });
 
+test('accounts need a birth year at least 13 years ago, and under-age accounts are shut out', async () => {
+  const year = new Date().getUTCFullYear();
+  assert.equal((await call('signup', { name: fresh(), password: 'longenough', birthYear: null })).status, 400);
+  const young = await call('signup', { name: fresh(), password: 'longenough', birthYear: year - 12 });
+  assert.equal(young.status, 400);
+  assert.match(young.body.reason, /13 and older/);
+  assert.equal((await call('signup', { name: fresh(), password: 'longenough', birthYear: year - 13 })).status, 200);
+
+  // An account from before the age check is asked once; an under-age answer signs it out for good.
+  const name = fresh();
+  const { cookie } = await call('signup', { name, password: 'longenough' });
+  accounts.db.prepare('UPDATE users SET birth_year = NULL WHERE key = ?').run(name.toLowerCase());
+  const fresh2 = createAccounts({ file });
+  assert.equal(fresh2.me(cookie.split('=')[1]).info.birthYear, null);
+  assert.equal(fresh2.setBirthYear(cookie.split('=')[1], year - 10).tooYoung, true);
+  assert.equal(fresh2.me(cookie.split('=')[1]), null, 'signed out');
+  assert.equal((await fresh2.signIn(name, 'longenough')).ok, false);
+  fresh2.close();
+});
+
+test('a signed-in player can download everything stored about them', async () => {
+  const name = fresh();
+  const { cookie } = await call('signup', { name, password: 'longenough' });
+  const res = await fetch(`${base}/api/account/export`, { headers: { cookie } });
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-disposition'), /attachment; filename="metadeck-/);
+  const data = await res.json();
+  assert.equal(data.account.name, name);
+  assert.equal(data.account.birthYear, 2000);
+  assert.ok(data.profile.cards);
+  assert.ok(Array.isArray(data.matches) && Array.isArray(data.events));
+  const raw = JSON.stringify(data);
+  const row = accounts.db.prepare('SELECT hash, salt FROM users WHERE key = ?').get(name.toLowerCase());
+  assert.ok(!raw.includes(row.hash) && !raw.includes(row.salt), 'no password hash in the export');
+  assert.equal((await fetch(`${base}/api/account/export`)).status, 401);
+});
+
 test('accounts.json from before the database is imported once', async () => {
   const legacyDir = fs.mkdtempSync(path.join(os.tmpdir(), 'metadeck-legacy-'));
   const old = createAccounts();
-  const made = await old.signUp('Legacy_1', 'longenough', '10.9.9.9');
+  const made = await old.signUp('Legacy_1', 'longenough', '10.9.9.9', 2000);
   const user = old.db.prepare('SELECT * FROM users').get();
   fs.writeFileSync(path.join(legacyDir, 'accounts.json'), JSON.stringify({
     users: { legacy_1: { name: user.name, salt: user.salt, hash: user.hash, recovery: user.recovery, created: user.created, profile: JSON.parse(user.profile) } },

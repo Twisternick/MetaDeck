@@ -12,11 +12,13 @@ import {
   COSMETICS, ownsCosmetic, CORE_COPIES, bestFinish,
 } from '../data/economy.js';
 import { DECKS, CARDS, MAX_COPIES } from '../data/index.js';
+import { tip } from './tutorial.js';
 
 const byCost = (a, b) => a.cost - b.cost || (a.type === b.type ? 0 : a.type === 'Monster' ? -1 : 1) || a.displayName.localeCompare(b.displayName);
 
 // tab: 'cards' | 'packs' | 'cosmetics'
 export function collection(root, { onBack, nav, tab = null, deckId = null }) {
+  tip('collection', "Your cards live here. Disenchant spare copies into Dust, and use Dust to craft any card you’re missing.");
   removeFx();
   const prefs = storage.get('metadeck.collection', { tab: 'cards', deck: DECKS[0].id, show: 'all', rarity: 'all' });
   if (tab) prefs.tab = tab;

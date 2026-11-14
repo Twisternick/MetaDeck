@@ -30,10 +30,21 @@ const FAILS_PER_WINDOW = 10;      // failed sign-ins per address
 const FAIL_WINDOW_MS = 10 * 60_000;
 const SIGNUPS_PER_HOUR = 5;       // new accounts per address
 const CACHE_MAX = 5000;           // accounts kept in memory
+export const MIN_AGE = 13;        // accounts are for players this old or older (COPPA); guests can play at any age
 
 export const nameError = name => (NAME_RE.test(name ?? '') ? null : 'Names are 3–20 letters, digits or underscores.');
 export const passwordError = pw => (typeof pw === 'string' && pw.length >= PASSWORD_MIN && pw.length <= PASSWORD_MAX
   ? null : `Passwords need at least ${PASSWORD_MIN} characters.`);
+
+// The age check at sign-up asks for the birth year only. Someone who could be under MIN_AGE (their birth
+// year is less than MIN_AGE years ago) is refused, and an account found to be under age can't sign in.
+export const TOO_YOUNG = `MetaDeck accounts are for players ${MIN_AGE} and older. You can keep playing as a guest; your progress stays in this browser.`;
+export function birthYearError(year, now = new Date()) {
+  const y = now.getUTCFullYear();
+  if (!Number.isInteger(year) || year < y - 120 || year > y) return 'Choose the year you were born.';
+  return y - year < MIN_AGE ? TOO_YOUNG : null;
+}
+const tooYoung = (user, now) => user.birthYear != null && now.getUTCFullYear() - user.birthYear < MIN_AGE;
 
 const sha = s => crypto.createHash('sha256').update(s).digest('hex');
 const key = name => name.toLowerCase();
@@ -61,9 +72,11 @@ export function createAccounts({ file = null, legacy = null, now = () => new Dat
   const db = openDb(file);
   const q = {
     user: db.prepare('SELECT * FROM users WHERE key = ?'),
-    putUser: db.prepare(`INSERT INTO users (key, name, salt, hash, recovery, created, profile) VALUES (?, ?, ?, ?, ?, ?, ?)
+    putUser: db.prepare(`INSERT INTO users (key, name, salt, hash, recovery, created, profile, birth_year) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(key) DO UPDATE SET name = excluded.name, salt = excluded.salt, hash = excluded.hash,
-      recovery = excluded.recovery, profile = excluded.profile`),
+      recovery = excluded.recovery, profile = excluded.profile, birth_year = excluded.birth_year`),
+    userMatches: db.prepare('SELECT at, kind, deck0, deck1, winner, turns, seconds, ending, p0 = ? AS seat0 FROM matches WHERE p0 = ? OR p1 = ? ORDER BY at'),
+    userEvents: db.prepare('SELECT at, name, data FROM events WHERE user = ? ORDER BY at'),
     delUser: db.prepare('DELETE FROM users WHERE key = ?'),
     forgetMatches0: db.prepare('UPDATE matches SET p0 = NULL WHERE p0 = ?'),
     forgetMatches1: db.prepare('UPDATE matches SET p1 = NULL WHERE p1 = ?'),
@@ -81,17 +94,17 @@ export function createAccounts({ file = null, legacy = null, now = () => new Dat
 
   // ------------------------------------------------------------ storage
   // Loaded accounts by key, least recently used first. A user is { key, name, salt, hash, recovery,
-  // created, profile }; `saved` holds its row as last written, so an unchanged account isn't rewritten.
+  // created, profile, birthYear }; `saved` holds its row as last written, so an unchanged account isn't rewritten.
   const cache = new Map();
   const saved = new WeakMap();
-  const rowOf = u => [u.key, u.name, u.salt, u.hash, u.recovery ?? null, u.created, JSON.stringify(u.profile)];
+  const rowOf = u => [u.key, u.name, u.salt, u.hash, u.recovery ?? null, u.created, JSON.stringify(u.profile), u.birthYear ?? null];
   function getUser(k) {
     if (typeof k !== 'string') return null;
     let user = cache.get(k);
     if (user) { cache.delete(k); cache.set(k, user); return user; }
     const row = q.user.get(k);
     if (!row) return null;
-    user = { key: row.key, name: row.name, salt: row.salt, hash: row.hash, recovery: row.recovery ?? undefined, created: row.created, profile: JSON.parse(row.profile) };
+    user = { key: row.key, name: row.name, salt: row.salt, hash: row.hash, recovery: row.recovery ?? undefined, created: row.created, profile: JSON.parse(row.profile), birthYear: row.birth_year ?? null };
     saved.set(user, rowOf(user));
     cache.set(k, user);
     if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value);
@@ -137,7 +150,8 @@ export function createAccounts({ file = null, legacy = null, now = () => new Dat
   function userFor(token) {
     if (typeof token !== 'string' || !token) return null;
     const s = q.session.get(sha(token), now().getTime());
-    return s ? getUser(s.user) : null;
+    const user = s ? getUser(s.user) : null;
+    return user && !tooYoung(user, now()) ? user : null;
   }
   // Check a signed-in player's password again before a sensitive change. Wrong guesses count toward the
   // same per-address limit as sign-in. Returns null when it's right, or the reason it isn't.
@@ -166,15 +180,15 @@ export function createAccounts({ file = null, legacy = null, now = () => new Dat
   }
 
   return {
-    async signUp(name, password, ip = '') {
-      const bad = nameError(name) ?? passwordError(password);
+    async signUp(name, password, ip = '', birthYear = null) {
+      const bad = nameError(name) ?? passwordError(password) ?? birthYearError(birthYear, now());
       if (bad) return { ok: false, reason: bad };
       if (limited(signups, ip, SIGNUPS_PER_HOUR)) return { ok: false, reason: 'Too many new accounts from your network. Try again later.' };
       if (getUser(key(name))) return { ok: false, reason: 'That name is taken.' };
       const pw = await hashPassword(password);
       if (getUser(key(name))) return { ok: false, reason: 'That name is taken.' };
       bump(signups, ip, 3_600_000);
-      const user = { key: key(name), name, ...pw, created: now().toISOString(), profile: normalizeProfile(null, now(), rng) };
+      const user = { key: key(name), name, ...pw, created: now().toISOString(), profile: normalizeProfile(null, now(), rng), birthYear };
       put(user);
       return { ok: true, token: newSession(key(name)), name, recoveryCode: issueCode(user) };
     },
@@ -188,6 +202,7 @@ export function createAccounts({ file = null, legacy = null, now = () => new Dat
         bump(fails, ip, FAIL_WINDOW_MS);
         return { ok: false, reason: 'Wrong name or password.' };
       }
+      if (tooYoung(user, now())) return { ok: false, reason: TOO_YOUNG };
       return { ok: true, token: newSession(key(name)), name: user.name };
     },
 
@@ -268,7 +283,35 @@ export function createAccounts({ file = null, legacy = null, now = () => new Dat
       if (!user) return null;
       const profile = profileOf(user);
       put(user);
-      return { name: user.name, profile, info: { created: user.created, recovery: !!user.recovery, devices: devices(key(user.name)) } };
+      return { name: user.name, profile, info: { created: user.created, recovery: !!user.recovery, devices: devices(key(user.name)), birthYear: user.birthYear } };
+    },
+
+    // Signed in: the birth year, for an account made before sign-up asked for it (it can't be changed
+    // once set). An account that turns out to be under age is signed out everywhere and can't sign in.
+    setBirthYear(token, year) {
+      const user = userFor(token);
+      if (!user) return { ok: false, status: 401, reason: 'Please sign in again.' };
+      if (user.birthYear != null) return { ok: false, reason: 'Your birth year is already set.' };
+      const bad = birthYearError(year, now());
+      if (bad && bad !== TOO_YOUNG) return { ok: false, reason: bad };
+      user.birthYear = year;
+      put(user);
+      if (bad) { dropSessions(user.key); return { ok: false, status: 403, tooYoung: true, reason: TOO_YOUNG }; }
+      return { ok: true };
+    },
+
+    // Signed in: everything stored about the account, as one JSON document (the right to a copy of
+    // your data). The password hash and recovery-code hash are left out: they're only useful to an attacker.
+    exportData(token) {
+      const user = userFor(token);
+      if (!user) return null;
+      return {
+        exported: now().toISOString(),
+        account: { name: user.name, created: user.created, birthYear: user.birthYear, hasRecoveryCode: !!user.recovery, devicesSignedIn: devices(user.key) },
+        profile: profileOf(user),
+        matches: q.userMatches.all(user.key, user.key, user.key).map(({ seat0, ...m }) => ({ ...m, you: seat0 ? 0 : 1 })),
+        events: q.userEvents.all(user.key).map(e => ({ ...e, data: e.data ? JSON.parse(e.data) : null })),
+      };
     },
 
     // Apply one economy operation for the signed-in player. `testPurchases` comes from the server

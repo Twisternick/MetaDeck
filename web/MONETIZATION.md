@@ -54,5 +54,5 @@ This build is ready to try, not to sell:
    - Guests still play with a local profile that they can edit. Fine for trying the game, but anything paid needs an account.
    - Add password reset (needs an email address) and email verification.
 2. **Connect a payment provider** (Stripe, or the app stores for mobile builds) and credit Gems only from its server-side confirmation. `creditGems` in `economy.js` is where that credit lands. Until then the shop's Gem bundles are disabled, except on localhost and `.test` hosts, where they're labelled test purchases and charge nothing.
-3. **Legal.** Paid random packs are regulated or restricted in some places (Belgium, the Netherlands), and several stores and countries require published odds (done here). Add age gating, spending limits for minors, refund handling and region rules before launch.
+3. **Legal.** Paid random packs are regulated or restricted in some places (Belgium, the Netherlands), and several stores and countries require published odds (done here). Accounts already store a birth year and refuse players under 13. Still needed before selling: spending limits for minors, refund handling, the right-of-withdrawal consent at checkout, and region rules (see LAUNCH.md 4b).
 4. Hero skins need art: add hero portraits through the Art Studio, then add a `hero` cosmetic kind next to `back` and `arena`.

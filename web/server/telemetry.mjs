@@ -15,9 +15,10 @@ import crypto from 'node:crypto';
 // Each event and the fields it may carry. Field values are short strings, numbers or booleans.
 export const EVENTS = {
   visit: [],
-  match_start: ['mode', 'deck'],      // mode: ai | online | watch
+  match_start: ['mode', 'deck'],      // mode: ai | online | watch | tutorial
   match_end: ['mode', 'deck', 'won'],
   pack_open: ['kind'],
+  tutorial: ['step'],                 // the step reached (-1: skipped)
   signup: [],                         // sent by the server
 };
 const EVENTS_PER_HOUR = 300;

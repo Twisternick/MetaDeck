@@ -7,6 +7,7 @@ import { h } from './dom.js';
 import { removeFx, confetti, motionOK } from './fx.js';
 import {
   profile, signedIn, signIn, signUp, signOut, resetPassword, changePassword, newRecoveryCode, signOutOthers, deleteAccount, reload, walletBar,
+  setBirthYear, downloadMyData,
 } from './profile.js';
 import { toast } from './packs.js';
 import { seasonTier, unopenedPacks } from '../data/economy.js';
@@ -14,6 +15,29 @@ import { seasonTier, unopenedPacks } from '../data/economy.js';
 const NAME_RE = /^[A-Za-z0-9_]{3,20}$/;
 const PW_MIN = 8;
 const NAME_RULE = 'Names are 3–20 letters, digits or underscores.';
+const MIN_AGE = 13; // as server/accounts.mjs
+const AGE_BLOCK_KEY = 'metadeck.ageBlock';
+const AGE_BLOCK_MS = 24 * 3_600_000;
+const TOO_YOUNG = `MetaDeck accounts are for players ${MIN_AGE} and older. You can keep playing as a guest; your progress stays in this browser.`;
+// After an under-age answer, sign-up stays closed in this browser for a day (so the answer isn't just retried).
+const ageBlocked = () => { try { return Date.now() - Number(localStorage.getItem(AGE_BLOCK_KEY) || 0) < AGE_BLOCK_MS; } catch { return false; } };
+const blockAge = () => { try { localStorage.setItem(AGE_BLOCK_KEY, String(Date.now())); } catch { /* storage unavailable */ } };
+const tooYoung = year => new Date().getFullYear() - year < MIN_AGE;
+
+// A birth-year picker: this year back 100 years, with a neutral "choose" first (no default that passes).
+function birthYearField(label = 'Year you were born') {
+  const id = `acct-f${++fieldId}`;
+  const now = new Date().getFullYear();
+  const input = h('select', { class: 'acct-input', id, required: true, 'aria-describedby': `${id}-hint` },
+    h('option', { value: '' }, 'Choose…'),
+    Array.from({ length: 101 }, (_, i) => h('option', { value: String(now - i) }, String(now - i))));
+  const hintEl = h('span', { class: 'acct-hint', id: `${id}-hint` }, 'Only the year is kept. It’s never shown to other players.');
+  const el = h('div', { class: 'acct-field' }, h('div', { class: 'acct-label-row' }, h('label', { for: id }, label)), h('div', { class: 'acct-input-wrap' }, input), hintEl);
+  return { el, input, value: () => Number(input.value) || null };
+}
+const legalNote = () => h('p', { class: 'acct-note' }, 'By creating an account you agree to the ',
+  h('a', { href: 'legal/terms.html', target: '_blank', rel: 'noopener' }, 'Terms of Service'), ' and the ',
+  h('a', { href: 'legal/privacy.html', target: '_blank', rel: 'noopener' }, 'Privacy Policy'), '.');
 
 // ------------------------------------------------------------ fields
 
@@ -211,10 +235,41 @@ export function accountScreen(root, { onBack, nav, mode = 'signin' }) {
           stat('wins', p.stats.wins.toLocaleString()),
           stat('season tier', seasonTier(p)),
           stat('unopened packs', unopenedPacks(p))),
+        me.birthYear == null ? birthYearCard() : null,
         h('div', { class: 'acct-actions' },
           h('button', { class: 'btn primary', onclick: onBack }, 'Play'),
           h('button', { class: 'btn ghost', onclick: async () => { await signOut(); toast('Signed out. You’re playing as a guest.'); mode = 'signin'; render(); } }, 'Sign out'))),
       securityCard(me));
+  }
+
+  // Accounts made before sign-up asked for a birth year are asked once.
+  function birthYearCard() {
+    const year = birthYearField();
+    const submit = h('button', { class: 'btn primary', type: 'submit' }, 'Save');
+    const form = h('form', { class: 'acct-form acct-ask' });
+    const err = submitter(form, submit, 'Saving…', {
+      check: () => (year.value() ? null : { input: year.input, reason: 'Choose the year you were born.' }),
+      run: async () => {
+        const r = await setBirthYear(year.value());
+        if (r.tooYoung) { mode = 'signin'; setTimeout(render, 4000); } // signed out: back to the sign-in form after they've read why
+        return r;
+      },
+      done: () => { toast('Thanks!'); render(); },
+    });
+    form.addEventListener('submit', () => { if (year.value() && tooYoung(year.value())) blockAge(); }, { capture: true });
+    form.append(h('p', null, h('b', null, 'One quick question.'), ' MetaDeck accounts are for players 13 and older. What year were you born?'), year.el, err, submit);
+    return form;
+  }
+
+  function dataPanel() {
+    const submit = h('button', { class: 'btn ghost', type: 'submit' }, 'Download my data');
+    const form = h('form', { class: 'acct-form' });
+    const err = submitter(form, submit, 'Preparing…', { run: () => downloadMyData(), done: () => toast('Downloaded.') });
+    form.append(
+      h('p', { class: 'muted small' }, 'A copy of everything MetaDeck stores about your account — your collection, currencies, match history and the gameplay events linked to you — as a JSON file. See the ',
+        h('a', { href: 'legal/privacy.html', target: '_blank', rel: 'noopener' }, 'Privacy Policy'), ' for what we keep and why.'),
+      err, submit);
+    return form;
   }
 
   function securityCard(me) {
@@ -242,6 +297,7 @@ export function accountScreen(root, { onBack, nav, mode = 'signin' }) {
       panel('password', 'Change password', null, changePasswordForm(me)),
       panel('recovery', 'Recovery code', me.recovery ? 'Saved' : 'Not set up', recoveryForm(me)),
       panel('devices', 'Signed-in devices', devices === 1 ? 'Just this one' : `${devices} devices`, devicesPanel(devices)),
+      panel('data', 'Your data', null, dataPanel()),
       panel('delete', 'Delete account', null, deleteForm(me)));
   }
 
@@ -384,12 +440,21 @@ export function accountScreen(root, { onBack, nav, mode = 'signin' }) {
         name.el, code.el, ...pair.els, err, submit,
         h('p', { class: 'acct-note' }, 'Lost your recovery code too? Ask whoever runs this server to set a new password for you.'),
         h('button', { type: 'button', class: 'linkish', onclick: () => go('signin') }, '← Back to sign in'));
+    } else if (isUp && ageBlocked()) {
+      form.append(tabs, h('div', { class: 'acct-badge', 'aria-hidden': 'true' }, '🎮'), h('p', null, TOO_YOUNG),
+        h('button', { type: 'button', class: 'btn primary', onclick: onBack }, 'Keep playing'));
     } else if (isUp) {
       const pair = newPasswordPair(() => name.input.value.trim());
+      const year = birthYearField();
       submit = h('button', { class: 'btn primary big', type: 'submit' }, 'Create account');
       err = submitter(form, submit, 'Creating…', {
-        check: () => (!NAME_RE.test(name.input.value.trim()) ? { input: name.input, reason: NAME_RULE } : pair.check()),
-        run: () => signUp(name.input.value.trim(), pair.value()),
+        check: () => {
+          if (!NAME_RE.test(name.input.value.trim())) return { input: name.input, reason: NAME_RULE };
+          if (!year.value()) return { input: year.input, reason: 'Choose the year you were born.' };
+          if (tooYoung(year.value())) { blockAge(); render(); return { input: year.input, reason: TOO_YOUNG }; }
+          return pair.check();
+        },
+        run: () => signUp(name.input.value.trim(), pair.value(), year.value()),
         done: r => {
           draftName = '';
           if (motionOK()) confetti();
@@ -400,7 +465,7 @@ export function accountScreen(root, { onBack, nav, mode = 'signin' }) {
       });
       form.append(tabs,
         h('p', { class: 'muted' }, 'Save your cards, Gold, Gems and season progress to an account, so they follow you to any device. A new account starts with every free starter deck, 300 Gold and 100 Dust; guest progress stays in this browser.'),
-        name.el, ...pair.els, err, submit);
+        name.el, year.el, ...pair.els, err, submit, legalNote());
     } else {
       const pw = passwordField('Password', { autocomplete: 'current-password' });
       if (draftName) pw.input.dataset.autofocus = '';

@@ -12,10 +12,12 @@ import {
   SEASON_PASS_GEMS, COSMETICS, ownsCosmetic, seasonName,
 } from '../data/economy.js';
 import { DECKS } from '../data/index.js';
+import { tip } from './tutorial.js';
 
 const money = n => `$${n.toFixed(2)}`;
 
 export function shop(root, { onBack, nav }) {
+  tip('shop', "Packs cost 100 Gold. You earn Gold from wins, the first win of each day and daily quests.");
   removeFx();
   const prefs = storage.get('metadeck.shop', { pack: DECKS[0].id });
   const body = h('div', { class: 'shop-body' });

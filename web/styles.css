@@ -8,6 +8,21 @@
 @font-face { font-family: 'Roboto'; src: url('assets/fonts/Roboto-Regular.ttf') format('truetype'); font-weight: 400; font-display: swap; }
 @font-face { font-family: 'Roboto'; src: url('assets/fonts/Roboto-Bold.ttf') format('truetype'); font-weight: 700; font-display: swap; }
 @font-face { font-family: 'Roboto Condensed'; src: url('assets/fonts/Roboto-BoldCondensed.ttf') format('truetype'); font-weight: 700; font-display: swap; }
+/* Rajdhani and Space Grotesk (SIL Open Font License: assets/fonts/*-OFL.txt), served from here rather
+   than Google Fonts so visitors' browsers never contact Google. Latin and Latin Extended subsets;
+   Space Grotesk is one variable font covering weights 300–700. */
+@font-face { font-family: 'Rajdhani'; font-weight: 600; font-display: swap; src: url('assets/fonts/rajdhani-600-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Rajdhani'; font-weight: 600; font-display: swap; src: url('assets/fonts/rajdhani-600-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: 'Rajdhani'; font-weight: 700; font-display: swap; src: url('assets/fonts/rajdhani-700-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Rajdhani'; font-weight: 700; font-display: swap; src: url('assets/fonts/rajdhani-700-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: 'Space Grotesk'; font-weight: 300 700; font-display: swap; src: url('assets/fonts/space-grotesk-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Space Grotesk'; font-weight: 300 700; font-display: swap; src: url('assets/fonts/space-grotesk-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
 
 :root {
   --bg-0: #04050b;
@@ -3218,3 +3233,64 @@ body:has(#app > .menu, #app > .match, #app > .collection, #app > .builder, #app 
 .site-banner span { flex: 1; }
 @keyframes bannerIn { from { opacity: 0; transform: translate(-50%, -16px) scale(.96); } }
 @media (max-width: 600px) { .site-banner { left: 16px; right: 16px; transform: none; max-width: none; font-size: 14px; } @keyframes bannerIn { from { opacity: 0; } } }
+
+/* ---------------------------------------------------------------- tutorial coach, tips, settings */
+.coach {
+  position: absolute; top: 74px; left: 50%; transform: translateX(-50%); z-index: 60; width: min(560px, calc(100% - 32px));
+  background: linear-gradient(180deg, rgba(26,30,62,.96), rgba(12,14,32,.97)); color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--accent) 60%, transparent); border-radius: 18px; padding: 12px 18px 14px;
+  box-shadow: 0 16px 44px rgba(0,0,0,.65), 0 0 34px -10px var(--accent);
+  animation: coachIn .5s var(--ease-spring) both;
+}
+.coach.waiting { border-color: var(--stroke-2); box-shadow: 0 12px 34px rgba(0,0,0,.55); opacity: .92; }
+.coach p { margin: 6px 0 0; line-height: 1.45; }
+.coach p b { color: var(--accent); }
+.coach .btn { margin-top: 10px; }
+.coach-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.coach-step { font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.coach-skip { background: none; border: 0; color: var(--muted); cursor: pointer; font: inherit; font-size: 13px; text-decoration: underline; padding: 2px 4px; }
+.coach-skip:hover { color: var(--text); }
+@keyframes coachIn { from { opacity: 0; transform: translate(-50%, -12px) scale(.97); } }
+.coach-glow { outline: 3px solid var(--accent); outline-offset: 4px; border-radius: 12px; animation: coachGlow 1.2s ease-in-out infinite; }
+@keyframes coachGlow { 50% { outline-color: color-mix(in srgb, var(--accent) 35%, transparent); box-shadow: 0 0 28px 4px color-mix(in srgb, var(--accent) 55%, transparent); } }
+
+.tutorial-offer {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 10px 0 4px; padding: 14px 18px;
+  border-radius: 18px; border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  background: linear-gradient(120deg, color-mix(in srgb, var(--accent) 16%, rgba(14,17,38,.9)), rgba(14,17,38,.85));
+  box-shadow: 0 10px 30px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.08);
+}
+.tutorial-offer > div { flex: 1; min-width: 200px; }
+.tutorial-offer b { color: var(--accent); }
+
+.tip-card {
+  position: fixed; right: 16px; bottom: 16px; z-index: 92; display: flex; align-items: flex-start; gap: 10px;
+  width: min(380px, calc(100% - 32px)); padding: 12px 12px 12px 14px; border-radius: 16px; color: var(--text);
+  background: linear-gradient(180deg, rgba(24,28,58,.96), rgba(11,13,30,.97)); border: 1px solid var(--stroke-2);
+  box-shadow: 0 14px 40px rgba(0,0,0,.6); animation: tipIn .45s var(--ease-spring) both;
+}
+.tip-card p { margin: 2px 0 0; flex: 1; line-height: 1.4; font-size: 14px; }
+.tip-icon { font-size: 20px; }
+@keyframes tipIn { from { opacity: 0; transform: translateY(14px) scale(.96); } }
+
+.settings-dialog { text-align: left; width: min(460px, 100%); }
+.settings-dialog h2 { text-align: center; }
+.settings-dialog section { margin-top: 18px; }
+.settings-dialog h3 { margin: 0 0 8px; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); }
+.setting-row { display: grid; grid-template-columns: 80px 1fr 48px; align-items: center; gap: 12px; padding: 6px 0; }
+.setting-row.check { grid-template-columns: auto 1fr; }
+.setting-row input[type="range"] { width: 100%; accent-color: var(--accent); }
+.setting-row output { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.setting-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+@media (max-width: 600px) {
+  .coach { top: 58px; padding: 10px 14px 12px; font-size: 14px; }
+  .tip-card { left: 16px; right: 16px; width: auto; bottom: calc(max(230px, 35vh) + 10px); }
+}
+@media (prefers-reduced-motion: reduce) { .coach-glow { animation: none; } }
+.site-foot { display: flex; justify-content: center; gap: 10px; margin: 26px 0 8px; font-size: 13px; color: var(--muted); }
+.site-foot a { color: var(--muted); text-decoration: none; }
+.site-foot a:hover { color: var(--text); text-decoration: underline; }
+.acct-ask { margin-top: 18px; padding: 14px 16px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); background: color-mix(in srgb, var(--accent) 8%, transparent); text-align: left; }
+.acct-note a { color: var(--accent); }
+select.acct-input { appearance: auto; }

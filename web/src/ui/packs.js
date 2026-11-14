@@ -7,6 +7,7 @@ import { renderCard, renderCardBack } from './card-view.js';
 import { motionOK, confetti, sparkle, screenShake, removeFx, deckEmblem, currency } from './fx.js';
 import { profile, act } from './profile.js';
 import { track } from './telemetry.js';
+import { sfx } from './audio.js';
 import { rewardLabel, RARITY, RARITY_ORDER, dustValue, archLevel, ARCH_LEVEL_XP, TIER_XP, seasonTier } from '../data/economy.js';
 import { CARDS, DECKS } from '../data/index.js';
 
@@ -78,6 +79,7 @@ export function openPacks(kind, onClose = () => {}) {
     busy = true;
     pack.classList.remove('idle');
     pack.classList.add('ripping');
+    sfx('pack-open');
     const res = await act('openPack', { kind });
     if (!res.ok) { busy = false; toast(res.reason, 'bad'); return close(); }
     track('pack_open', { kind });
@@ -94,6 +96,7 @@ export function openPacks(kind, onClose = () => {}) {
     const stack = h('div', { class: 'pack-stack', style: { '--n': shown } },
       Array.from({ length: shown }, (_, i) => h('div', { class: 'pack-stack-slot', style: { '--i': i } }, packArt(kind, 'big ripping'))));
     stage.replaceChildren(h('div', { class: 'pack-left' }, `Opening ${count} packs…`), stack);
+    sfx('pack-open');
     const res = await act('openPacks', { kind, count });
     if (!res.ok) { busy = false; toast(res.reason, 'bad'); return close(); }
     track('pack_open', { kind });
@@ -118,6 +121,9 @@ export function openPacks(kind, onClose = () => {}) {
     const flip = () => {
       if (el.classList.contains('flipped')) return;
       el.classList.add('flipped');
+      sfx('flip');
+      if (c.holo || c.premium) sfx('shine', { delay: 120 });
+      if (c.rarity !== 'common') sfx(`reveal-${c.rarity}`, { delay: 80 });
       el.setAttribute('aria-label', `${def.displayName}, ${RARITY[c.rarity].name}${c.holo ? ', hologram' : c.premium ? ', premium' : ''}`);
       const r = el.getBoundingClientRect();
       if (motionOK()) {
@@ -226,6 +232,8 @@ const cardChip = g => h('span', { class: `sum-chip${g.fresh ? ' fresh' : ''}`, s
 // Game-over rewards: Gold, season XP, quests finished and archetype level-ups.
 export function rewardsPanel(out, deckId) {
   const p = profile();
+  sfx(out?.levelUps?.length ? 'unlock' : 'reward', { delay: 300 });
+  if (out?.gold) sfx('coin', { delay: 700 });
   const deck = DECKS.find(d => d.id === deckId);
   const a = p.arch[deckId] ?? { xp: 0 };
   const lv = archLevel(a.xp);

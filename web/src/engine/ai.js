@@ -2,6 +2,10 @@
 // evaluation, and take the best one if it beats doing nothing. Spells that set up an attack
 // (pumps, Rush grants) also get credit for the best attack they enable. The same AI plays both
 // sides in tools/simulate.mjs, so it doubles as the balance-testing opponent.
+//
+// { difficulty: 'easy' } (a new player's first matches) sometimes passes on its best move and takes
+// one of the next best instead. It stays deterministic, choosing from a hash of the game state rather
+// than Math.random, because the server replays vs-AI matches to check them (server/ai-match.mjs).
 
 import {
   legalActions, applyAction, cloneState, decisionPlayer, monsters, getAttack, getHealth,
@@ -82,10 +86,12 @@ function scoreAfter(state, pid) {
   return evaluate(state, pid);
 }
 
-export function chooseAction(state) {
+export function chooseAction(state, { difficulty = 'normal' } = {}) {
   const pid = decisionPlayer(state);
   const actions = legalActions(state);
   if (!actions.length) return null;
+  const easy = difficulty === 'easy' && !state.pending;
+  const options = []; // easy only: every action that beat doing nothing, with its score
 
   if (state.pending) {
     const passed = simulate(state, { type: 'pass' });
@@ -113,7 +119,32 @@ export function chooseAction(state) {
     if (card && defOf(card).type === 'Spell') {
       sc = Math.max(sc, bestFollowUpAttack(next, pid) - 0.5);
     }
+    if (easy && sc > baseline + 0.05) options.push({ a, sc });
     if (sc > bestScore) { best = a; bestScore = sc; }
   }
+  if (easy && options.length > 1) {
+    const roll = stateHash(state);
+    if (roll % 100 < EASY_MISS_PCT) {
+      options.sort((x, y) => y.sc - x.sc);
+      return options[1 + (Math.floor(roll / 100) % Math.min(2, options.length - 1))].a;
+    }
+  }
   return best;
+}
+
+const EASY_MISS_PCT = 35;
+// A player's first matches against the AI are on easy.
+export const EASY_FIRST_GAMES = 3;
+export const difficultyFor = gamesPlayed => (gamesPlayed < EASY_FIRST_GAMES ? 'easy' : 'normal');
+
+// A number from the visible game state: the same state always gives the same number.
+function stateHash(state) {
+  let h = 2166136261;
+  const mix = n => { h = Math.imul(h ^ (n & 0xffff), 16777619) >>> 0; };
+  mix(state.turn); mix(state.uidSeq);
+  for (const p of state.players) {
+    mix(p.hp); mix(p.bw); mix(p.hand.length); mix(p.deck.length);
+    for (const m of p.board) if (m) { mix(m.uid); mix(m.attacks ?? 0); }
+  }
+  return h;
 }

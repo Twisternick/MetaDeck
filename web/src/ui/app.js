@@ -10,6 +10,10 @@ import { net } from './net.js';
 import { decksFor, resolveDeck, randomStarter, isPlayable } from './deck-store.js';
 import { profile, act, walletBar, signedIn, initAccount, reload, startAiMatch, finishAiMatch } from './profile.js';
 import { track, installTelemetry, showBanner } from './telemetry.js';
+import { difficultyFor } from '../engine/ai.js';
+import { installAudio, music } from './audio.js';
+import { settingsDialog } from './settings.js';
+import { tutorial as startTutorial, tutorialSeen, dismissTutorial, tip } from './tutorial.js';
 import { accountScreen } from './account.js';
 import { collection } from './collection.js';
 import { shop } from './shop.js';
@@ -32,6 +36,7 @@ installCardFit();
 installSettle(root);
 installTooltips(describeTip);
 installTelemetry();
+installAudio();
 
 const emblem = deck => deckEmblem(deck, 'chip-emblem');
 
@@ -115,6 +120,7 @@ function logo() {
 
 function menu() {
   removeFx();
+  music('music-menu');
   const pickOpponent = () => {
     if (prefs.oppDeck !== 'random') return prefs.oppDeck;
     const others = DECKS.filter(d => d.id !== prefs.myDeck);
@@ -127,17 +133,19 @@ function menu() {
     const launch = async () => {
       // Signed in, the server deals the match so it can check the result (server/ai-match.mjs).
       let deal = null, ticket = null;
+      let difficulty = spectate ? 'normal' : difficultyFor(profile().stats.games);
       if (!spectate && signedIn()) {
         const r = await startAiMatch({ myDeck: prefs.myDeck, myCards: mine.cards, oppDeck: opp, oppCards: theirs.cards });
-        if (r.ok) { deal = { seed: r.seed, firstPlayer: r.firstPlayer }; ticket = r.ticket; } else ticket = false;
+        if (r.ok) { deal = { seed: r.seed, firstPlayer: r.firstPlayer }; ticket = r.ticket; difficulty = r.difficulty ?? 'normal'; } else ticket = false;
       }
       track('match_start', { mode: spectate ? 'watch' : 'ai', deck: prefs.myDeck });
+      if (!spectate) setTimeout(() => tip('match', 'Hover any card, keyword or monster to read what it does (long-press on a phone). Esc cancels a move.'), 1500);
       startMatch(root, {
         myDeck: prefs.myDeck, oppDeck: opp, spectate,
         myCards: mine.cards, oppCards: theirs.cards,
         onExit: menu,
         onRematch: launch,
-        deal,
+        deal, difficulty,
         ...(spectate ? {} : matchExtras(prefs.myDeck, false, ticket)),
       });
     };
@@ -260,6 +268,10 @@ function menu() {
             class: `chip${prefs.oppDeck === d.id ? ' selected' : ''}`, style: { '--deck': d.color },
             onclick: () => { prefs.oppDeck = d.id; savePrefs(); render(false); },
           }, emblem(d), d.name)))),
+      !profile().tutorial && !tutorialSeen() ? h('div', { class: `tutorial-offer${animate ? ' rise' : ''}`, style: { '--i': 12 } },
+        h('div', null, h('b', null, 'New to MetaDeck?'), h('span', null, ' Learn the basics in about four minutes, and get a free pack.')),
+        h('button', { class: 'btn primary', onclick: tutorial }, 'Play the tutorial'),
+        h('button', { class: 'btn ghost small', 'aria-label': 'No thanks', onclick: () => { dismissTutorial(); render(false); } }, '✕')) : null,
       h('div', { class: `vs-strip${animate ? ' rise' : ''}`, style: { '--i': 13 } },
         vsSide(mine, 'You', false, myList.name),
         h('div', { class: 'vs-badge' }, 'VS'),
@@ -272,10 +284,20 @@ function menu() {
         h('button', { class: 'btn ghost', onclick: nav.shop }, 'Shop'),
         h('button', { class: 'btn ghost', onclick: () => gallery(prefs.myDeck) }, 'Card gallery'),
         h('button', { class: 'btn ghost', onclick: rules }, 'How to play'),
+        h('button', { class: 'btn ghost', onclick: () => settingsDialog({ onTutorial: tutorial }) }, 'Settings'),
         h('button', { class: 'btn ghost', onclick: () => balanceLab(root, { onBack: menu }) }, 'Balance lab')),
+      h('footer', { class: 'site-foot' },
+        h('a', { href: 'legal/privacy.html', target: '_blank', rel: 'noopener' }, 'Privacy'),
+        h('span', { 'aria-hidden': 'true' }, '·'),
+        h('a', { href: 'legal/terms.html', target: '_blank', rel: 'noopener' }, 'Terms')),
     ));
   };
   render(true);
+}
+
+// The tutorial match, then back to the menu.
+function tutorial() {
+  startTutorial(root, { onExit: menu });
 }
 
 // Online play with the deck list picked in the menu.

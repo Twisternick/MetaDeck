@@ -3,7 +3,7 @@
 // while the server writes.
 //
 // Tables:
-//   users     one row per account: name, password hash, recovery-code hash, and the economy profile (JSON)
+//   users     one row per account: name, password hash, recovery-code hash, birth year, and the economy profile (JSON)
 //   sessions  signed-in devices, by SHA-256 of the session token (the database never holds a live token)
 //   tickets   the vs-AI match each account is playing (server/ai-match.mjs)
 //   matches   every finished match the server ran or checked, for history, stats and ranked
@@ -39,6 +39,8 @@ const MIGRATIONS = [
      id INTEGER PRIMARY KEY, at TEXT NOT NULL, day TEXT NOT NULL, visitor TEXT, user TEXT, name TEXT NOT NULL, data TEXT
    );
    CREATE INDEX events_name ON events(name, day);`,
+  // 2: the birth year asked at sign-up (null for accounts made before the age check).
+  `ALTER TABLE users ADD COLUMN birth_year INTEGER;`,
 ];
 
 // Open (or create) the database and bring its schema up to date. `file` null or ':memory:' keeps it in memory.

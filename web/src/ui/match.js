@@ -19,6 +19,7 @@ import { getDeck, deckList, CARDS } from '../data/index.js';
 import { BOARD_SLOTS, START_HP, KEYWORDS } from '../engine/constants.js';
 import { rulesLines } from '../engine/text.js';
 import { kwName, kwIcon, kwColor, kwKind, kwText, kwHint, richText, glossaryList } from './keywords.js';
+import { sfx, music, playEvents } from './audio.js';
 
 const DRAG_THRESHOLD = 8;
 const LONG_PRESS_MS = 380;
@@ -31,7 +32,14 @@ const LONG_PRESS_MS = 380;
 // is called once when a match the human played ends; whatever it returns (the rewards) is shown on the
 // game-over screen. `moves` is every action the human made, in order: with deal = { seed, firstPlayer }
 // from the server (server/ai-match.mjs), the server replays them to check a vs-AI result.
-export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate = false, online = null, onExit, onRematch, cosmetics = null, onResult = null, deal = null }) {
+// script (offline only) steers a scripted match such as the tutorial (src/ui/tutorial.js):
+//   setup(state)            adjusts the new game before the first render
+//   ai(state)               the AI's next action, or null to let the normal AI choose
+//   allow(action, state)    null to allow one of the human's actions, or the reason it isn't allowed yet
+//   after(state, view, api) runs after every render, to draw the coaching on top; api = { refresh }
+//   difficulty              'easy' makes the AI take a weaker move now and then (src/engine/ai.js)
+// shuffle: false keeps both decks in the order given (they're drawn from the end), for a stacked match.
+export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate = false, online = null, onExit, onRematch, cosmetics = null, onResult = null, deal = null, script = null, difficulty = 'normal', shuffle = true }) {
   const cos = { back: 'back:classic', arena: 'arena:standard', finishes: new Map(), ...cosmetics };
   const HUMAN = online ? online.seat : 0;
   const OPP = 1 - HUMAN;
@@ -43,8 +51,11 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     names: spectate ? [`${me.name} AI`, `${them.name} AI`] : ['You', `${them.name} AI`],
     firstPlayer: deal ? deal.firstPlayer : Math.random() < 0.5 ? 0 : 1,
     seed: deal?.seed,
+    shuffle: shuffle ? null : () => {},
   });
+  if (!online) script?.setup?.(state);
   const moves = []; // the human's actions that the engine accepted, for the server's replay
+  music('music-match');
 
   const ui = {
     mode: 'idle',          // idle | target | attack
@@ -149,6 +160,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
   }
 
   function toast(text) {
+    sfx('error');
     ui.toast = text;
     render();
     const mine = text;
@@ -189,6 +201,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     ui.targets = [];
     if (!res.ok) { toast(res.reason); return false; }
     const events = res.events;
+    playEvents(events, { humanPid: HUMAN });
     if (events.some(e => e.type === 'keyword' || e.type === 'damage')) ui.quietUntil = Date.now() + 1400;
     for (const e of events) {
       if (e.type === 'play' && CARDS[e.id]) {
@@ -256,7 +269,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
       while (!state.over && !ui.exited && aiControls(decisionPlayer(state))) {
         await delay(ui.speed);
         if (ui.exited) return;
-        const action = chooseAction(state);
+        const action = script?.ai?.(state) ?? chooseAction(state, { difficulty });
         if (action.type === 'attack' || action.type === 'play' || action.type === 'respond') {
           highlightIntent(action);
           await delay(action.type === 'attack' ? ui.speed * 0.6 : ui.speed * 1.4);
@@ -278,6 +291,15 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
   // whose 'update' comes back through onServer like the opponent's moves.
   function submit(action) {
     if (!online) {
+      const refused = script?.allow?.(action, state);
+      if (refused) {
+        stopArrow();
+        ui.mode = 'idle';
+        ui.source = null;
+        ui.targets = [];
+        toast(refused);
+        return Promise.resolve();
+      }
       // Recorded as the engine takes it, not when its animation ends, so quick clicks keep their order.
       const record = a => { const res = applyLocal(a); if (res.ok) moves.push(a); return res; };
       return act(action, record).then(pump);
@@ -391,6 +413,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     pill.querySelector('b').textContent = fmtClock(left);
     pill.style.setProperty('--pct', `${(left / ui.clock.total) * 100}%`);
     pill.classList.toggle('urgent', secs <= 15);
+    if (secs <= 10 && secs > 0 && secs !== ui.lastTick && decisionPlayer(state) === HUMAN && !state.over) { ui.lastTick = secs; sfx('tick'); }
   }
 
   // Play a card from the hand (after a click or a drop on the mat). A card you can afford to Boost
@@ -519,6 +542,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
       const card = state.players[HUMAN].hand.find(c => c.uid === uid);
       if (!card) return;
       ui.drag = { kind: 'card', uid, card, el: cardEl, x0: e.clientX, y0: e.clientY, moved: false };
+      sfx('pickup');
       e.preventDefault();
     } else if (minionEl) {
       const uid = Number(minionEl.dataset.uid);
@@ -904,6 +928,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     const key = `${state.turn}:${state.active}`;
     if (key === ui.lastTurnKey || state.over) return;
     ui.lastTurnKey = key;
+    sfx(!spectate && state.active === HUMAN ? 'your-turn' : 'enemy-turn', { delay: ui.firstRender ? 500 : 0 });
     const p = state.players[state.active];
     const text = spectate ? `${p.name}` : state.active === HUMAN ? 'YOUR TURN' : 'ENEMY TURN';
     const cls = state.active === HUMAN ? 'good' : 'enemy';
@@ -977,15 +1002,19 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
       for (const c of p.hand) ui.seenHand.add(c.uid);
       ui.handCount[p.id] = p.hand.length;
     }
+    if (responding && !ui.alerted) sfx('alert');
+    ui.alerted = responding;
     if (state.over && !ui.celebrated) {
       ui.celebrated = true;
       stopArrow();
+      if (!spectate) sfx(state.winner === HUMAN ? 'victory' : 'defeat', { delay: 150 });
       if (state.winner === HUMAN || (spectate && state.winner !== 'draw')) {
         const deck = state.players[state.winner].deckId === me.id ? me : them;
         setTimeout(() => confetti(['#ffc53d', '#ffffff', deck.color, '#22d3ee', '#f472b6']), 200);
       }
     }
     ui.firstRender = false;
+    script?.after?.(state, view, { refresh: render });
   }
 
   // Fan the hand into an arc and overlap cards just enough to fit the row.

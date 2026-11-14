@@ -1,8 +1,10 @@
 // HTTP endpoints for accounts, under /api/account/:
-//   POST signup { name, password }    -> sets the session cookie, returns { name, profile, info, recoveryCode }
+//   POST signup { name, password, birthYear } -> sets the session cookie, returns { name, profile, info, recoveryCode }
 //   POST signin { name, password }    -> same, without the recovery code
 //   POST reset { name, code, password } -> forgotten password: like signup, with a fresh recovery code
 //   POST signout
+//   POST birthyear { year }           -> sets the birth year of an account made before sign-up asked for it
+//   GET  export                       -> a download of everything stored about the account (JSON)
 //   GET  me                           -> { name, profile, info }, or 401 when signed out
 //   POST newpassword { current, password } -> { signedOut } (other devices signed out; this one stays)
 //   POST recovery { password }        -> { recoveryCode } (replaces the old code)
@@ -64,15 +66,23 @@ export function handleAccountApi(req, res, route, ctx) {
     const me = accounts.me(sessionToken(req));
     return me ? send(res, 200, { ok: true, ...me, testPurchases: ctx.testPurchases(req) }) : send(res, 401, { ok: false, reason: 'Signed out.' });
   }
+  if (route === 'export' && req.method === 'GET') {
+    const data = accounts.exportData(sessionToken(req));
+    if (!data) return send(res, 401, { ok: false, reason: 'Signed out.' });
+    const file = `metadeck-${data.account.name}-${data.exported.slice(0, 10)}.json`;
+    return res.writeHead(200, {
+      'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Content-Disposition': `attachment; filename="${file}"`,
+    }).end(JSON.stringify(data, null, 2));
+  }
   if (!post) return send(res, 405, { ok: false, reason: 'Method not allowed.' }, { Allow: 'POST' });
 
   switch (route) {
     case 'signup':
     case 'signin':
     case 'reset':
-      return readJson(req, res, async ({ name, password, code }) => {
+      return readJson(req, res, async ({ name, password, code, birthYear }) => {
         const ip = ctx.clientIp(req);
-        const r = route === 'signup' ? await accounts.signUp(name, password, ip)
+        const r = route === 'signup' ? await accounts.signUp(name, password, ip, birthYear)
           : route === 'reset' ? await accounts.resetPassword(name, code, password, ip)
           : await accounts.signIn(name, password, ip);
         if (!r.ok) return send(res, route === 'signin' ? 401 : 400, r);
@@ -92,6 +102,11 @@ export function handleAccountApi(req, res, route, ctx) {
       return readJson(req, res, async ({ password }) => {
         const r = await accounts.newRecoveryCode(sessionToken(req), password, ctx.clientIp(req));
         send(res, r.status ?? (r.ok ? 200 : 400), r);
+      });
+    case 'birthyear':
+      return readJson(req, res, ({ year }) => {
+        const r = accounts.setBirthYear(sessionToken(req), year);
+        send(res, r.status ?? (r.ok ? 200 : 400), r, r.tooYoung ? { 'Set-Cookie': cookie('', ctx.secure(req), 0) } : {});
       });
     case 'signoutothers': {
       const r = accounts.signOutOthers(sessionToken(req));

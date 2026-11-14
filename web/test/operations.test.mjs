@@ -55,6 +55,28 @@ function request(pathname, { method = 'GET', headers = {}, body = null } = {}) {
   });
 }
 
+test('the privacy and terms pages are served, and nothing else in legal/', async () => {
+  for (const page of ['privacy', 'terms']) {
+    const r = await request(`/legal/${page}.html`);
+    assert.equal(r.status, 200, page);
+    assert.match(r.text, /<h1>/);
+  }
+  assert.equal((await request('/legal/legal.css')).status, 200);
+});
+
+test('the page loads nothing from third parties: fonts are served from here', async () => {
+  const page = await request('/index.html');
+  assert.doesNotMatch(page.text, /https?:\/\/(?!localhost)/, 'no external URLs in index.html');
+  assert.doesNotMatch(page.headers['content-security-policy'], /https:/, 'the CSP allows only this site');
+  const css = await request('/styles.css');
+  for (const [, file] of css.text.matchAll(/url\('(assets\/fonts\/[^']+\.woff2)'\)/g)) {
+    const font = await request(`/${file}`);
+    assert.equal(font.status, 200, file);
+    assert.equal(font.headers['content-type'], 'font/woff2');
+  }
+  assert.equal((await request('/legal/../serve.mjs')).status, 404);
+});
+
 test('health check and version', async () => {
   const h = await request('/healthz');
   assert.equal(h.status, 200);
@@ -87,7 +109,7 @@ test("admin routes need the token, and a tunnel's headers make a local request c
     assert.equal(r.status, 403, h);
   }
   // Test purchases are only for this machine as well.
-  const signup = await request('/api/account/signup', { method: 'POST', body: { name: 'Tunnel_1', password: 'longenough' }, headers: { 'cf-connecting-ip': '203.0.113.9' } });
+  const signup = await request('/api/account/signup', { method: 'POST', body: { name: 'Tunnel_1', password: 'longenough', birthYear: 2000 }, headers: { 'cf-connecting-ip': '203.0.113.9' } });
   assert.equal(signup.json.testPurchases, false);
 });
 

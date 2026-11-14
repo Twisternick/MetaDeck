@@ -11,11 +11,13 @@ import {
   archInfo, archLevel, ARCH_LEVEL_XP, ARCH_MAX_LEVEL, STARTER_UNLOCKS, QUEST_XP,
 } from '../data/economy.js';
 import { DECKS, starterDecks } from '../data/index.js';
+import { tip } from './tutorial.js';
 
 const REWARD_ICONS = { pack: '🎴', cosmetic: '🎨', premiumCard: '🌟', holoCard: '💠', cards: '📦' };
 const rewardIcon = type => (['gold', 'gems', 'dust'].includes(type) ? currency(type) : REWARD_ICONS[type]);
 
 export function season(root, { onBack, nav }) {
+  tip('season', "Every match earns season XP. Climb the 40 tiers and claim a reward at each one; daily quests give extra XP.");
   removeFx();
   const body = h('div', { class: 'season-body' });
   let scrolled = false;

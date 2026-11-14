@@ -49,7 +49,7 @@ export async function initAccount() {
 
 // Each resolves to the server's answer: { ok, reason? , ... }. Sign-up and reset also carry the
 // account's new `recoveryCode`, for the player to save.
-export async function signUp(name, password) { return authenticate('signup', { name, password }); }
+export async function signUp(name, password, birthYear) { return authenticate('signup', { name, password, birthYear }); }
 export async function signIn(name, password) { return authenticate('signin', { name, password }); }
 export async function resetPassword(name, code, password) { return authenticate('reset', { name, code, password }); }
 async function authenticate(path, body) {
@@ -81,6 +81,31 @@ export async function newRecoveryCode(password) {
   const r = await manage('recovery', { password });
   if (r.ok && account) account.recovery = true;
   return r;
+}
+// For an account made before sign-up asked for a birth year. An under-age answer signs the account out.
+export async function setBirthYear(year) {
+  const r = await manage('birthyear', { year });
+  if (r.ok && account) account.birthYear = year;
+  if (r.tooYoung) forget();
+  return r;
+}
+// Download everything the server stores about the account, as a JSON file.
+export async function downloadMyData() {
+  try {
+    const res = await fetch('/api/account/export', { credentials: 'same-origin' });
+    if (res.status === 401) { forget(); return { ok: false, reason: 'Please sign in again.' }; }
+    if (!res.ok) return { ok: false, reason: 'The download didn’t work. Try again.' };
+    const name = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1] ?? 'metadeck-data.json';
+    const url = URL.createObjectURL(await res.blob());
+    const a = h('a', { href: url, download: name });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    return { ok: true };
+  } catch {
+    return { ok: false, reason: 'Can’t reach the server. Check your connection.' };
+  }
 }
 export async function signOutOthers() {
   const r = await manage('signoutothers');

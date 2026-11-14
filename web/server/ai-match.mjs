@@ -2,11 +2,12 @@
 // match it didn't win.
 //
 // The match still runs in the browser (instant moves, no turn clock), but the server deals it:
-//   POST /api/account/aistart { myDeck, myCards, oppDeck, oppCards } -> { ticket, seed, firstPlayer }
+//   POST /api/account/aistart { myDeck, myCards, oppDeck, oppCards } -> { ticket, seed, firstPlayer, difficulty }
 // The browser creates its game with that seed and first player and keeps a list of the player's moves.
 //   POST /api/account/aifinish { ticket, moves }                      -> { won, out } (the rewards)
 // The server then plays the same match again: same decks, seed and first player, the player's moves in
-// order, and the AI (src/engine/ai.js, deterministic for a given state) choosing every one of its own.
+// order, and the AI (src/engine/ai.js, deterministic for a given state) choosing every one of its own,
+// at the difficulty the server picked (easy for an account's first few matches).
 // The engine is deterministic too, so an honest list of moves reproduces the browser's game exactly;
 // rewards are paid from the server's result, not the browser's. A list that makes an illegal move or
 // stops before the game ends earns nothing.
@@ -17,7 +18,7 @@
 
 import crypto from 'node:crypto';
 import { createGame, applyAction, decisionPlayer } from '../src/engine/game.js';
-import { chooseAction } from '../src/engine/ai.js';
+import { chooseAction, difficultyFor } from '../src/engine/ai.js';
 import { getDeck, deckErrors } from '../src/data/index.js';
 import { START_HP } from '../src/engine/constants.js';
 import { missingCards } from '../src/data/economy.js';
@@ -54,9 +55,9 @@ export function createAiMatches({ accounts, now = () => new Date() }) {
       if (t - (lastStart.get(account.key) ?? 0) < START_GAP_MS) return { ok: false, status: 429, reason: 'Slow down: starting matches too quickly.' };
       lastStart.set(account.key, t);
       const ticket = crypto.randomBytes(16).toString('base64url');
-      const deal = { myDeck, myCards: [...myCards], oppDeck, oppCards: [...oppCards], seed: crypto.randomBytes(4).readInt32LE(0), firstPlayer: crypto.randomInt(2), started: t };
+      const deal = { myDeck, myCards: [...myCards], oppDeck, oppCards: [...oppCards], seed: crypto.randomBytes(4).readInt32LE(0), firstPlayer: crypto.randomInt(2), started: t, difficulty: difficultyFor(profile.stats.games) };
       q.put.run(account.key, ticket, JSON.stringify(deal), t + TICKET_MS);
-      return { ok: true, ticket, seed: deal.seed, firstPlayer: deal.firstPlayer };
+      return { ok: true, ticket, seed: deal.seed, firstPlayer: deal.firstPlayer, difficulty: deal.difficulty };
     },
 
     // Replay the finished match and pay out what the server's own replay says.
@@ -88,7 +89,7 @@ export function createAiMatches({ accounts, now = () => new Date() }) {
 
 // Play a dealt match again from the player's moves (seat 0) and the AI's own choices (seat 1).
 // Returns { ok: true, game } once the game is over, or { ok: false, reason }.
-export function replay({ myDeck, myCards, oppDeck, oppCards, seed, firstPlayer }, moves) {
+export function replay({ myDeck, myCards, oppDeck, oppCards, seed, firstPlayer, difficulty = 'normal' }, moves) {
   const game = createGame({
     decks: [myCards, oppCards], deckIds: [myDeck, oppDeck],
     names: ['You', `${getDeck(oppDeck).name} AI`], firstPlayer, seed,
@@ -102,7 +103,7 @@ export function replay({ myDeck, myCards, oppDeck, oppCards, seed, firstPlayer }
       action = cleanAction(moves[next++]);
       if (!action) return { ok: false, reason: `move ${next} is malformed` };
     } else {
-      action = chooseAction(game);
+      action = chooseAction(game, { difficulty });
       if (!action) return { ok: false, reason: 'the AI had no move' };
     }
     const res = applyAction(game, action);

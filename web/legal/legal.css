@@ -1,0 +1,22 @@
+/* The privacy and terms pages: plain, readable, in the game's colours. */
+:root {
+  --bg: #0a0d1c; --panel: #12162e; --text: #e8ebfa; --muted: #9aa2c4; --accent: #ffc53d; --line: rgba(255, 255, 255, .12);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: radial-gradient(ellipse 90% 50% at 50% -10%, #1a1f45, var(--bg) 60%) fixed, var(--bg); color: var(--text);
+  font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 760px; margin: 0 auto; padding: 40px 16px 80px; }
+header a { color: var(--muted); text-decoration: none; font-size: 15px; }
+header a:hover { color: var(--text); }
+h1 { font-size: clamp(28px, 6vw, 40px); line-height: 1.15; margin: 18px 0 6px; }
+.updated { color: var(--muted); margin: 0 0 28px; }
+h2 { font-size: 21px; margin: 36px 0 8px; padding-top: 18px; border-top: 1px solid var(--line); }
+h3 { font-size: 17px; margin: 22px 0 6px; }
+a { color: var(--accent); }
+table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 15px; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-weight: 600; }
+.summary { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 6px 20px; }
+.todo { background: rgba(255, 197, 61, .14); border-radius: 4px; padding: 0 4px; }
+@media (max-width: 600px) { table, thead, tbody, tr, th, td { display: block; } thead { display: none; } td { border: 0; padding: 4px 0; } tr { border-bottom: 1px solid var(--line); padding: 8px 0; } td:first-child { font-weight: 600; } }
