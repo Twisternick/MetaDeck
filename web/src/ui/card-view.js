@@ -9,7 +9,7 @@ import { DECKS } from '../data/index.js';
 import { KEYWORDS, TERMS } from '../engine/constants.js';
 import { rulesLines } from '../engine/text.js';
 import { getAttack, getHealth, getMaxHealth, hasKeyword, defOf, attackBonuses } from '../engine/game.js';
-import { artSlot, cardArtUrls, cardBackUrls } from './fx.js';
+import { artSlot, deckEmblem, cardArtUrls, cardBackUrls, backSkinUrls } from './fx.js';
 import { kwChip, richText, kwIcon, kwKind, kwColor, kwName, glossaryList } from './keywords.js';
 import { rarityOf, RARITY } from '../data/economy.js';
 
@@ -33,22 +33,25 @@ function typeLine(def, deck) {
   ];
 }
 
-// `premium` draws the animated premium version (a cosmetic the player owns; it plays the same).
+// `premium` draws a finish the player owns (a cosmetic; it plays the same): true or 'premium' for the
+// animated premium version, 'holo' for the hologram, whose art is projected up out of the card.
 export function renderCard(def, { cost = def.cost, classes = '', onclick, attrs = {}, ownerDeckId = null, large = false, premium = false } = {}) {
   const { deck, style } = deckStyle(def, ownerDeckId);
+  const holo = premium === 'holo';
   const costClass = cost > def.cost ? ' cost-up' : '';
   const costTip = cost > def.cost ? `Costs ${cost - def.cost} more: an enemy Tax monster is on the board.` : null;
   const rarity = def.deckId ? rarityOf(def.cardId) : null;
   return h('div', {
-    class: `card ${def.type === 'Spell' ? 'spell' : 'monster'}${def.speedWindow === 'Quick' ? ' quick' : ''}${rarity ? ` rarity-${rarity}` : ''}${premium ? ' premium' : ''} ${classes}`,
-    style, onclick, 'data-tilt': '12', ...attrs,
+    class: `card ${def.type === 'Spell' ? 'spell' : 'monster'}${def.speedWindow === 'Quick' ? ' quick' : ''}${rarity ? ` rarity-${rarity}` : ''}${holo ? ' holo' : premium ? ' premium' : ''} ${classes}`,
+    style, onclick, 'data-tilt': '12', 'data-deck': themeFrame(deck, rarity ?? 'common'), ...attrs,
   },
     h('div', { class: `card-cost${costClass}`, 'data-kw': costTip ? null : 'Bandwidth', 'data-tip': costTip, 'data-tip-title': costTip ? `${kwIcon('Tax')} Taxed` : null }, cost),
     def.isNew ? h('div', { class: 'card-new' }, 'NEW') : null,
-    artSlot('card-art', cardArtUrls(def, ownerDeckId), deck.icon, { label: large || classes.includes('large'), alt: '' }),
+    artSlot('card-art', cardArtUrls(def, ownerDeckId), deckEmblem(deck), { label: large || classes.includes('large'), alt: '' }),
     h('div', { class: 'card-title' },
       h('div', { class: 'card-name' }, def.displayName),
       h('div', { class: 'card-type' }, typeLine(def, deck))),
+    arcName(def.displayName, rarity ?? 'common', holo ? 'holo' : premium ? 'premium' : ''),
     h('div', { class: 'card-body' },
       def.keywords.length ? h('div', { class: 'card-kws' }, def.keywords.map(k => kwChip(k))) : null,
       rulesLines(def).map(line => h('div', { class: 'card-line' }, richText(line))),
@@ -58,11 +61,107 @@ export function renderCard(def, { cost = def.cost, classes = '', onclick, attrs 
           h('span', { class: 'stat atk', 'data-tip': 'Attack: damage this deals when it fights.', 'data-tip-title': 'Attack' }, def.baseAttack),
           h('span', { class: 'stat hp', 'data-tip': 'Health: it is destroyed when this reaches 0.', 'data-tip-title': 'Health' }, def.baseHealth))
       : null,
+    // The rarity frame (ui/frame-<rarity>) is drawn over the art; tokens get the common one.
+    h('div', { class: `card-frame frame-${rarity ?? 'common'}`, 'aria-hidden': 'true' }),
     rarity ? h('div', { class: 'card-gem', 'data-tip': `${RARITY[rarity].name} card`, 'data-tip-title': 'Rarity' }) : null,
-    premium ? h('div', { class: 'card-premium', 'aria-hidden': 'true' }, h('i'), h('i'), h('i')) : null,
+    premium && !holo ? h('div', { class: 'card-premium', 'aria-hidden': 'true' }, h('i'), h('i'), h('i')) : null,
+    holo ? holoProjection('card-holo', cardArtUrls(def, ownerDeckId), deck) : null,
     h('div', { class: 'card-foil', 'aria-hidden': 'true' }),
     h('div', { class: 'card-glare', 'aria-hidden': 'true' }),
   );
+}
+
+// Deck-themed frames: the first time a card of a deck and rarity is drawn, that rarity's frame art is
+// recoloured on a canvas: the blue (or epic violet) enamel takes the deck's colour and the silver picks up
+// a hint of it, while the gold trim, and with it the rarity read, stays. The plain frame shows until it's ready.
+const themedFrames = new Set();
+let frameSheet;
+function themeFrame(deck, rarity) {
+  if (!deck.id) return null; // tokens keep the plain frame
+  const key = `${deck.id}|${rarity}`;
+  if (themedFrames.has(key)) return deck.id;
+  themedFrames.add(key);
+  const img = new Image();
+  img.src = `assets/img/ui/frame-${rarity}.webp`;
+  img.decode().then(() => {
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0);
+    const px = ctx.getImageData(0, 0, c.width, c.height);
+    tintFrame(px.data, deck.color);
+    ctx.putImageData(px, 0, 0);
+    return new Promise(done => c.toBlob(done, 'image/webp', .92));
+  }).then(blob => {
+    frameSheet ??= document.head.appendChild(document.createElement('style')).sheet;
+    frameSheet.insertRule(`.card[data-deck="${deck.id}"] > .card-frame.frame-${rarity} { background-image: url(${URL.createObjectURL(blob)}); }`);
+  }).catch(() => themedFrames.delete(key));
+  return deck.id;
+}
+
+function hsl(r, g, b) {
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 510, d = (max - min) / 255;
+  if (!d) return [0, 0, l];
+  const s = d / (1 - Math.abs(2 * l - 1));
+  const h = max === r ? ((g - b) / (max - min) + 6) % 6 : max === g ? (b - r) / (max - min) + 2 : (r - g) / (max - min) + 4;
+  return [h * 60, Math.min(1, s), l];
+}
+function rgbOf(h, s, l, out, i) {
+  const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2;
+  const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+  out[i] = (r + m) * 255; out[i + 1] = (g + m) * 255; out[i + 2] = (b + m) * 255;
+}
+function tintFrame(px, color) {
+  const n = parseInt(color.slice(1), 16);
+  const [dh, ds] = hsl(n >> 16, (n >> 8) & 255, n & 255);
+  for (let i = 0; i < px.length; i += 4) {
+    if (!px[i + 3]) continue;
+    const [h, s, l] = hsl(px[i], px[i + 1], px[i + 2]);
+    if (s > .25 && h > 185 && h < 305) rgbOf(dh, Math.min(1, Math.max(s, ds) * 1.05), l, px, i); // enamel and its glow
+    else if (s < .2 && l > .3) rgbOf(dh, ds * .3, l, px, i); // silver
+  }
+}
+
+// The card name, set along the arched name banner of the rarity's frame with an SVG textPath. The
+// banner's centreline (y) and how far its ends drop (sag) were measured on the 560×784 frames; the
+// viewBox matches them so the curve lines up at any card size. Names too long for the banner are squeezed.
+const BANNER = { common: [424, 20], rare: [409, 9], epic: [408, 11], legendary: [413, 8] };
+const NAME_PX = 36, NAME_ROOM = 340;
+const SVG = 'http://www.w3.org/2000/svg';
+const svg = (tag, attrs, ...kids) => {
+  const el = document.createElementNS(SVG, tag);
+  for (const [k, v] of Object.entries(attrs)) if (v != null) el.setAttribute(k, v);
+  el.append(...kids);
+  return el;
+};
+let arcIds = 0;
+let measure;
+const nameWidth = text => {
+  measure ??= document.createElement('canvas').getContext('2d');
+  measure.font = `700 ${NAME_PX}px Rajdhani, 'Roboto Condensed', sans-serif`;
+  return measure.measureText(text).width;
+};
+function arcName(text, rarity, finish) {
+  const [y, sag] = BANNER[rarity];
+  const base = y + NAME_PX * .34; // baseline that centres the letters on the banner
+  const id = `name-arc-${++arcIds}`;
+  return svg('svg', { class: `card-name-arc${finish ? ` ${finish}` : ''}`, viewBox: '0 0 560 784', preserveAspectRatio: 'none', 'aria-hidden': 'true' },
+    svg('path', { id, d: `M 90 ${base + sag} Q 280 ${base - sag} 470 ${base + sag}`, fill: 'none' }),
+    svg('text', { 'font-size': NAME_PX },
+      svg('textPath', {
+        href: `#${id}`, startOffset: '50%', 'text-anchor': 'middle',
+        textLength: nameWidth(text) > NAME_ROOM ? NAME_ROOM : null, lengthAdjust: 'spacingAndGlyphs',
+      }, text)));
+}
+
+// A hologram's projection: the card's art floating above its art window, with the light beam that
+// throws it up from an emitter in the window. It follows the card's tilt (--px/--py, see installTilt) a
+// little further than the card itself, which is what makes it read as hovering above it.
+function holoProjection(className, urls, deck) {
+  return h('div', { class: className, 'aria-hidden': 'true' },
+    h('i', { class: 'holo-beam' }),
+    artSlot('holo-art', urls, deckEmblem(deck)),
+    h('i', { class: 'holo-emitter' }));
 }
 
 // `skin` is a card back cosmetic id ('back:aurora'); the classic back is the art slot alone.
@@ -70,7 +169,22 @@ export function renderCardBack(classes = '', skin = 'back:classic') {
   const name = skin.split(':')[1];
   return h('div', { class: `card card-back ${classes}`, 'data-back': name },
     artSlot('', cardBackUrls(), 'M'),
-    name !== 'classic' ? h('div', { class: 'back-skin', 'aria-hidden': 'true' }, h('span', null, 'M')) : null);
+    name !== 'classic' ? backSkin(name) : null);
+}
+
+// A non-classic back: its painted image (ui/back-<name>, made in the Art Studio) over the CSS skin it
+// falls back to, with a foil sheen sweeping across either one.
+export function backSkin(name) {
+  return h('div', { class: 'back-skin', 'aria-hidden': 'true' },
+    artSlot('back-img', backSkinUrls(name), ''), h('span', null, 'M'), h('i', { class: 'back-sheen' }));
+}
+
+// Ambient motion for an arena skin: a few drifting particles (embers, stars, fog...) styled per arena in
+// styles.css. Positions are fixed per index so re-renders don't make them jump.
+export function arenaFx(name) {
+  if (name === 'standard') return null;
+  return h('div', { class: 'arena-fx', 'data-arena': name, 'aria-hidden': 'true' },
+    Array.from({ length: 9 }, (_, i) => h('i', { style: { '--x': `${(i * 37 + 11) % 100}%`, '--y': `${(i * 53 + 7) % 100}%`, '--d': `${-i * 1.7}s`, '--s': `${0.6 + ((i * 29) % 10) / 12}` } })));
 }
 
 // Keywords that mean nothing on the board on their own (tags), hidden from badges to save room.
@@ -106,10 +220,11 @@ export function renderMinion(state, m, { classes = '', onclick, onmouseenter, pr
 
   const bonusTip = bonuses.map(b => `${kwName(b.keyword)} +${b.amount}`).join(', ');
   return h('div', {
-    class: `minion ${flags}${premium ? ' premium' : ''} ${classes}`, style, 'data-uid': m.uid, 'data-tilt': '10', onclick, onmouseenter,
+    class: `minion ${flags}${premium === 'holo' ? ' holo' : premium ? ' premium' : ''} ${classes}`, style, 'data-uid': m.uid, 'data-tilt': '10', onclick, onmouseenter,
     role: 'button', tabindex: '0', 'aria-label': `${def.displayName}, ${atk} attack, ${hp} health`,
   },
-    artSlot('minion-art', cardArtUrls(def, ownerDeckId), deck.icon),
+    artSlot('minion-art', cardArtUrls(def, ownerDeckId), deckEmblem(deck)),
+    premium === 'holo' ? holoProjection('minion-holo', cardArtUrls(def, ownerDeckId), deck) : null,
     // Keyword strip between the art and the name: named chips, icon-only when there are too many to fit.
     kws.length || m.xp ? h('div', { class: `minion-badges${kws.length > 2 ? ' compact' : ''}` },
       kws.map(k => h('span', {

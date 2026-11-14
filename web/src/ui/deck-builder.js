@@ -4,11 +4,11 @@
 
 import { h } from './dom.js';
 import { renderCard, renderPreview } from './card-view.js';
-import { motionOK, flyTo, sparkle, removeFx } from './fx.js';
+import { motionOK, flyTo, sparkle, removeFx, deckEmblem } from './fx.js';
 import { getDeck, CARDS, DECK_SIZE, MAX_COPIES, countCards, deckErrors, starterDecks } from '../data/index.js';
 import { saveCustomDeck, deleteCustomDeck } from './deck-store.js';
 import { profile } from './profile.js';
-import { ownedTotal, missingCards, missingDust, hasPremium } from '../data/economy.js';
+import { ownedTotal, missingCards, missingDust, bestFinish } from '../data/economy.js';
 
 const COST_FILTERS = ['All', 1, 2, 3, 4, 5, 6, '7+'];
 const TYPE_FILTERS = ['All', 'Monster', 'Spell'];
@@ -95,7 +95,7 @@ export function deckBuilder(root, { archetype, deck = null, onBack, onPlay }) {
         if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); remove(def.cardId); }
       },
     },
-      renderCard(def, { attrs: { style: `--deck:${arch.color}` }, premium: hasPremium(profile(), def.cardId) && profile().cosmetics.premiumArt }),
+      renderCard(def, { attrs: { style: `--deck:${arch.color}` }, premium: profile().cosmetics.premiumArt && bestFinish(profile(), def.cardId) }),
       h('div', { class: 'pool-copies', 'aria-hidden': 'true' }, Array.from({ length: MAX_COPIES }, (_, k) =>
         h('span', { class: `pip${k >= ownedTotal(profile(), def.cardId) ? ' unowned' : ''}` }))),
       ownedTotal(profile(), def.cardId) ? null : h('div', { class: 'pool-lock' }, '🔒 Not owned'),
@@ -242,7 +242,7 @@ export function deckBuilder(root, { archetype, deck = null, onBack, onPlay }) {
       h('button', { class: 'btn ghost small', onclick: leave }, '← Menu'),
       h('h1', null, 'Deck builder'),
       h('span', { class: 'chip selected builder-arch', style: { '--deck': arch.color } },
-        h('span', { class: 'chip-emblem', 'aria-hidden': 'true' }, arch.icon), arch.name)),
+        deckEmblem(arch, 'chip-emblem'), arch.name)),
     h('div', { class: 'builder-layout' },
       h('section', { class: 'pool' },
         h('div', { class: 'pool-filters rise' },

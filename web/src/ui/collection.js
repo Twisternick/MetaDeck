@@ -2,14 +2,14 @@
 // unopened packs and your cosmetics (card backs, arenas, premium art).
 
 import { h, storage } from './dom.js';
-import { renderCard, renderCardBack, glossaryFor } from './card-view.js';
-import { removeFx, sparkle, motionOK } from './fx.js';
+import { renderCard, renderCardBack, glossaryFor, arenaFx } from './card-view.js';
+import { removeFx, sparkle, motionOK, deckEmblem, currency } from './fx.js';
 import { glossaryList } from './keywords.js';
 import { profile, act, walletBar } from './profile.js';
 import { openPacks, packArt, packName, rarityColor, toast } from './packs.js';
 import {
   RARITY, RARITY_ORDER, rarityOf, owned, ownedTotal, spareCopies, craftCost, dustValue, upgradeCost,
-  COSMETICS, ownsCosmetic, CORE_COPIES,
+  COSMETICS, ownsCosmetic, CORE_COPIES, bestFinish,
 } from '../data/economy.js';
 import { DECKS, CARDS, MAX_COPIES } from '../data/index.js';
 
@@ -52,7 +52,7 @@ export function collection(root, { onBack, nav, tab = null, deckId = null }) {
     return h('div', { style: { '--deck': deck.color } },
       h('nav', { class: 'chips', 'aria-label': 'Archetypes' }, DECKS.map(d => h('button', {
         class: `chip${d.id === deck.id ? ' selected' : ''}`, style: { '--deck': d.color }, onclick: () => { prefs.deck = d.id; render(); },
-      }, h('span', { class: 'chip-emblem', 'aria-hidden': 'true' }, d.icon), d.name))),
+      }, deckEmblem(d, 'chip-emblem'), d.name))),
       h('div', { class: 'col-filters' },
         h('div', { class: 'col-progress' },
           h('b', null, `${have} / ${all.length}`), ' cards owned · ', h('b', null, complete), ' complete',
@@ -67,15 +67,15 @@ export function collection(root, { onBack, nav, tab = null, deckId = null }) {
   function colTile(def, i) {
     const p = profile();
     const c = owned(p, def.cardId);
-    const n = c.n + c.p;
+    const n = c.n + c.p + c.h;
     return h('div', {
       class: `col-tile rise${n ? '' : ' unowned'}`, style: { '--i': Math.min(i, 24) }, role: 'button', tabindex: '0',
       onclick: () => craftDialog(def), onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); craftDialog(def); } },
     },
-      renderCard(def, { premium: c.p > 0 && p.cosmetics.premiumArt }),
+      renderCard(def, { premium: p.cosmetics.premiumArt && bestFinish(p, def.cardId) }),
       h('div', { class: 'col-count' },
-        Array.from({ length: MAX_COPIES }, (_, k) => h('span', { class: `pip${k < c.p ? ' premium' : k < n ? ' on' : ''}` })),
-        n ? null : h('span', { class: 'col-craft' }, `✨ ${craftCost(def.cardId)}`)));
+        Array.from({ length: MAX_COPIES }, (_, k) => h('span', { class: `pip${k < c.h ? ' holo' : k < c.h + c.p ? ' premium' : k < n ? ' on' : ''}` })),
+        n ? null : h('span', { class: 'col-craft' }, currency('dust'), ` ${craftCost(def.cardId)}`)));
   }
 
   function craftDialog(def) {
@@ -89,7 +89,7 @@ export function collection(root, { onBack, nav, tab = null, deckId = null }) {
       const c = owned(p, def.cardId);
       const rarity = rarityOf(def.cardId);
       const spare = spareCopies(p, def.cardId);
-      const full = c.n + c.p >= MAX_COPIES;
+      const full = c.n + c.p + c.h >= MAX_COPIES;
       const run = (op, args, msg) => async e => {
         e.currentTarget.disabled = true;
         const res = await act(op, { id: def.cardId, ...args });
@@ -99,25 +99,30 @@ export function collection(root, { onBack, nav, tab = null, deckId = null }) {
       };
       const btn = (label, cost, enabled, onclick, cls = 'primary') =>
         h('button', { class: `btn ${cls}`, disabled: enabled ? null : true, onclick }, label, cost ? h('span', { class: 'btn-cost' }, cost) : null);
-      const cardEl = renderCard(def, { classes: 'large', large: true, premium: c.p > 0 && p.cosmetics.premiumArt });
+      const cardEl = renderCard(def, { classes: 'large', large: true, premium: p.cosmetics.premiumArt && bestFinish(p, def.cardId) });
+      const kinds = [c.n && `${c.n} normal`, c.p && `${c.p} premium`, c.h && `${c.h} hologram`].filter(Boolean);
       panel.replaceChildren(
         h('div', { class: 'craft-card' }, cardEl),
         h('div', { class: 'craft-side' },
           h('div', { class: 'craft-rarity', style: { '--glow': rarityColor(rarity) } }, RARITY[rarity].name, CORE_COPIES[def.cardId] ? ' · Core set' : ''),
           h('h2', null, def.displayName),
-          h('p', { class: 'muted' }, `You own ${c.n} normal${c.p ? ` and ${c.p} premium` : ''} ${c.n + c.p === 1 ? 'copy' : 'copies'} (max ${MAX_COPIES} in a deck).`),
-          h('p', { class: 'craft-dust' }, '✨ ', h('b', null, p.dust.toLocaleString()), ' Dust'),
+          h('p', { class: 'muted' }, `You own ${kinds.length ? kinds.join(', ').replace(/, ([^,]*)$/, ' and $1') : 0} ${c.n + c.p + c.h === 1 ? 'copy' : 'copies'} (max ${MAX_COPIES} in a deck).`),
+          h('p', { class: 'craft-dust' }, currency('dust'), ' ', h('b', null, p.dust.toLocaleString()), ' Dust'),
           h('div', { class: 'craft-actions' },
-            btn('Craft', `✨ ${craftCost(def.cardId)}`, !full && p.dust >= craftCost(def.cardId),
+            btn('Craft', [currency('dust'), ` ${craftCost(def.cardId)}`], !full && p.dust >= craftCost(def.cardId),
               run('craft', {}, r => `Crafted ${def.displayName} (−${r.cost} Dust)`)),
-            btn('Craft premium', `✨ ${craftCost(def.cardId, true)}`, !full && p.dust >= craftCost(def.cardId, true),
+            btn('Craft premium', [currency('dust'), ` ${craftCost(def.cardId, true)}`], !full && p.dust >= craftCost(def.cardId, true),
               run('craft', { premium: true }, () => `Crafted premium ${def.displayName}`), 'primary online'),
-            btn('Upgrade to premium', `✨ ${upgradeCost(def.cardId)}`, c.n > 0 && p.dust >= upgradeCost(def.cardId),
+            btn('Upgrade to premium', [currency('dust'), ` ${upgradeCost(def.cardId)}`], c.n > 0 && p.dust >= upgradeCost(def.cardId),
               run('upgrade', {}, () => `${def.displayName} is now premium`), 'ghost'),
+            btn('Upgrade to hologram', [currency('dust'), ` ${upgradeCost(def.cardId, true)}`], c.p > 0 && p.dust >= upgradeCost(def.cardId, true),
+              run('upgrade', { holo: true }, () => `${def.displayName} is now a hologram`), 'holo-btn'),
             btn('Disenchant', `+${dustValue(def.cardId)}`, spare > 0 && c.n > 0,
               run('disenchant', {}, r => `+${r.value} Dust`), 'danger'),
             c.p ? btn('Disenchant premium', `+${dustValue(def.cardId, true)}`, spare > 0,
-              run('disenchant', { premium: true }, r => `+${r.value} Dust`), 'danger') : null),
+              run('disenchant', { premium: true }, r => `+${r.value} Dust`), 'danger') : null,
+            c.h ? btn('Disenchant hologram', `+${dustValue(def.cardId, false, true)}`, spare > 0,
+              run('disenchant', { holo: true }, r => `+${r.value} Dust`), 'danger') : null),
           spare ? null : h('p', { class: 'muted small' }, 'Core set copies can’t be disenchanted, so your free starter deck always works.'),
           glossaryList(glossaryFor(def))),
         h('button', { class: 'btn ghost small craft-close', onclick: close }, 'Close'));
@@ -152,7 +157,7 @@ export function collection(root, { onBack, nav, tab = null, deckId = null }) {
     return h('div', null,
       h('label', { class: 'toggle cos-toggle' },
         h('input', { type: 'checkbox', checked: p.cosmetics.premiumArt || null, onchange: e => act('premiumArt', { on: e.target.checked }) }),
-        ' Show premium (animated) versions of cards I own'),
+        ' Show premium and hologram versions of cards I own'),
       section('back', 'Card backs'),
       section('arena', 'Arenas'));
   }
@@ -161,7 +166,7 @@ export function collection(root, { onBack, nav, tab = null, deckId = null }) {
     const p = profile();
     const have = ownsCosmetic(p, c.id);
     const on = p.cosmetics[c.kind] === c.id;
-    const how = c.default ? 'Default' : c.gems ? `💎 ${c.gems} in the shop` : `Season tier ${c.season.tier} (${c.season.track === 'premium' ? 'premium' : 'free'} track)`;
+    const how = c.default ? 'Default' : c.gems ? [currency('gems'), ` ${c.gems} in the shop`] : `Season tier ${c.season.tier} (${c.season.track === 'premium' ? 'premium' : 'free'} track)`;
     return h('div', { class: `cos-tile rise${on ? ' equipped' : ''}${have ? '' : ' locked'}`, style: { '--i': i } },
       cosmeticPreview(c),
       h('div', { class: 'cos-name' }, c.name),
@@ -184,5 +189,5 @@ export function collection(root, { onBack, nav, tab = null, deckId = null }) {
 export function cosmeticPreview(c) {
   return c.kind === 'back'
     ? h('div', { class: 'cos-preview back' }, renderCardBack('', c.id))
-    : h('div', { class: 'cos-preview arena-swatch', 'data-arena': c.id.split(':')[1] }, h('div', { class: 'swatch-mat' }));
+    : h('div', { class: 'cos-preview arena-swatch', 'data-arena': c.id.split(':')[1] }, arenaFx(c.id.split(':')[1]), h('div', { class: 'swatch-mat' }));
 }

@@ -8,14 +8,15 @@ import { lobby } from './lobby.js';
 import { balanceLab } from './balance.js';
 import { net } from './net.js';
 import { decksFor, resolveDeck, randomStarter, isPlayable } from './deck-store.js';
-import { profile, act, walletBar, signedIn, initAccount, reload } from './profile.js';
+import { profile, act, walletBar, signedIn, initAccount, reload, startAiMatch, finishAiMatch } from './profile.js';
+import { track, installTelemetry, showBanner } from './telemetry.js';
 import { accountScreen } from './account.js';
 import { collection } from './collection.js';
 import { shop } from './shop.js';
 import { season } from './season.js';
 import { rewardsPanel, toast } from './packs.js';
-import { missingCards, missingDust, archInfo, archLevel, starterUnlockLevel, hasPremium } from '../data/economy.js';
-import { installTilt, installRipples, installTooltips, artSlot, deckArtUrls, removeFx } from './fx.js';
+import { missingCards, missingDust, archInfo, archLevel, starterUnlockLevel, bestFinish } from '../data/economy.js';
+import { installTilt, installRipples, installTooltips, installCardFit, installSettle, artSlot, deckArtUrls, logoUrls, deckEmblem, removeFx, currency } from './fx.js';
 import { DECKS, CARDS, DECK_SIZE, getDeck } from '../data/index.js';
 import { KEYWORDS, TERMS, START_HP, BOARD_SLOTS, MAX_HAND, OPENING_HAND } from '../engine/constants.js';
 import { describeTip, glossaryList, kwName, KW_META, KIND_COLORS } from './keywords.js';
@@ -27,9 +28,12 @@ const savePrefs = () => storage.set('metadeck.prefs', prefs);
 
 installTilt();
 installRipples();
+installCardFit();
+installSettle(root);
 installTooltips(describeTip);
+installTelemetry();
 
-const emblem = deck => h('span', { class: 'chip-emblem', 'aria-hidden': 'true' }, deck.icon);
+const emblem = deck => deckEmblem(deck, 'chip-emblem');
 
 const nav = {
   shop: () => shop(root, { onBack: menu, nav }),
@@ -46,20 +50,25 @@ net.subscribe(msg => {
   if (rewardWaiter) rewardWaiter(msg); else pendingRewards = msg;
 });
 let pendingRewards = null;
+// The server is about to restart (tools/maintenance.mjs): say so to everyone connected.
+net.subscribe(msg => { if (msg.t === 'notice') showBanner(msg.text, { kind: 'notice' }); });
 
 // A deck list can be played when it's legal and the player owns every card in it.
 const usable = deck => isPlayable(deck) && missingCards(profile(), deck.cards).length === 0;
 
-// The human's cosmetics in a match, and paying out its rewards when it ends.
-function matchExtras(deckId, online = false) {
+// The human's cosmetics in a match, and paying out its rewards when it ends. A signed-in vs-AI match
+// passes the server's `ticket` (or false when the server couldn't deal it), and its moves go back for checking.
+function matchExtras(deckId, online = false, ticket = null) {
   const p = profile();
+  if (online) track('match_start', { mode: 'online', deck: deckId });
   return {
     cosmetics: {
       back: p.cosmetics.back, arena: p.cosmetics.arena,
-      premium: new Set(p.cosmetics.premiumArt ? Object.keys(p.cards).filter(id => hasPremium(p, id)) : []),
+      finishes: new Map(p.cosmetics.premiumArt ? Object.keys(p.cards).map(id => [id, bestFinish(p, id)]).filter(([, f]) => f) : []),
     },
     // The game-over screen shows `holder`, filled in once the rewards are known.
-    onResult: ({ won, damage }) => {
+    onResult: ({ won, damage, moves }) => {
+      track('match_end', { mode: online ? 'online' : 'ai', deck: deckId, won });
       const holder = h('div', { class: 'rewards-holder' }, h('p', { class: 'muted rewards-wait' }, 'Adding up your rewards…'));
       const show = out => holder.replaceChildren(rewardsPanel(out, deckId));
       const note = text => holder.replaceChildren(h('p', { class: 'muted' }, text));
@@ -68,12 +77,40 @@ function matchExtras(deckId, online = false) {
         if (pendingRewards) got(pendingRewards); else rewardWaiter = got;
       } else if (online) {
         note('Sign in to earn rewards from online matches.');
+      } else if (ticket) {
+        finishAiMatch(ticket, moves).then(r => (r.ok ? show(r.out) : note(r.reason)));
+      } else if (ticket === false) {
+        note('The server couldn’t set up this match, so it earns no rewards. Check your connection.');
       } else {
         act('recordMatch', { deckId, won, damage }).then(r => (r.ok ? show(r.out) : note(r.reason)));
       }
       return { render: () => holder };
     },
   };
+}
+
+// The menu logo: the transparent logo art (ui/logo) when it exists, else the gradient text. The URL that
+// loaded (or false once none did) is remembered so the menu's re-renders don't flash or re-request it.
+let logoArt;
+function logo() {
+  const title = h('h1', { class: 'logo' }, h('span', { class: 'logo-text' }, 'MetaDeck'));
+  if (logoArt === false) return title;
+  const show = url => {
+    title.classList.add('has-art');
+    title.style.setProperty('--logo', `url("${url}")`);
+  };
+  const urls = logoArt ? [logoArt] : logoUrls();
+  let i = 0;
+  const img = h('img', { class: 'logo-art', alt: '', draggable: 'false', decoding: logoArt ? 'sync' : 'async' });
+  img.addEventListener('load', () => { logoArt = img.src; show(img.src); });
+  img.addEventListener('error', () => {
+    if (++i < urls.length) img.src = urls[i];
+    else { logoArt = false; img.remove(); }
+  });
+  img.src = urls[0];
+  if (logoArt) show(img.src);
+  title.prepend(img);
+  return title;
 }
 
 function menu() {
@@ -87,21 +124,31 @@ function menu() {
     const opp = pickOpponent();
     const mine = resolveDeck(prefs.myDeck, prefs.lists[prefs.myDeck], usable);
     const theirs = randomStarter(opp);
-    const launch = () => startMatch(root, {
-      myDeck: prefs.myDeck, oppDeck: opp, spectate,
-      myCards: mine.cards, oppCards: theirs.cards,
-      onExit: menu,
-      onRematch: launch,
-      ...(spectate ? {} : matchExtras(prefs.myDeck)),
-    });
+    const launch = async () => {
+      // Signed in, the server deals the match so it can check the result (server/ai-match.mjs).
+      let deal = null, ticket = null;
+      if (!spectate && signedIn()) {
+        const r = await startAiMatch({ myDeck: prefs.myDeck, myCards: mine.cards, oppDeck: opp, oppCards: theirs.cards });
+        if (r.ok) { deal = { seed: r.seed, firstPlayer: r.firstPlayer }; ticket = r.ticket; } else ticket = false;
+      }
+      track('match_start', { mode: spectate ? 'watch' : 'ai', deck: prefs.myDeck });
+      startMatch(root, {
+        myDeck: prefs.myDeck, oppDeck: opp, spectate,
+        myCards: mine.cards, oppCards: theirs.cards,
+        onExit: menu,
+        onRematch: launch,
+        deal,
+        ...(spectate ? {} : matchExtras(prefs.myDeck, false, ticket)),
+      });
+    };
     launch();
   };
 
   const deckTile = (deck, i, selected, onclick) => h('button', {
     class: `deck-tile rise${selected ? ' selected' : ''}`, style: { '--deck': deck.color, '--i': i }, onclick,
-    'data-tilt': '8', 'aria-pressed': selected ? 'true' : 'false',
+    'data-tilt': '8', 'data-deck': deck.id, 'aria-pressed': selected ? 'true' : 'false',
   },
-    artSlot('deck-art', deckArtUrls(deck.id), deck.icon),
+    artSlot('deck-art', deckArtUrls(deck.id), deckEmblem(deck)),
     h('span', { class: 'pick', 'aria-hidden': 'true' }, '✓'),
     h('span', { class: 'deck-level', title: 'Archetype level' }, `Lv ${archLevel(archInfo(profile(), deck.id).xp)}`),
     h('span', { class: 'deck-tile-body' },
@@ -161,19 +208,19 @@ function menu() {
         locked ? h('button', {
           class: 'btn primary small', disabled: profile().dust < dust || null, title: profile().dust < dust ? `You have ${profile().dust} Dust` : null,
           onclick: e => { e.stopPropagation(); craftMissing(deck); },
-        }, `Craft ✨ ${dust}`) : null,
+        }, 'Craft ', currency('dust'), ` ${dust}`) : null,
         h('button', {
           class: 'btn ghost small list-edit', onclick: e => { e.stopPropagation(); build(deck); },
         }, deck.starter ? 'Copy & edit' : 'Edit')));
   };
 
   const vsSide = (deck, label, right, listName) => h('div', { class: `vs-side${right ? ' right' : ''}`, style: { '--deck': deck ? deck.color : '#888' } },
-    right ? null : artSlot('', deck ? deckArtUrls(deck.id) : [], deck ? deck.icon : '🎲'),
+    right ? null : artSlot('', deck ? deckArtUrls(deck.id) : [], deck ? deckEmblem(deck) : '🎲'),
     h('div', null,
       h('div', { class: 'vs-sub' }, label),
       h('div', { class: 'vs-name' }, deck ? deck.name : 'Random deck'),
       listName ? h('div', { class: 'vs-list' }, listName) : null),
-    right ? artSlot('', deck ? deckArtUrls(deck.id) : [], deck ? deck.icon : '🎲') : null);
+    right ? artSlot('', deck ? deckArtUrls(deck.id) : [], deck ? deckEmblem(deck) : '🎲') : null);
 
   let listsShownFor = null; // deal the list tiles in again only when the archetype changes
   const render = (animate = true) => {
@@ -186,7 +233,7 @@ function menu() {
       walletBar({ nav, quiet: !animate }),
       h('header', { class: `menu-head${animate ? ' rise' : ''}` },
         h('div', { class: 'logo-kicker' }, 'Every deck is a genre'),
-        h('div', { class: 'logo-wrap' }, h('h1', { class: 'logo' }, 'MetaDeck')),
+        h('div', { class: 'logo-wrap' }, logo()),
         h('p', { class: 'tagline' }, 'A card battler where every deck is a video game genre.')),
       h('section', null,
         h('h2', null, 'Your deck'),
@@ -259,7 +306,7 @@ function gallery(deckId, newOnly = false) {
     }, emblem(d), d.name))),
     h('section', { class: 'deck-summary rise' },
       h('div', null,
-        h('h2', null, `${deck.icon} ${deck.name}`),
+        h('h2', null, deckEmblem(deck), ' ', deck.name),
         h('p', null, deck.tagline),
         h('p', { class: 'muted' }, `${deck.cards.length} cards · ${monsters} monsters · ${deck.cards.length - monsters} spells · ${newCount} new`),
         h('label', { class: 'toggle' },
@@ -327,6 +374,36 @@ function rules() {
     )));
 }
 
+// Title screen: the key art full-bleed (its logo is the title), embers rising, and "press to start".
+// Resolves once the player clicks or presses a key, after the art has flared out.
+function titleScreen() {
+  return new Promise(resolve => {
+    let done = false;
+    const start = () => {
+      if (done) return;
+      done = true;
+      removeEventListener('keydown', onKey);
+      screen.classList.add('leaving');
+      setTimeout(resolve, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 650);
+    };
+    const onKey = e => { if (!e.repeat && !['Shift', 'Control', 'Alt', 'Meta', 'Tab'].includes(e.key)) start(); };
+    addEventListener('keydown', onKey);
+    const embers = Array.from({ length: 26 }, (_, i) => h('i', { style: {
+      '--x': `${(i * 37) % 100}%`, '--s': `${2 + (i % 4)}px`, '--d': `${7 + (i * 13) % 9}s`, '--t': `${-(i * 0.7)}s`, '--dx': `${(i % 2 ? 1 : -1) * (12 + i % 30)}px`,
+    } }));
+    const screen = h('main', { class: 'title-screen', onclick: start },
+      h('div', { class: 'title-art', 'aria-hidden': 'true' }, h('img', { src: 'assets/img/ui/key-art.webp', alt: '', decoding: 'async' })),
+      h('div', { class: 'title-embers', 'aria-hidden': 'true' }, embers),
+      h('h1', { class: 'sr-only' }, 'MetaDeck'),
+      h('div', { class: 'title-foot' },
+        h('button', { class: 'title-start' }, 'Press to start'),
+        h('p', { class: 'title-tag' }, 'A card battler where every deck is a video game genre.')));
+    root.replaceChildren(screen);
+  });
+}
+
 // Pick up a signed-in account first, then go to the menu. A reload during an online match goes
 // straight back to it (the server keeps it for a while).
-initAccount().finally(() => { if (net.inMatch) online(); else menu(); });
+const ready = initAccount().catch(() => {});
+if (net.inMatch) ready.finally(online);
+else Promise.all([ready, titleScreen()]).then(menu);

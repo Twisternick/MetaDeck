@@ -1,18 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  createGame, applyAction, legalActions, placeMonster, giveCard, getAttack, getHealth,
-  effectiveCost, findMonster, hasKeyword, decisionPlayer, attackBonuses,
+  createGame, applyAction, legalActions, attackTargets, placeMonster, giveCard, getAttack, getHealth,
+  effectiveCost, findMonster, hasKeyword, decisionPlayer, attackBonuses, boostCost, canBoost, defOf,
 } from '../src/engine/game.js';
 import { chooseAction } from '../src/engine/ai.js';
 import { DECKS, CARDS, deckList, starterDecks, deckErrors, DECK_SIZE, MAX_COPIES } from '../src/data/index.js';
 import { rulesText } from '../src/engine/text.js';
-import { CHOSEN_TARGETINGS } from '../src/engine/constants.js';
+import { CHOSEN_TARGETINGS, START_HP } from '../src/engine/constants.js';
 
 // A quiet game: both decks are the vanilla Monster Card, player 0 active on turn 3 with 10 Bandwidth.
-function setup() {
+function setup(seed = 42) {
   const filler = Array(30).fill('CCG_M03_MonsterCard');
-  const s = createGame({ decks: [filler, filler], seed: 42, firstPlayer: 0 });
+  const s = createGame({ decks: [filler, filler], seed, firstPlayer: 0 });
   s.players[0].hand = [];
   s.players[1].hand = [];
   s.turn = 3;
@@ -104,7 +104,7 @@ test('no response window opens without a playable Quick card', () => {
   const att = ready(placeMonster(s, 0, 'CCG_M03_MonsterCard'));
   ok(applyAction(s, { type: 'attack', uid: att.uid, target: 'P1' }));
   assert.equal(s.pending, null);
-  assert.equal(s.players[1].hp, 28);
+  assert.equal(s.players[1].hp, START_HP - 2);
 });
 
 test('Tax raises enemy spell costs only', () => {
@@ -114,6 +114,64 @@ test('Tax raises enemy spell costs only', () => {
   const monster = giveCard(s, 0, 'FPS_M05_ShotgunEnforcer');
   assert.equal(effectiveCost(s, spell), 3);
   assert.equal(effectiveCost(s, monster), 2);
+});
+
+test('Errata never picks a monster that is already Silenced', () => {
+  for (let seed = 1; seed <= 20; seed++) {
+    const s = setup(seed);
+    const muted = placeMonster(s, 1, 'CCG_M03_MonsterCard');
+    muted.silenced = true;
+    const fresh = placeMonster(s, 1, 'CCG_M03_MonsterCard');
+    ok(applyAction(s, { type: 'play', uid: giveCard(s, 0, 'CCG_M04_WildCard').uid }));
+    assert.equal(fresh.silenced, true, `seed ${seed}: the unsilenced enemy is the victim`);
+  }
+  const s = setup();
+  placeMonster(s, 1, 'CCG_M03_MonsterCard').silenced = true;
+  s.events = [];
+  ok(applyAction(s, { type: 'play', uid: giveCard(s, 0, 'CCG_M04_WildCard').uid }));
+  assert.ok(!s.events.some(e => e.type === 'silence'), 'no target left: Errata does nothing');
+});
+
+test('a Stealthed Guard stops guarding instead of locking out every attack', () => {
+  const s = setup();
+  const judge = placeMonster(s, 1, 'CCG_M18_Judge'); // Guard
+  judge.tempKw.push('Stealth');
+  const open = placeMonster(s, 1, 'CCG_M03_MonsterCard');
+  const att = ready(placeMonster(s, 0, 'CCG_M03_MonsterCard'));
+  assert.deepEqual(attackTargets(s, att).sort(), [open.uid, 'P1'].sort());
+});
+
+test('Checkpoint counts as surviving: no Devour on a saved defender, XP for a saved attacker', () => {
+  const s = setup();
+  const devourer = ready(placeMonster(s, 0, 'HOR_M10_CultDevourer')); // 3/3 Devour
+  const survivor = placeMonster(s, 1, 'HOR_M05_LoneSurvivor'); // 2/2 Checkpoint
+  ok(applyAction(s, { type: 'attack', uid: devourer.uid, target: survivor.uid }));
+  assert.equal(getHealth(survivor), 1, 'Checkpoint saved the defender');
+  assert.equal(getAttack(s, devourer), 3, 'nothing was killed, so no Devour');
+
+  const rogue = ready(placeMonster(s, 0, 'RPG_M02_DungeonRogue')); // 2/1 XP
+  rogue.kw.push('Checkpoint');
+  ok(applyAction(s, { type: 'attack', uid: rogue.uid, target: placeMonster(s, 1, 'CCG_M03_MonsterCard').uid }));
+  assert.equal(getHealth(rogue), 1);
+  assert.equal(rogue.xp, 1, 'it survived the attack, so it gains XP');
+});
+
+test('Copy lands within the top 3 cards of the deck', () => {
+  for (let seed = 1; seed <= 30; seed++) {
+    const s = setup(seed);
+    const card = giveCard(s, 0, 'CCG_M05_ReverseCard');
+    ok(applyAction(s, { type: 'play', uid: card.uid }));
+    const top3 = s.players[0].deck.slice(-3).map(c => c.id);
+    assert.ok(top3.includes('CCG_M05_ReverseCard'), `seed ${seed}`);
+  }
+});
+
+test('Populate on a full board does not announce a Citizen', () => {
+  const s = setup();
+  for (let i = 0; i < 4; i++) placeMonster(s, 0, 'CCG_M03_MonsterCard');
+  s.events = [];
+  ok(applyAction(s, { type: 'play', uid: giveCard(s, 0, 'CTY_M04_HousingPlanner').uid }));
+  assert.ok(!s.events.some(e => e.keyword === 'Populate'));
 });
 
 test('Combo counts other cards played this turn, capped at +2', () => {
@@ -126,15 +184,30 @@ test('Combo counts other cards played this turn, capped at +2', () => {
   assert.equal(getAttack(s, student), 3);
 });
 
-test('Boost spends Nitro only when there is enough', () => {
+test('Boost is optional: Nitro is spent only when the player chooses to Boost', () => {
   const s = setup();
   const target = placeMonster(s, 1, 'FPS_M19_JuggernautExoSuit'); // 5/7
   s.players[0].nitro = 1;
   ok(applyAction(s, { type: 'play', uid: giveCard(s, 0, 'RAC_S12_PhotoFinish').uid, target: target.uid }));
-  assert.equal(getHealth(target), 3);
+  assert.equal(getHealth(target), 5, 'played without Boost: base damage only');
+  assert.equal(s.players[0].nitro, 1, 'Nitro kept');
+  ok(applyAction(s, { type: 'play', uid: giveCard(s, 0, 'RAC_S12_PhotoFinish').uid, target: target.uid, boost: true }));
+  assert.equal(getHealth(target), 1, 'boosted: 2 + 2 damage');
   assert.equal(s.players[0].nitro, 0);
-  ok(applyAction(s, { type: 'play', uid: giveCard(s, 0, 'RAC_S12_PhotoFinish').uid, target: target.uid }));
-  assert.equal(getHealth(target), 1, 'no Nitro left, so only the base damage');
+  const res = applyAction(s, { type: 'play', uid: giveCard(s, 0, 'RAC_S12_PhotoFinish').uid, target: target.uid, boost: true });
+  assert.equal(res.ok, false, "can't Boost without enough Nitro");
+});
+
+test('legal actions offer a boosted and a plain play only when the Boost is affordable', () => {
+  const s = setup();
+  const card = giveCard(s, 0, 'RAC_S14_LapRecord'); // Boost 2
+  const plays = () => legalActions(s).filter(a => a.type === 'play' && a.uid === card.uid);
+  s.players[0].nitro = 1;
+  assert.deepEqual(plays().map(a => !!a.boost), [false]);
+  s.players[0].nitro = 2;
+  assert.deepEqual(plays().map(a => !!a.boost), [false, true]);
+  assert.equal(boostCost(defOf(card)), 2);
+  assert.equal(canBoost(s, 0, card), true);
 });
 
 test('XP levels a monster up after three surviving attacks', () => {
@@ -174,10 +247,10 @@ test('drawing from an empty deck deals escalating fatigue', () => {
   const s = setup();
   s.players[1].deck = [];
   ok(applyAction(s, { type: 'end' }));
-  assert.equal(s.players[1].hp, 29);
+  assert.equal(s.players[1].hp, START_HP - 1);
   ok(applyAction(s, { type: 'end' }));
   ok(applyAction(s, { type: 'end' }));
-  assert.equal(s.players[1].hp, 27);
+  assert.equal(s.players[1].hp, START_HP - 3);
 });
 
 test('AI plays complete games between every deck using only legal actions', () => {

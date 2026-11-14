@@ -1,6 +1,6 @@
 // Core rule constants and the keyword glossary. Pure data, shared by engine, UI and tools.
 
-export const START_HP = 30;
+export const START_HP = 35;
 export const BOARD_SLOTS = 5;
 export const MAX_HAND = 10;
 export const MAX_BANDWIDTH = 10;
@@ -35,10 +35,10 @@ export const KEYWORDS = {
   Generate: { name: 'Generate', text: 'At the start of your turn, gain 1 temporary Bandwidth.' },
   District: { name: 'District', text: 'A city district. Some cards get stronger if you control one.' },
   Tax: { name: 'Tax', text: 'Enemy spells cost 1 more.' },
-  Populate: { name: 'Populate', text: 'When summoned, summon a 1/1 Citizen.' },
-  Topdeck: { name: 'Topdeck', text: 'Whenever you draw a card, this gains +1/+1.' },
-  Errata: { name: 'Errata', text: 'When summoned, Silence a random enemy monster.' },
-  Copy: { name: 'Copy', text: 'When summoned, shuffle a copy of this into your deck.' },
+  Populate: { name: 'Populate', text: 'When played, summon a 1/1 Citizen.' },
+  Topdeck: { name: 'Topdeck', text: "Whenever you draw an extra card (not your turn's normal draw), this gains +1/+1." },
+  Errata: { name: 'Errata', text: 'When played, Silence a random enemy monster.' },
+  Copy: { name: 'Copy', text: 'When played, shuffle a copy of this into the top 3 cards of your deck.' },
   Overtake: { name: 'Overtake', text: 'After this attacks and survives, gain 1 Nitro.' },
   Slipstream: { name: 'Slipstream', text: 'Has +1 ATK while you have any Nitro.' },
   Inspire: { name: 'Inspire', text: 'Your other monsters have +1 ATK.' },
@@ -48,11 +48,11 @@ export const KEYWORDS = {
 export const TERMS = {
   Silence: 'Removes all keywords, buffs and card text from a monster.',
   Suppress: "The monster can't attack on its controller's next turn.",
-  Boost: 'Spend that much Nitro to get the extra effect. Skipped if you don\'t have enough.',
+  Boost: 'Optional: when you play this, you may spend that much Nitro to get the extra effect. Needs enough Nitro.',
   Nitro: 'A Racing resource. Stays until spent.',
   Bandwidth: 'Spent to play cards. Max goes up by 1 each turn (up to 10) and refills at the start of your turn. Unspent Bandwidth can pay for Quick cards on the enemy turn.',
   Quick: 'Can also be played from your hand in response to an enemy attack.',
-  Revive: 'Return your most recently destroyed monster to the board (it is summoned fresh).',
+  Revive: 'Return your most recently destroyed monster to the board (it is summoned fresh, without its When-played effects).',
 };
 
 export const TRIGGERS = ['play', 'death', 'turnStart', 'turnEnd', 'draw', 'allyDeath'];

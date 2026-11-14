@@ -10,6 +10,7 @@ import cityBuilder from './decks/citybuilder.js';
 import cardGame from './decks/cardgame.js';
 import { TOKENS } from './tokens.js';
 import { STARTERS } from './starters.js';
+export { STYLES } from './starters.js';
 
 export const DECKS = [fps, horror, platformer, rpg, racing, fighting, sports, strategy, cityBuilder, cardGame];
 
@@ -55,5 +56,5 @@ export const starterDecks = archetypeId => (STARTERS[archetypeId] ?? []).map((s,
   const cut = new Set(s.cut.map(code => byCode(archetypeId, code)));
   const cards = deckList(archetypeId).filter(id => !cut.has(id));
   for (const code of s.double) cards.push(byCode(archetypeId, code));
-  return { key: `${archetypeId}:starter:${i}`, archetype: archetypeId, name: s.name, blurb: s.blurb, cards, starter: true };
+  return { key: `${archetypeId}:starter:${i}`, archetype: archetypeId, name: s.name, style: s.style, blurb: s.blurb, cards, starter: true };
 });

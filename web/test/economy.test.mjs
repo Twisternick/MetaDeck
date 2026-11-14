@@ -6,6 +6,7 @@ import {
   upgrade, openPack, buyPack, PACK_SIZE, LEGENDARY_PITY, recordMatch, seasonReward, SEASON_TIERS, claimSeason,
   TIER_XP, COSMETICS, buyCosmetic, equipCosmetic, buySeasonPass, creditGems, rerollQuest, MAX_QUESTS,
   DAILY_WIN_GOLD_CAP, archLevel, ownedTotal, craftCost, dustValue, runOp, addPacks,
+  upgradeCost, bestFinish, HOLO_CHANCE,
 } from '../src/data/economy.js';
 import { nextRandom } from '../src/engine/rng.js';
 
@@ -144,4 +145,46 @@ test('openPacks opens several packs at once, never more than you have', () => {
   assert.equal(p.packs.Horror, undefined);
   assert.equal(runOp(p, 'openPacks', { kind: 'Horror', count: 5 }, { now: at() }).ok, false);
   assert.equal(runOp(p, 'openPacks', { kind: '__proto__', count: 5 }, { now: at() }).ok, false);
+});
+
+test('hologram: upgraded from a premium copy, counted with the others, and survives a reload', () => {
+  const p = newProfile(at());
+  const epic = Object.keys(CARD_RARITY).find(id => rarityOf(id) === 'epic');
+  p.dust = 50000;
+  craft(p, epic);
+  assert.equal(upgrade(p, epic, true).ok, false, 'needs a premium copy first');
+  upgrade(p, epic);
+  const dust = p.dust;
+  assert.equal(upgrade(p, epic, true).ok, true);
+  assert.equal(p.dust, dust - upgradeCost(epic, true));
+  assert.deepEqual(p.cards[epic], { n: 0, p: 0, h: 1 });
+  assert.equal(bestFinish(p, epic), 'holo');
+  craft(p, epic);
+  assert.equal(craft(p, epic).ok, false, 'the hologram counts toward max copies');
+  const back = normalizeProfile(JSON.parse(JSON.stringify(p)), at());
+  assert.deepEqual(back.cards[epic], { n: 1, p: 0, h: 1 });
+  const before = back.dust;
+  assert.equal(runOp(back, 'disenchant', { id: epic, holo: true }, { now: at() }).ok, true);
+  assert.equal(back.dust, before + dustValue(epic, false, true));
+  assert.equal(back.cards[epic].h, 0);
+});
+
+test('hologram: old saves without a hologram count load, and packs and the season track give them', () => {
+  const legacy = newProfile(at());
+  const id = Object.keys(CARD_RARITY).find(c => rarityOf(c) === 'rare');
+  legacy.cards[id] = { n: 1, p: 1 };
+  const p = normalizeProfile(JSON.parse(JSON.stringify(legacy)), at());
+  assert.deepEqual(p.cards[id], { n: 1, p: 1, h: 0 });
+  assert.equal(ownedTotal(p, id), 2);
+
+  const rng = mulberry32(3);
+  let holos = 0, cards = 0;
+  for (let i = 0; i < 600; i++) for (const c of openPack(newProfile(at()), 'any', rng)) { cards++; if (c.holo) { holos++; assert.ok(!c.premium); } }
+  assert.ok(holos > 0 && holos / cards < HOLO_CHANCE * 2, `${holos} holograms in ${cards} cards`);
+
+  assert.deepEqual([28, 36].map(t => seasonReward('premium', t).type), ['holoCard', 'holoCard']);
+  const q = newProfile(at());
+  const r = claimSeason(Object.assign(q, { season: { ...q.season, premium: true, xp: TIER_XP * 36 } }), 'premium', 36, rng);
+  assert.equal(r.type, 'holoCard');
+  assert.equal(q.cards[r.id].h, 1);
 });

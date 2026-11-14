@@ -49,10 +49,9 @@ Every pack has a Rare or better, and a Legendary comes at least once every 30 pa
 
 This build is ready to try, not to sell:
 
-1. **Accounts (done).** Signed-in players' profiles live on the server (`server/accounts.mjs`, saved to `data/accounts.json`). Every change is a named operation (`OPS` in `economy.js`) the server applies, online matches are paid by the server, and online decks must be owned by the account. What's left:
-   - vs-AI results are still reported by the browser, at most one every 15 seconds. Running the AI matches on the server, or paying less for them, would close that.
+1. **Accounts (done).** Signed-in players' profiles live on the server (`server/accounts.mjs`, saved in the SQLite database `data/metadeck.db`). Every change is a named operation (`OPS` in `economy.js`) the server applies, online matches are paid by the server, and online decks must be owned by the account. What's left:
+   - vs-AI results are checked: the server deals the match and replays the player's moves against the same AI before paying out (`server/ai-match.mjs`). Guests' results stay in their browser.
    - Guests still play with a local profile that they can edit. Fine for trying the game, but anything paid needs an account.
-   - The JSON file suits one server. With more players, move it to a database.
    - Add password reset (needs an email address) and email verification.
 2. **Connect a payment provider** (Stripe, or the app stores for mobile builds) and credit Gems only from its server-side confirmation. `creditGems` in `economy.js` is where that credit lands. Until then the shop's Gem bundles are disabled, except on localhost and `.test` hosts, where they're labelled test purchases and charge nothing.
 3. **Legal.** Paid random packs are regulated or restricted in some places (Belgium, the Netherlands), and several stores and countries require published odds (done here). Add age gating, spending limits for minors, refund handling and region rules before launch.

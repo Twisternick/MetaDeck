@@ -3,12 +3,16 @@
 //
 // Other people connect to it for online play, so it only serves the game itself (index.html,
 // styles.css, src/ and assets/), sends strict security headers, accepts the game's socket only from
-// pages it served, and only takes Balance lab reports from this machine. Behind a reverse proxy, set
-// TRUST_PROXY=1 so the per-address connection cap sees each player's address instead of the proxy's.
+// pages it served, and only takes Balance lab reports from this machine. Behind a reverse proxy or a
+// Cloudflare Tunnel, set TRUST_PROXY=1 so rate limits see each player's address instead of the proxy's
+// (see HOSTING.md).
 //
-// Player accounts (server/accounts.mjs) are kept in data/accounts.json, or DATA_DIR if set. That folder
-// is never served. On startup the server writes data/admin-token, which tools/grant.mjs uses to add
-// currency to an account from this machine.
+// Player accounts (server/accounts.mjs), match history and analytics are kept in data/metadeck.db, or
+// DATA_DIR if set. That folder is never served. On startup the server writes data/admin-token, which the
+// admin tools (grant, set-password, users, maintenance) use to talk to it from this machine.
+//
+// Environment: PORT, DATA_DIR, TRUST_PROXY=1, LOG_DIR (default DATA_DIR/logs), BACKUP_DIR (nightly
+// database copies, kept BACKUP_DAYS days, default 14).
 
 import http from 'node:http';
 import fs from 'node:fs';
@@ -17,27 +21,86 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { acceptWebSocket } from './server/ws.mjs';
 import { createLobby } from './server/lobby.mjs';
-import { createAccounts } from './server/accounts.mjs';
+import { accountsIn } from './server/accounts.mjs';
+import { createAiMatches } from './server/ai-match.mjs';
+import { createTelemetry } from './server/telemetry.mjs';
+import { installLog } from './server/log.mjs';
+import { backup } from './server/db.mjs';
 import { handleAccountApi, sessionToken } from './server/account-api.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
-const port = Number(process.env.PORT || process.argv[2]) || 5173;
+const portArg = process.env.PORT || process.argv[2];
+const port = portArg !== undefined && /^\d+$/.test(portArg) ? Number(portArg) : 5173; // 0 picks a free port (the tests)
 const trustProxy = process.env.TRUST_PROXY === '1';
 const types = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.ttf': 'font/ttf', '.svg': 'image/svg+xml',
   '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8',
+  '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg',
 };
 // The only paths the game loads. Everything else in web/ (the server, tools, tests, reports) stays private.
 const PUBLIC = [/^\/index\.html$/, /^\/styles\.css$/, /^\/src\//, /^\/assets\//];
 
 const dataDir = path.resolve(process.env.DATA_DIR || path.join(root, 'data'));
-const accounts = createAccounts({ file: path.join(dataDir, 'accounts.json') });
-const lobby = createLobby({ accounts });
 fs.mkdirSync(dataDir, { recursive: true });
+installLog(path.resolve(process.env.LOG_DIR || path.join(dataDir, 'logs')));
+process.on('uncaughtException', err => {
+  // Unknown state: log it and stop, and let the supervisor (HOSTING.md) start a fresh process.
+  console.error('fatal:', err);
+  try { accounts.close(); } catch { /* already closed */ }
+  process.exit(1);
+});
+process.on('unhandledRejection', err => console.error('unhandled rejection:', err));
+// A live database in a synced folder risks corruption, and sends password hashes to the cloud.
+if (/onedrive|dropbox|google drive|icloud/i.test(dataDir)) {
+  console.warn(`Warning: the data folder ${dataDir} is inside a synced folder. Set DATA_DIR to a folder outside it (see HOSTING.md).`);
+}
+
+const accounts = accountsIn(dataDir);
+const aiMatches = createAiMatches({ accounts });
+const telemetry = createTelemetry({ db: accounts.db });
+const lobby = createLobby({ accounts });
 const adminToken = crypto.randomBytes(24).toString('base64url');
 fs.writeFileSync(path.join(dataDir, 'admin-token'), adminToken, { mode: 0o600 });
-for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { accounts.flush(); process.exit(0); });
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { accounts.close(); process.exit(0); });
+
+// The build version: a hash of every file the browser loads except the art and sound. A page that
+// finds a different version (GET /api/version) knows the game was updated under it and offers a reload.
+function buildVersion() {
+  const h = crypto.createHash('sha1');
+  const add = f => h.update(path.relative(root, f)).update('\0').update(fs.readFileSync(f)).update('\0');
+  const walk = dir => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const f = path.join(dir, e.name);
+      if (e.isDirectory()) walk(f); else add(f);
+    }
+  };
+  add(path.join(root, 'index.html'));
+  add(path.join(root, 'styles.css'));
+  walk(path.join(root, 'src'));
+  return h.digest('hex').slice(0, 10);
+}
+const version = buildVersion();
+const startedAt = Date.now();
+
+// Nightly copies of the database, when BACKUP_DIR is set: one shortly after startup, then every 6 hours
+// a check whether today's copy exists yet.
+const backupDir = process.env.BACKUP_DIR ? path.resolve(process.env.BACKUP_DIR) : null;
+function runBackup(force = false) {
+  if (!backupDir) return null;
+  try {
+    const file = backup(accounts.db, backupDir, { keepDays: Number(process.env.BACKUP_DAYS) || 14, force });
+    if (file) console.log(`Backed up the database to ${file}`);
+    return file;
+  } catch (err) {
+    console.error('backup failed:', err);
+    return null;
+  }
+}
+if (backupDir) {
+  setTimeout(runBackup, 60_000).unref();
+  setInterval(runBackup, 6 * 3_600_000).unref();
+}
 
 function securityHeaders(req) {
   const host = req.headers.host ?? '';
@@ -49,6 +112,7 @@ function securityHeaders(req) {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob:",
+      "media-src 'self'",
       `connect-src 'self' ws://${host} wss://${host}`,
       "object-src 'none'",
       "base-uri 'none'",
@@ -66,6 +130,11 @@ function securityHeaders(req) {
 
 const loopback = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 const localHost = host => /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(host ?? '');
+// Headers a proxy or tunnel adds. A request carrying any of them came from outside, even though it
+// arrives from localhost (cloudflared connects from this machine).
+const PROXY_HEADERS = ['x-forwarded-for', 'x-forwarded-host', 'x-real-ip', 'forwarded', 'cf-connecting-ip', 'cf-ray', 'true-client-ip'];
+const proxied = req => PROXY_HEADERS.some(h => req.headers[h] !== undefined);
+let warnedProxy = false;
 
 // A request from a page this server served: no Origin (not a browser) or an Origin naming this host.
 function sameOrigin(req) {
@@ -75,36 +144,63 @@ function sameOrigin(req) {
   try { return new URL(origin).host === host; } catch { return false; }
 }
 
-const clientIp = req => (trustProxy && String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim()) || req.socket.remoteAddress || '';
+function clientIp(req) {
+  if (!trustProxy) {
+    if (!warnedProxy && proxied(req)) {
+      warnedProxy = true;
+      console.warn('Requests are arriving through a proxy or tunnel, but TRUST_PROXY is not set: every player shares one address for rate limits. Set TRUST_PROXY=1.');
+    }
+    return req.socket.remoteAddress || '';
+  }
+  return String(req.headers['cf-connecting-ip'] ?? '').trim()
+    || String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim()
+    || req.socket.remoteAddress || '';
+}
+
+// Requests made on this machine, to localhost, not relayed by a proxy: the Balance lab report, test
+// purchases and the admin tools. Checking the proxy headers too means a tunnel that rewrites the Host
+// header to localhost still can't hand these to the world.
+const fromThisMachine = req => loopback.has(req.socket.remoteAddress) && localHost(req.headers.host) && !proxied(req);
+
+function readBody(req, res, max, then) {
+  const chunks = [];
+  let size = 0;
+  req.on('data', chunk => {
+    size += chunk.length;
+    if (size > max) { res.writeHead(413).end('Too large'); req.destroy(); return; }
+    chunks.push(chunk);
+  });
+  req.on('end', () => {
+    if (res.writableEnded) return;
+    let body = null;
+    try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { /* handled by the caller */ }
+    then(body);
+  });
+}
+const json = (res, status, body) => res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }).end(JSON.stringify(body));
+const isJson = req => /^application\/json\b/i.test(req.headers['content-type'] ?? '');
 
 // The Balance lab's "Send stats to Claude" button saves its report here, where Claude can read it.
 // It writes a file, so it only accepts requests from this machine, addressed to localhost (which stops
 // DNS rebinding), from the game's own page, as JSON (which a cross-site form can't send).
 const reportFile = path.join(root, 'reports', 'meta-latest.md');
 function saveReport(req, res) {
-  const local = loopback.has(req.socket.remoteAddress) && localHost(req.headers.host) && sameOrigin(req)
-    && /^application\/json\b/i.test(req.headers['content-type'] ?? '');
-  if (!local) { res.writeHead(403).end('Reports can only be saved from the machine running the server.'); return; }
-  const chunks = [];
-  let size = 0;
-  req.on('data', chunk => {
-    size += chunk.length;
-    if (size > 1_000_000) { res.writeHead(413).end('Too large'); req.destroy(); return; }
-    chunks.push(chunk);
-  });
-  req.on('end', () => {
-    if (res.writableEnded) return;
-    let markdown;
-    try { ({ markdown } = JSON.parse(Buffer.concat(chunks).toString('utf8'))); } catch { /* handled below */ }
+  if (!fromThisMachine(req) || !sameOrigin(req) || !isJson(req)) { res.writeHead(403).end('Reports can only be saved from the machine running the server.'); return; }
+  readBody(req, res, 1_000_000, body => {
+    const markdown = body?.markdown;
     if (typeof markdown !== 'string' || !markdown) { res.writeHead(400).end('Expected { markdown }'); return; }
     fs.mkdirSync(path.dirname(reportFile), { recursive: true });
     fs.writeFile(reportFile, markdown, err => {
       if (err) { res.writeHead(500).end('Could not save the report'); return; }
-      res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ path: 'web/reports/meta-latest.md' }));
+      json(res, 200, { path: 'web/reports/meta-latest.md' });
     });
   });
 }
 
+// Static files. Each has an ETag, so a browser revalidating gets a tiny 304 instead of the file.
+// Art, sound and fonts may be cached for a day (and used stale for a week while refreshing), so a
+// proxy like Cloudflare can serve them; the code is always revalidated so updates show up at once.
+// On localhost everything is revalidated, so new art from the Art Studio appears on the next load.
 function serveStatic(req, res) {
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405, { Allow: 'GET, HEAD' }).end(); return; }
   let urlPath;
@@ -116,38 +212,96 @@ function serveStatic(req, res) {
   if (!ok) { res.writeHead(404).end('Not found'); return; }
   fs.stat(file, (err, stat) => {
     if (err || !stat.isFile()) { res.writeHead(404).end('Not found'); return; }
-    res.writeHead(200, {
+    const etag = `W/"${stat.size.toString(36)}-${Math.floor(stat.mtimeMs).toString(36)}"`;
+    const media = urlPath.startsWith('/assets/') && !localHost(req.headers.host);
+    const headers = {
       ...securityHeaders(req),
-      'Content-Type': types[path.extname(file)] ?? 'application/octet-stream',
-      'Content-Length': stat.size,
-      'Cache-Control': 'no-cache',
-    });
+      ETag: etag,
+      'Cache-Control': media ? 'public, max-age=86400, stale-while-revalidate=604800' : 'no-cache',
+    };
+    if (req.headers['if-none-match'] === etag) { res.writeHead(304, headers).end(); return; }
+    res.writeHead(200, { ...headers, 'Content-Type': types[path.extname(file)] ?? 'application/octet-stream', 'Content-Length': stat.size });
     if (req.method === 'HEAD') { res.end(); return; }
     fs.createReadStream(file).on('error', () => res.destroy()).pipe(res);
   });
 }
 
+const isAdmin = req => {
+  const given = Buffer.from(String(req.headers['x-admin-token'] ?? ''));
+  const want = Buffer.from(adminToken);
+  return fromThisMachine(req) && given.length === want.length && crypto.timingSafeEqual(given, want);
+};
+const track = (name, data, req, user = null) => {
+  try { return telemetry.track(name, data, { ip: clientIp(req), ua: req.headers['user-agent'] ?? '', user }); }
+  catch (err) { console.error('telemetry:', err); return false; }
+};
+
 // Account endpoints. Test purchases (Gems for free, clearly labelled) are only offered to a browser on this
 // machine; a deployed server never grants them.
-const fromThisMachine = req => loopback.has(req.socket.remoteAddress) && localHost(req.headers.host) && !(trustProxy && req.headers['x-forwarded-for']);
 const accountCtx = {
-  accounts, sameOrigin, clientIp,
+  accounts, aiMatches, sameOrigin, clientIp, isAdmin, track,
   secure: req => !!req.socket.encrypted || (trustProxy && req.headers['x-forwarded-proto'] === 'https'),
   testPurchases: fromThisMachine,
-  isAdmin: req => {
-    const given = Buffer.from(String(req.headers['x-admin-token'] ?? ''));
-    const want = Buffer.from(adminToken);
-    return fromThisMachine(req) && given.length === want.length && crypto.timingSafeEqual(given, want);
-  },
+  online: () => lobby.stats(),
 };
+
+// Health check for uptime monitors: 200 while the database answers, 503 otherwise.
+function health(res) {
+  let db = true;
+  try { accounts.db.prepare('SELECT 1').get(); } catch { db = false; }
+  json(res, db ? 200 : 503, { ok: db, version, uptime: Math.round((Date.now() - startedAt) / 1000), ...lobby.stats() });
+}
+
+// Admin, from this machine with the admin token (tools/maintenance.mjs and tools/backup.mjs):
+//   POST /api/admin/maintenance { minutes, exit }   POST /api/admin/backup   POST /api/admin/ping
+function admin(req, res, route) {
+  if (req.method !== 'POST') { res.writeHead(405, { Allow: 'POST' }).end(); return; }
+  if (!isAdmin(req)) return json(res, 403, { ok: false, reason: 'Admin only, from this machine.' });
+  readBody(req, res, 4096, body => {
+    if (route === 'ping') return json(res, 200, { ok: true });
+    if (route === 'backup') {
+      if (!backupDir) return json(res, 400, { ok: false, reason: 'Set BACKUP_DIR to turn on backups.' });
+      const file = runBackup(true);
+      return json(res, file ? 200 : 500, file ? { ok: true, file } : { ok: false, reason: 'The backup failed; see the log.' });
+    }
+    if (route === 'maintenance') {
+      const minutes = Math.max(0, Math.min(60, Number(body?.minutes) || 0));
+      const exit = body?.exit !== false;
+      const started = lobby.maintenance(minutes, () => {
+        console.log(exit ? 'Maintenance: no matches running, shutting down.' : 'Maintenance: no matches running. Safe to restart.');
+        if (exit) setTimeout(() => { accounts.close(); process.exit(0); }, 500);
+      });
+      console.log(`Maintenance requested: ${minutes} minute warning${exit ? ', then exit' : ''}.`);
+      return json(res, 200, { ok: true, started, ...lobby.stats() });
+    }
+    json(res, 404, { ok: false, reason: 'Not found.' });
+  });
+}
 
 const server = http.createServer((req, res) => {
   try {
-    const route = /^\/api\/account\/([a-z]+)$/.exec(new URL(req.url, 'http://x').pathname);
+    const pathname = new URL(req.url, 'http://x').pathname;
+    const route = /^\/api\/account\/([a-z]+)$/.exec(pathname);
     if (route) { handleAccountApi(req, res, route[1], accountCtx); return; }
-    if (req.url === '/api/meta-report') {
-      if (req.method === 'POST') saveReport(req, res); else res.writeHead(405, { Allow: 'POST' }).end();
-      return;
+    const adminRoute = /^\/api\/admin\/([a-z]+)$/.exec(pathname);
+    if (adminRoute) { admin(req, res, adminRoute[1]); return; }
+    switch (pathname) {
+      case '/api/meta-report':
+        if (req.method === 'POST') saveReport(req, res); else res.writeHead(405, { Allow: 'POST' }).end();
+        return;
+      case '/healthz':
+        return health(res);
+      case '/api/version':
+        return json(res, 200, { version });
+      case '/api/event':
+      case '/api/client-error':
+        if (req.method !== 'POST') { res.writeHead(405, { Allow: 'POST' }).end(); return; }
+        if (!sameOrigin(req) || !isJson(req)) return json(res, 403, { ok: false });
+        return readBody(req, res, 8192, body => {
+          if (pathname === '/api/client-error') telemetry.clientError(body, clientIp(req));
+          else track(String(body?.name ?? ''), body?.data, req, accounts.accountFor(sessionToken(req))?.key ?? null);
+          json(res, 202, { ok: true });
+        });
     }
     serveStatic(req, res);
   } catch (err) {
@@ -173,4 +327,4 @@ server.on('upgrade', (req, socket) => {
   });
 });
 
-server.listen(port, () => console.log(`MetaDeck running at http://localhost:${server.address().port}`));
+server.listen(port, () => console.log(`MetaDeck running at http://localhost:${server.address().port} (version ${version})`));

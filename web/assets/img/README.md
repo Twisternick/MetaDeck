@@ -9,9 +9,14 @@ Each slot is tried as `.webp`, then `.png`, then its fallback; the first one tha
 | Card art (one per card) | `cards/<cardId>.webp`, e.g. `cards/FPS_M10_SniperOperative.webp` | 768 × 480 (16:10) | the deck's art, then the placeholder |
 | Deck art (menu tiles, gallery, cards without art) | `decks/<deckId>.webp`: `FPS`, `Horror`, `Platformer`, `RPG`, `Racing`, `Fighting`, `Sports`, `Strategy`, `CityBuilder`, `CardGame` | 1024 × 640 | placeholder |
 | Hero portrait (match screen avatar) | `heroes/<deckId>.webp` | 512 × 512, centered subject | deck art, then placeholder |
+| Deck emblem (chips, headings, Balance lab tables, art placeholders) | `ui/emblem-<deckId>.webp`, e.g. `ui/emblem-RPG.webp` | 512 × 512, transparent, fitted whole | the deck's emoji (`icon` in its deck file) |
 | Token art | `cards/<tokenId>.webp` (ids in `src/data/tokens.js`), otherwise `decks/token.webp` | 768 × 480 | the summoner's deck art |
 | Card back | `ui/card-back.webp` | 560 × 784 (5:7) | placeholder with the "M" monogram |
-| Favicon | `ui/favicon.png` (already present, generated) | 64 × 64 | — |
+| Card back cosmetics | `ui/back-<name>.webp`, e.g. `ui/back-aurora.webp` (names from `COSMETICS` in `src/data/economy.js`) | 560 × 784 | the back's CSS skin |
+| Arena cosmetics | `ui/arena-<name>.webp`, e.g. `ui/arena-molten-core.webp` | 1536 × 864 (16:9), calm in the middle | the arena's CSS gradient |
+| Favicon | `ui/favicon.png`: the key art crest (`ui/crest.webp`) cropped to 64 × 64. The Art Studio's tab uses the same crest on a gold-rimmed tile (`tools/art-studio/icon.png`) | 64 × 64 | — |
+| Title screen key art (logo is part of the image) | `ui/key-art.webp` (present) | 1672 × 941 (16:9) | — |
+| Menu logo (the wordmark alone, transparent background) | `ui/logo.webp` or `ui/logo.png` | 1600 × 640 (5:2), fitted whole, not cropped | the gradient "MetaDeck" text |
 
 Card ids are the first argument of every `M(...)` / `S(...)` entry in `src/data/decks/*.js`. Deck ids are the `id` field at the top of each deck file.
 
@@ -28,7 +33,7 @@ Then open http://localhost:5174. The studio lists every slot above, grouped by d
 3. Right-click the result and choose **Copy image**. You can also download it and drop the file on the card, or use **File…**.
 4. Back in the studio, press **Ctrl+V**. Drag to frame the image (scroll to zoom), then press **Enter**.
 
-The studio saves the image as a WebP of the right size, then moves on to the next card that still needs art and copies its prompt. The progress bar and tab counts show what is left. To redo an image, untick **Missing or flagged only**.
+The studio saves the image as a WebP of the right size, then moves on to the next card that still needs art and copies its prompt. The progress bar and tab counts show what is left. The **All** tab lists every slot from every tab in one grid. The **Show** picker lists **Missing only** (no file yet), **Missing or flagged** (the default, which adds images flagged for redoing) or **Everything**. Saving moves on to the next image the picker lists. To redo a finished image, pick **Everything**.
 
 Images flagged for redoing (by an art audit) are listed in `tools/art-studio/redo.js` with the reason. The studio marks them **REDO**, shows the reason under the card, counts them on each tab (⚑) and gathers them all under the **Flagged for redo** tab. Their prompts also say what was wrong with the last image. A flag clears by itself once you save a new image over the flagged one.
 

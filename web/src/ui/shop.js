@@ -3,12 +3,12 @@
 // clearly labelled test purchase so the flow can be tried end to end; anywhere else the button is off.
 
 import { h, storage } from './dom.js';
-import { removeFx, sparkle, motionOK } from './fx.js';
+import { removeFx, sparkle, motionOK, deckEmblem, currency } from './fx.js';
 import { profile, act, walletBar, testPurchasesAllowed } from './profile.js';
 import { openPacks, packArt, packName, rarityColor, toast } from './packs.js';
 import { cosmeticPreview } from './collection.js';
 import {
-  PACK_GOLD, PACK_GEMS, PACK_BUNDLE, PACK_SIZE, PACK_ODDS, PREMIUM_CHANCE, LEGENDARY_PITY, RARITY, GEM_BUNDLES,
+  PACK_GOLD, PACK_GEMS, PACK_BUNDLE, PACK_SIZE, PACK_ODDS, PREMIUM_CHANCE, HOLO_CHANCE, LEGENDARY_PITY, RARITY, GEM_BUNDLES,
   SEASON_PASS_GEMS, COSMETICS, ownsCosmetic, seasonName,
 } from '../data/economy.js';
 import { DECKS } from '../data/index.js';
@@ -56,24 +56,24 @@ export function shop(root, { onBack, nav }) {
       h('button', {
         class: 'btn primary big', disabled: p.gems < SEASON_PASS_GEMS || null,
         onclick: e => buy('buySeasonPass', {}, () => 'Premium track unlocked!', e.currentTarget),
-      }, `Unlock · 💎 ${SEASON_PASS_GEMS}`));
+      }, 'Unlock · ', currency('gems'), ` ${SEASON_PASS_GEMS}`));
   }
 
   function packsSection() {
     const p = profile();
     const kind = prefs.pack;
     const deck = DECKS.find(d => d.id === kind);
-    const pick = (id, label, icon, color) => h('button', {
+    const pick = (id, label, emblem, color) => h('button', {
       class: `chip${kind === id ? ' selected' : ''}`, style: { '--deck': color }, onclick: () => { prefs.pack = id; render(); },
-    }, h('span', { class: 'chip-emblem', 'aria-hidden': 'true' }, icon), label);
-    const purchase = (currency, count, label, price) => h('button', {
-      class: `btn ${currency === 'gold' ? 'primary' : 'primary online'}`, disabled: p[currency] < price || null,
-      onclick: e => buy('buyPack', { kind, currency, count }, () => `${count > 1 ? `${count} packs` : 'Pack'} added`, e.currentTarget),
-    }, label, h('span', { class: 'btn-cost' }, `${currency === 'gold' ? '🪙' : '💎'} ${price}`));
+    }, deckEmblem(emblem, 'chip-emblem'), label);
+    const purchase = (cur, count, label, price) => h('button', {
+      class: `btn ${cur === 'gold' ? 'primary' : 'primary online'}`, disabled: p[cur] < price || null,
+      onclick: e => buy('buyPack', { kind, currency: cur, count }, () => `${count > 1 ? `${count} packs` : 'Pack'} added`, e.currentTarget),
+    }, label, h('span', { class: 'btn-cost' }, currency(cur), ` ${price}`));
     const unopened = p.packs[kind] ?? 0;
     return h('section', { class: 'rise', style: { '--i': 1 } },
       h('h2', null, 'Card packs'),
-      h('nav', { class: 'chips' }, DECKS.map(d => pick(d.id, d.name, d.icon, d.color)), pick('any', 'Mixed', '🎴', '#a78bfa')),
+      h('nav', { class: 'chips' }, DECKS.map(d => pick(d.id, d.name, d, d.color)), pick('any', 'Mixed', null, '#a78bfa')),
       h('div', { class: 'pack-offer', style: { '--deck': deck?.color ?? '#a78bfa' } },
         packArt(kind, 'idle'),
         h('div', { class: 'pack-offer-text' },
@@ -97,7 +97,7 @@ export function shop(root, { onBack, nav }) {
         PACK_ODDS.map(o => h('li', null, h('span', { class: 'odds-gem', style: { '--glow': rarityColor(o.rarity) } }),
           `${RARITY[o.rarity].name}: ${(o.chance * 100).toFixed(1)}% per card`)),
         h('li', null, `Every pack has at least one Rare or better.`),
-        h('li', null, `Each card has a ${(PREMIUM_CHANCE * 100).toFixed(0)}% chance to be premium (animated).`),
+        h('li', null, `Each card has a ${(PREMIUM_CHANCE * 100).toFixed(0)}% chance to be premium (animated) and a ${(HOLO_CHANCE * 100).toFixed(0)}% chance to be a hologram.`),
         h('li', null, `You get a Legendary at least once every ${LEGENDARY_PITY} packs.`),
         h('li', null, 'Duplicate protection: you never get a copy of a card you already own the maximum of while other cards of that rarity are missing. If you own them all, the extra copy turns into Dust.')));
   }
@@ -110,10 +110,19 @@ export function shop(root, { onBack, nav }) {
       h('div', { class: 'cos-name' }, c.name, h('span', { class: 'cos-kind' }, c.kind === 'back' ? 'Card back' : 'Arena')),
       h('div', { class: 'cos-blurb muted' }, c.blurb),
       have ? h('span', { class: 'cos-how' }, '✔ Owned')
-        : h('button', {
-          class: 'btn primary online small', disabled: p.gems < c.gems || null,
-          onclick: e => buy('buyCosmetic', { id: c.id }, () => `${c.name} unlocked. Equip it in your Collection.`, e.currentTarget),
-        }, `💎 ${c.gems}`));
+        : p.gems < c.gems
+          // Short on Gems: say so and point at the Gems section rather than showing a dead button.
+          ? h('button', {
+            class: 'btn ghost small', title: `You have ${p.gems} Gems`,
+            onclick: () => {
+              toast(`You need ${c.gems - p.gems} more Gems for ${c.name}.`, 'bad');
+              document.querySelector('.gem-grid')?.scrollIntoView({ behavior: motionOK() ? 'smooth' : 'auto', block: 'center' });
+            },
+          }, currency('gems'), ` ${c.gems} · need ${c.gems - p.gems} more`)
+          : h('button', {
+            class: 'btn primary online small',
+            onclick: e => buy('buyCosmetic', { id: c.id }, () => `${c.name} unlocked. Equip it in your Collection.`, e.currentTarget),
+          }, currency('gems'), ` ${c.gems}`));
   }
 
   function gemsSection() {
@@ -124,7 +133,7 @@ export function shop(root, { onBack, nav }) {
         ? 'Payments are not connected yet. On this local server, a bundle is credited as a test purchase: nothing is charged.'
         : 'Gem purchases are coming soon.'),
       h('div', { class: 'gem-grid' }, GEM_BUNDLES.map((b, i) => h('div', { class: 'gem-tile rise', style: { '--i': i, '--size': i } },
-        h('div', { class: 'gem-pile', 'aria-hidden': 'true' }, '💎'.repeat(Math.min(5, i + 1))),
+        h('div', { class: 'gem-pile', 'aria-hidden': 'true' }, Array.from({ length: Math.min(5, i + 1) }, () => currency('gems'))),
         h('div', { class: 'gem-amount' }, b.gems.toLocaleString(), ' Gems'),
         b.bonus ? h('div', { class: 'gem-bonus' }, b.bonus) : null,
         h('button', {

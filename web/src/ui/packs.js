@@ -4,8 +4,9 @@
 
 import { h, delay } from './dom.js';
 import { renderCard, renderCardBack } from './card-view.js';
-import { motionOK, confetti, sparkle, screenShake, removeFx } from './fx.js';
+import { motionOK, confetti, sparkle, screenShake, removeFx, deckEmblem, currency } from './fx.js';
 import { profile, act } from './profile.js';
+import { track } from './telemetry.js';
 import { rewardLabel, RARITY, RARITY_ORDER, dustValue, archLevel, ARCH_LEVEL_XP, TIER_XP, seasonTier } from '../data/economy.js';
 import { CARDS, DECKS } from '../data/index.js';
 
@@ -20,7 +21,7 @@ export function packArt(kind, classes = '') {
   const deck = packDeck(kind);
   return h('div', { class: `pack ${classes}`, style: { '--deck': deck?.color ?? '#a78bfa' } },
     h('div', { class: 'pack-shine', 'aria-hidden': 'true' }),
-    h('div', { class: 'pack-emblem', 'aria-hidden': 'true' }, deck?.icon ?? '🎴'),
+    h('div', { class: 'pack-emblem', 'aria-hidden': 'true' }, deckEmblem(deck)),
     h('div', { class: 'pack-name' }, deck ? deck.name : 'Mixed'),
     h('div', { class: 'pack-brand' }, 'MetaDeck'));
 }
@@ -79,6 +80,7 @@ export function openPacks(kind, onClose = () => {}) {
     pack.classList.add('ripping');
     const res = await act('openPack', { kind });
     if (!res.ok) { busy = false; toast(res.reason, 'bad'); return close(); }
+    track('pack_open', { kind });
     await burst(pack);
     busy = false;
     reveal(res.pulls);
@@ -94,6 +96,7 @@ export function openPacks(kind, onClose = () => {}) {
     stage.replaceChildren(h('div', { class: 'pack-left' }, `Opening ${count} packs…`), stack);
     const res = await act('openPacks', { kind, count });
     if (!res.ok) { busy = false; toast(res.reason, 'bad'); return close(); }
+    track('pack_open', { kind });
     await burst(stack);
     if (motionOK()) await delay(150);
     busy = false;
@@ -103,22 +106,23 @@ export function openPacks(kind, onClose = () => {}) {
   function pullSlot(c, i, back, onFlip) {
     const def = CARDS[c.id];
     const el = h('div', {
-      class: `pull rarity-${c.rarity}${c.premium ? ' is-premium' : ''}`, role: 'button', tabindex: '0',
+      class: `pull rarity-${c.rarity}${c.holo ? ' is-holo' : c.premium ? ' is-premium' : ''}`, role: 'button', tabindex: '0',
       style: { '--i': i, '--glow': rarityColor(c.rarity) }, 'aria-label': `Face-down ${RARITY[c.rarity].name} card`,
     },
       h('div', { class: 'pull-inner' },
         h('div', { class: 'pull-back' }, renderCardBack('', back)),
-        h('div', { class: 'pull-front' }, renderCard(def, { premium: c.premium }))),
+        h('div', { class: 'pull-front' }, renderCard(def, { premium: c.holo ? 'holo' : c.premium }))),
       h('div', { class: 'pull-tag' },
         c.count > 1 ? `×${c.count}${c.fresh ? ' · New!' : ''}`
-          : c.dust ? (c.count ? `+${c.dust} Dust` : `Extra copy → ${c.dust} Dust`) : c.fresh ? 'New!' : c.premium ? 'Premium!' : RARITY[c.rarity].name));
+          : c.dust ? (c.count ? `+${c.dust} Dust` : `Extra copy → ${c.dust} Dust`) : c.holo ? 'Hologram!' : c.fresh ? 'New!' : c.premium ? 'Premium!' : RARITY[c.rarity].name));
     const flip = () => {
       if (el.classList.contains('flipped')) return;
       el.classList.add('flipped');
-      el.setAttribute('aria-label', `${def.displayName}, ${RARITY[c.rarity].name}${c.premium ? ', premium' : ''}`);
+      el.setAttribute('aria-label', `${def.displayName}, ${RARITY[c.rarity].name}${c.holo ? ', hologram' : c.premium ? ', premium' : ''}`);
       const r = el.getBoundingClientRect();
       if (motionOK()) {
-        if (c.rarity === 'legendary' || c.premium) { confetti([rarityColor(c.rarity), '#ffffff', '#ffe08a', '#f472b6'], 90); screenShake(stage, 1); }
+        if (c.holo) { confetti(['#5ef0ff', '#ff5ee8', '#ffffff', '#b8fff7'], 140); screenShake(stage, 2); }
+        else if (c.rarity === 'legendary' || c.premium) { confetti([rarityColor(c.rarity), '#ffffff', '#ffe08a', '#f472b6'], 90); screenShake(stage, 1); }
         else if (c.rarity !== 'common') sparkle(r, rarityColor(c.rarity), c.rarity === 'epic' ? 26 : 16);
       }
       onFlip();
@@ -152,8 +156,8 @@ export function openPacks(kind, onClose = () => {}) {
     const all = packs.flat();
     const byCard = new Map();
     for (const c of all) {
-      const k = `${c.id}|${c.premium ? 1 : 0}`;
-      const g = byCard.get(k) ?? byCard.set(k, { id: c.id, rarity: c.rarity, premium: c.premium, count: 0, fresh: false, dust: 0 }).get(k);
+      const k = `${c.id}|${c.holo ? 2 : c.premium ? 1 : 0}`;
+      const g = byCard.get(k) ?? byCard.set(k, { id: c.id, rarity: c.rarity, premium: c.premium, holo: c.holo, count: 0, fresh: false, dust: 0 }).get(k);
       g.count++;
       g.fresh ||= c.fresh;
       g.dust += c.dust;
@@ -162,10 +166,11 @@ export function openPacks(kind, onClose = () => {}) {
     const tally = Object.fromEntries(RARITY_ORDER.map(r => [r, all.filter(c => c.rarity === r).length]));
     const fresh = groups.filter(g => g.fresh);
     const premiums = all.filter(c => c.premium).length;
+    const holos = all.filter(c => c.holo).length;
     const dust = all.reduce((s, c) => s + c.dust, 0);
     // Copies that turned straight into Dust only count as highlights when they are Legendary.
     let highlights = groups.filter(g => g.rarity === 'legendary'
-      || (g.dust < g.count * dustValue(g.id, g.premium) && (g.rarity === 'epic' || g.premium || (g.fresh && g.rarity === 'rare'))));
+      || g.holo || (g.dust < g.count * dustValue(g.id, g.premium) && (g.rarity === 'epic' || g.premium || (g.fresh && g.rarity === 'rare'))));
     if (!highlights.length) highlights = groups;
     highlights = highlights.slice(0, HIGHLIGHTS);
 
@@ -192,6 +197,7 @@ export function openPacks(kind, onClose = () => {}) {
         h('div', { class: 'sum-stats' },
           RARITY_ORDER.slice().reverse().map(r => stat(RARITY[r].name, tally[r], rarityColor(r))),
           stat('New cards', fresh.length, '#4ade80'),
+          holos ? stat('Hologram', holos, '#5ef0ff') : null,
           premiums ? stat('Premium', premiums, '#f472b6') : null,
           dust ? stat('Dust', dust, '#a78bfa') : null),
         h('div', { class: 'sum-bar', 'aria-hidden': 'true' },
@@ -213,9 +219,9 @@ export function openPacks(kind, onClose = () => {}) {
 
 const BULK = 10;
 const HIGHLIGHTS = 10;
-const pullScore = g => RARITY_ORDER.indexOf(g.rarity) * 2 + (g.premium ? 3 : 0) + (g.fresh ? 1 : 0);
+const pullScore = g => RARITY_ORDER.indexOf(g.rarity) * 2 + (g.holo ? 9 : g.premium ? 3 : 0) + (g.fresh ? 1 : 0);
 const cardChip = g => h('span', { class: `sum-chip${g.fresh ? ' fresh' : ''}`, style: { '--glow': rarityColor(g.rarity) } },
-  g.premium ? '🌟 ' : '', CARDS[g.id].displayName, g.count > 1 ? h('b', null, ` ×${g.count}`) : null);
+  g.holo ? '💠 ' : g.premium ? '🌟 ' : '', CARDS[g.id].displayName, g.count > 1 ? h('b', null, ` ×${g.count}`) : null);
 
 // Game-over rewards: Gold, season XP, quests finished and archetype level-ups.
 export function rewardsPanel(out, deckId) {
@@ -227,13 +233,13 @@ export function rewardsPanel(out, deckId) {
   const tierInto = p.season.xp % TIER_XP;
   return h('div', { class: 'rewards' },
     h('div', { class: 'reward-row' },
-      out.gold ? h('span', { class: 'reward-pill gold' }, `🪙 +${out.gold}`) : null,
+      out.gold ? h('span', { class: 'reward-pill gold' }, currency('gold'), ` +${out.gold}`) : null,
       h('span', { class: 'reward-pill xp' }, `⭐ +${out.xp} season XP`),
       out.firstWin ? h('span', { class: 'reward-pill hot' }, 'First win of the day!') : null),
     out.quests.map(q => h('div', { class: 'reward-quest' }, h('b', null, '✔ Quest complete: '), q.text, ` · +${q.gold} Gold`)),
     h('div', { class: 'reward-bars' },
       h('div', { class: 'reward-bar', style: { '--deck': deck.color } },
-        h('span', null, `${deck.icon} ${deck.name} · Level ${lv}`),
+        h('span', null, deckEmblem(deck), ` ${deck.name} · Level ${lv}`),
         h('div', { class: 'meter' }, h('i', { style: { '--pct': `${(into / ARCH_LEVEL_XP) * 100}%` } }))),
       h('div', { class: 'reward-bar', style: { '--deck': '#ffc53d' } },
         h('span', null, `Season tier ${seasonTier(p)}`),

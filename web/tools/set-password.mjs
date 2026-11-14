@@ -4,13 +4,13 @@
 //   npm run set-password -- <name> [--port 5180]
 //
 // While the server is running it goes through the server (with the admin token from data/admin-token,
-// from this machine only); with no server running it edits data/accounts.json directly. Either way the
+// from this machine only); with no server running it edits data/metadeck.db directly. Either way the
 // account is signed out everywhere. Set DATA_DIR if the server uses another data folder.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createAccounts, passwordError } from '../server/accounts.mjs';
+import { accountsIn, passwordError } from '../server/accounts.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dataDir = path.resolve(process.env.DATA_DIR || path.join(root, 'data'));
@@ -89,9 +89,9 @@ async function viaServer() {
 }
 
 if (!(await viaServer())) {
-  const accounts = createAccounts({ file: path.join(dataDir, 'accounts.json') });
+  const accounts = accountsIn(dataDir);
   const r = await accounts.setPassword(name, password);
   if (!r.ok) { console.error(r.reason); process.exit(1); }
   accounts.flush();
-  console.log(`Password set for ${r.name} (server not running: edited data/accounts.json).`);
+  console.log(`Password set for ${r.name} (server not running: edited data/metadeck.db).`);
 }

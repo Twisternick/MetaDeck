@@ -19,12 +19,17 @@
 //
 // With `accounts` (server/accounts.mjs), a signed-in player plays under their account name, may only
 // bring cards their account owns, and is paid their match rewards by the server when the match ends.
+// Every finished match is written to the database's match history.
+//
+// maintenance(minutes) gets the server ready to restart: everyone is told, no new match can start,
+// and the callback runs once no match is still being played (or after twice the warning, at the latest).
 
 import crypto from 'node:crypto';
 import { createGame, applyAction, decisionPlayer } from '../src/engine/game.js';
 import { getDeck, deckErrors } from '../src/data/index.js';
 import { START_HP } from '../src/engine/constants.js';
 import { missingCards } from '../src/data/economy.js';
+import { logMatch } from './db.mjs';
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_LEN = 5;
@@ -43,6 +48,7 @@ export function createLobby({
   const rooms = new Map();   // code -> room
   const queue = [];          // players waiting for a quick match
   const perIp = new Map();   // address -> open connections
+  let closing = null;        // maintenance: { until, done, timer, deadline }
 
   // ------------------------------------------------------------ connections
 
@@ -122,6 +128,7 @@ export function createLobby({
       send(player, { t: 'queued', since: player.queuedAt });
     }
     sendLobby(player);
+    if (closing) send(player, noticeMsg());
     return player;
   }
 
@@ -148,6 +155,10 @@ export function createLobby({
     // Starting something new mid-match would walk out of it without forfeiting.
     if (['queue', 'host', 'join'].includes(msg.t) && inRunningMatch(player)) {
       send(player, { t: 'error', message: 'Finish or leave your current match first.' });
+      return;
+    }
+    if (closing && ['queue', 'host', 'join', 'rematch'].includes(msg.t)) {
+      send(player, { t: 'error', message: 'The server is about to restart for an update. Try again in a few minutes.' });
       return;
     }
     switch (msg.t) {
@@ -317,6 +328,7 @@ export function createLobby({
       shuffle: cryptoShuffle,
     });
     room.game.events = [];
+    room.startedAt = Date.now();
     room.rematch.clear();
     room.clock = null;
     room.idle = [0, 0];
@@ -359,7 +371,7 @@ export function createLobby({
       state: view(game, i), events: eventsFor(events, i),
     }));
     if (abandoned) forfeit(room, actor, 'inactive');
-    if (game.over) { payOut(room); broadcastLobby(); }
+    if (game.over) { payOut(room); broadcastLobby(); checkIdle(); }
   }
 
   // Match rewards for signed-in players, once per game, from the server's own result.
@@ -367,6 +379,10 @@ export function createLobby({
     const game = room.game;
     if (!accounts || !game?.over || game.paid) return;
     game.paid = true;
+    logMatch(accounts.db, {
+      kind: 'online', players: room.seats.map(p => p.account?.key ?? null), decks: game.players.map(p => p.deckId),
+      winner: game.winner, turns: game.turn, seconds: Math.round((Date.now() - room.startedAt) / 1000), ending: game.ending ?? 'hero',
+    });
     room.seats.forEach((p, i) => {
       if (!p.account) return;
       const out = accounts.recordOnline(p.account, {
@@ -382,6 +398,7 @@ export function createLobby({
     if (!game || game.over || seatNo < 0) return;
     game.over = true;
     game.winner = 1 - seatNo;
+    game.ending = why;
     const how = { disconnected: 'disconnected', inactive: 'stopped taking turns' }[why] ?? 'left';
     game.log.push({ turn: game.turn, text: `${game.players[seatNo].name} ${how} and forfeits.` });
     clearTimeout(room.timer);
@@ -389,6 +406,38 @@ export function createLobby({
       t: 'update', actor: seatNo, action: null, forfeit: seatNo, clock: null, state: view(game, i), events: [],
     }));
     payOut(room);
+    checkIdle();
+  }
+
+  // ------------------------------------------------------------ maintenance
+
+  const running = () => [...rooms.values()].filter(r => r.game && !r.game.over).length;
+  const noticeMsg = () => ({
+    t: 'notice', kind: 'restart', until: closing.until,
+    text: 'MetaDeck is restarting for an update. Matches in progress can finish; new ones start again in a few minutes.',
+  });
+
+  // Stop new matches, tell everyone, and call onIdle once no match is running (at the latest after
+  // twice the warning time, so a stalled match can't hold the restart forever).
+  function maintenance(minutes, onIdle) {
+    if (closing) return false;
+    const ms = Math.max(0, minutes) * 60_000;
+    closing = { until: Date.now() + ms, onIdle, done: false };
+    for (const p of [...queue]) { leave(p); send(p, { t: 'idle' }); }
+    for (const room of [...rooms.values()]) if (!room.game) for (const p of [...room.seats]) { leave(p); send(p, { t: 'idle' }); }
+    for (const p of players.values()) send(p, noticeMsg());
+    closing.timer = setTimeout(guarded(() => finishClosing()), Math.max(ms * 2, 1000));
+    checkIdle();
+    return true;
+  }
+  function checkIdle() {
+    if (closing && !closing.done && running() === 0) finishClosing();
+  }
+  function finishClosing() {
+    if (!closing || closing.done) return;
+    closing.done = true;
+    clearTimeout(closing.timer);
+    closing.onIdle?.();
   }
 
   // ------------------------------------------------------------ turn clock
@@ -452,6 +501,7 @@ export function createLobby({
   const opponentOf = (room, player) => room.seats.find(p => p !== player);
 
   function close() {
+    clearTimeout(closing?.timer);
     for (const room of rooms.values()) clearTimeout(room.timer);
     for (const p of players.values()) { clearTimeout(p.graceTimer); p.ws?.close(); }
     players.clear();
@@ -460,7 +510,7 @@ export function createLobby({
     queue.length = 0;
   }
 
-  return { connect, close, stats: () => ({ players: players.size, rooms: rooms.size, queue: queue.length }) };
+  return { connect, close, maintenance, stats: () => ({ players: players.size, rooms: rooms.size, queue: queue.length, matches: running(), closing: !!closing }) };
 }
 
 // What one seat may see: its own hand, the opponent's hand only while it is revealed, and no deck
@@ -485,11 +535,12 @@ function eventsFor(events, seat) {
   return events.map(e => (e.type === 'draw' && e.pid !== seat ? { type: 'draw', pid: e.pid } : e));
 }
 
-function cleanAction(raw) {
+export function cleanAction(raw) {
   if (!raw || typeof raw !== 'object' || !ACTIONS.has(raw.type)) return null;
   const action = { type: raw.type };
   if (Number.isInteger(raw.uid)) action.uid = raw.uid;
   if (Number.isInteger(raw.target) || (typeof raw.target === 'string' && /^P[01]$/.test(raw.target))) action.target = raw.target;
+  if (raw.boost === true) action.boost = true;
   return action;
 }
 

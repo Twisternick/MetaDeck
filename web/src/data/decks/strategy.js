@@ -25,7 +25,7 @@ export default {
     M('STR_M12_GrandTactician', 'Grand Tactician', 4, 4, 4, [], [fx('GrantKeyword', 0, 'OtherFriendlyMonster', { keyword: 'Fortify' })]),
     M('STR_M13_CounterIntelChief', 'Counter-Intel Chief', 4, 3, 4, [], [fx('Silence', 0, 'EnemyMonster')]),
     M('STR_M17_ArtilleryBattery', 'Artillery Battery', 3, 0, 5, ['Structure'], [fx('DealDamage', 2, 'RandomEnemyMonster', { trigger: 'turnEnd' })], NEW),
-    M('STR_M22_CavalryCharger', 'Cavalry Charger', 3, 3, 3, ['Rush'], [], NEW),
+    M('STR_M22_CavalryCharger', 'Cavalry Charger', 3, 3, 2, ['Rush'], [], NEW),
     M('STR_M23_LogisticsChief', 'Logistics Chief', 4, 3, 4, [], [fx('GainMaxBandwidth', 1), fx('Draw', 1)], NEW),
     M('STR_M14_WarCouncilChair', 'War Council Chair', 5, 5, 6, ['Fortify']),
     M('STR_M18_SiegeTower', 'Siege Tower', 5, 3, 5, ['Fortify'], [fx('DealDamage', 2, 'EnemyMonster')], NEW),
@@ -49,7 +49,7 @@ export default {
     S('STR_S13_Ambush', 'Ambush', 3, [fx('DealDamage', 3, 'EnemyMonster')], QUICK_NEW),
     S('STR_S14_FortressWalls', 'Fortress Walls', 3, [fx('SummonToken', 2, 'None', { token: 'token_barricade' }), fx('Draw', 1)], NEW),
     S('STR_S12_ScorchedEarth', 'Scorched Earth', 4, [fx('DealDamage', 2, 'AllEnemyMonsters')], NEW),
-    S('STR_S15_GrandStrategy', 'Grand Strategy', 3, [fx('GainMaxBandwidth', 1), fx('Draw', 2)], NEW),
-    S('STR_S10_TotalWarDoctrine', 'Total War Doctrine', 6, [fx('SummonToken', 2, 'None', { token: 'token_soldier' }), fx('Buff', 2, 'AllFriendlyMonsters')]),
+    S('STR_S15_GrandStrategy', 'Grand Strategy', 4, [fx('GainMaxBandwidth', 1), fx('Draw', 2)], NEW),
+    S('STR_S10_TotalWarDoctrine', 'Total War Doctrine', 7, [fx('SummonToken', 2, 'None', { token: 'token_soldier' }), fx('Buff', 2, 'AllFriendlyMonsters')]),
   ],
 };

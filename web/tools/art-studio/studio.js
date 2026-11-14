@@ -8,8 +8,10 @@ const $ = id => document.getElementById(id);
 const slots = allSlots();
 const deckOf = Object.fromEntries(DECKS.map(d => [d.id, d]));
 const FLAGGED = 'Flagged';
-const groups = [...DECKS.map(d => ({ id: d.id, name: d.name, icon: d.icon, color: d.color })),
+const ALL = 'All'; // every slot in every group, filtered by Show like a deck tab
+const groups = [{ id: ALL, name: 'All', icon: '🗂️', color: '#eef1ff' }, ...DECKS.map(d => ({ id: d.id, name: d.name, icon: d.icon, color: d.color })),
   { id: 'Extras', name: 'Tokens & extras', icon: '✨', color: '#9aa3c7' },
+  { id: 'Cosmetics', name: 'Card backs & arenas', icon: '🎴', color: '#ffc53d' },
   { id: FLAGGED, name: 'Flagged for redo', icon: '⚑', color: '#ff4d6d' }];
 const colorOf = g => deckOf[g]?.color ?? '#9aa3c7';
 const iconOf = g => deckOf[g]?.icon ?? '✨';
@@ -20,7 +22,10 @@ let sizes = {};          // key -> size in bytes of the image on disk
 // Flagged in redo.js and not yet replaced: no image, or still the exact file that was flagged.
 const flagged = s => s.redo.length > 0 && (!done.has(s.key) || s.redo.some(r => sizes[s.key] === r.bytes));
 const needsWork = s => !done.has(s.key) || flagged(s);
-const inGroup = (s, g) => (g === FLAGGED ? flagged(s) : s.group === g);
+// The Show filter on deck tabs: images with no file yet, those plus flagged ones, or everything.
+const SHOW = { missing: s => !done.has(s.key), todo: needsWork, all: () => true };
+const shown = s => SHOW[$('show').value](s);
+const inGroup = (s, g) => (g === ALL || (g === FLAGGED ? flagged(s) : s.group === g));
 let group = DECKS[0].id;
 let batch = [];          // slots the next pasted image is for, in panel order
 const stamp = new Map(); // key -> cache-buster after a save
@@ -50,7 +55,7 @@ const el = (tag, attrs = {}, ...kids) => {
 
 // ------------------------------------------------------------ rendering
 function thumb(slot) {
-  const box = el('div', { class: `thumb${slot.kind === 'back' ? ' tall' : ''}`, style: `--ar:${slot.w}/${slot.h}` },
+  const box = el('div', { class: `thumb${slot.h > slot.w ? ' tall' : ''}${slot.fit ? ' clear' : ''}`, style: `--ar:${slot.w}/${slot.h}` },
     el('div', { class: 'ph' }, iconOf(slot.group)),
     el('span', { class: `badge${flagged(slot) ? ' redo' : ''}` }, !done.has(slot.key) ? 'NEEDED' : flagged(slot) ? 'REDO' : 'DONE'));
   if (done.has(slot.key)) {
@@ -89,7 +94,7 @@ function slotView(slot, i) {
 
 const inBatch = s => batch.some(b => b.key === s.key);
 const visible = () => slots.filter(s => (inGroup(s, group) || (group === FLAGGED && inBatch(s)))
-  && (group === FLAGGED || !$('missingOnly').checked || needsWork(s) || inBatch(s)));
+  && (group === FLAGGED || shown(s) || inBatch(s)));
 
 function renderTabs() {
   $('tabs').replaceChildren(...groups.map(g => {
@@ -101,7 +106,7 @@ function renderTabs() {
         onclick: () => { group = g.id; setPref('group', group); render(); },
       }, `${g.icon} ${g.name}`, el('small', {}, `${n}`));
     }
-    const all = slots.filter(s => s.group === g.id);
+    const all = slots.filter(s => inGroup(s, g.id));
     const n = all.filter(s => !needsWork(s)).length;
     const flags = all.filter(flagged).length;
     return el('button', {
@@ -129,13 +134,15 @@ function render() {
   }
   $('grid').replaceChildren(...(list.length ? list.map(slotView)
     : [el('p', { class: 'sub' }, group === FLAGGED ? 'Nothing is flagged for redoing.'
-      : 'Every image in this group is done. Untick "Missing or flagged only" to redo one.')]));
+      : $('show').value === 'missing' ? 'Every image in this group has a file. Show flagged ones or everything to redo one.'
+      : 'Every image in this group is done. Show everything to redo one.')]));
   activate(batch);
 }
 
 // ------------------------------------------------------------ batches
-// What the current tab is working through: flagged images on the Flagged tab, else missing or flagged ones.
-const wanted = s => (group === FLAGGED ? flagged(s) : needsWork(s));
+// What the current tab is working through: flagged images on the Flagged tab, else what the Show filter
+// lists (missing or flagged ones when it shows everything).
+const wanted = s => (group === FLAGGED ? flagged(s) : $('show').value === 'missing' ? !done.has(s.key) : needsWork(s));
 
 // `slot` plus, in batch mode, the next wanted cards after it in the same group and art style.
 function batchFor(slot) {
@@ -224,7 +231,8 @@ window.addEventListener('focus', grabClipboard);
 let img = null;
 let cells = [];
 
-const coverScale = c => Math.max(c.slot.w / c.src.w, c.slot.h / c.src.h);
+// Art fills its slot edge to edge; a transparent logo is fitted whole instead, so nothing gets clipped.
+const coverScale = c => (c.slot.fit ? Math.min : Math.max)(c.slot.w / c.src.w, c.slot.h / c.src.h);
 
 function clampPan(c) {
   const s = coverScale(c) * c.zoom;
@@ -328,7 +336,7 @@ async function saveCrop() {
 
 // Move on to the next wanted slot in this tab, and hand its prompt to the clipboard.
 async function nextBatch(after, saved) {
-  const order = group === FLAGGED ? slots : slots.filter(s => s.group === after.group);
+  const order = group === FLAGGED || group === ALL ? slots : slots.filter(s => s.group === after.group);
   const next = order.slice(order.indexOf(after) + 1).concat(order).find(wanted);
   batch = next ? batchFor(next) : [];
   render();
@@ -354,7 +362,15 @@ document.addEventListener('keydown', e => {
 });
 
 // ------------------------------------------------------------ start
-for (const id of ['missingOnly', 'autoCopy', 'batchMode', 'autoGrab']) {
+// The old "Missing or flagged only" checkbox, unticked, meant Show: everything.
+$('show').value = pref('show', pref('missingOnly', 'true') === 'false' ? 'all' : 'todo');
+if (!$('show').value) $('show').value = 'todo';
+$('show').addEventListener('change', () => {
+  setPref('show', $('show').value);
+  if (batch.length) batch = batchFor(batch[0]);
+  render();
+});
+for (const id of ['autoCopy', 'batchMode', 'autoGrab']) {
   $(id).checked = pref(id, 'true') === 'true';
   $(id).addEventListener('change', () => {
     setPref(id, $(id).checked);

@@ -4,13 +4,17 @@
   "private": true,
   "description": "MetaDeck as a web game: a card battler where every deck is a video game genre.",
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": { "node": ">=22.13" },
   "scripts": {
     "start": "node serve.mjs",
     "art": "node tools/art-studio.mjs",
     "test": "node --test test/*.test.mjs",
     "simulate": "node tools/simulate.mjs --games 100 --cards",
     "grant": "node tools/grant.mjs",
-    "set-password": "node tools/set-password.mjs"
+    "set-password": "node tools/set-password.mjs",
+    "users": "node tools/users.mjs",
+    "maintenance": "node tools/maintenance.mjs",
+    "backup": "node tools/backup.mjs",
+    "report": "node tools/report.mjs"
   }
 }

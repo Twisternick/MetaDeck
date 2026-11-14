@@ -5,7 +5,7 @@
 import { h, delay, storage } from './dom.js';
 import { net } from './net.js';
 import { startMatch } from './match.js';
-import { artSlot, deckArtUrls, removeFx, motionOK } from './fx.js';
+import { artSlot, deckArtUrls, deckEmblem, removeFx, motionOK } from './fx.js';
 import { getDeck } from '../data/index.js';
 
 const NAME_KEY = 'metadeck.netName';
@@ -190,7 +190,7 @@ export function lobby(root, { deck, onBack, matchExtras = () => ({}) }) {
             onkeydown: e => { if (e.key === 'Enter') e.target.blur(); },
           })),
         h('div', { class: 'lobby-deck' },
-          artSlot('', deckArtUrls(mine.id), mine.icon),
+          artSlot('', deckArtUrls(mine.id), deckEmblem(mine)),
           h('div', null,
             h('div', { class: 'vs-sub' }, 'Your deck'),
             h('div', { class: 'vs-name' }, mine.name),
@@ -244,7 +244,7 @@ export function lobby(root, { deck, onBack, matchExtras = () => ({}) }) {
       h('div', { class: 'radar', 'aria-hidden': 'true' },
         h('i', { class: 'radar-ring' }), h('i', { class: 'radar-ring' }), h('i', { class: 'radar-ring' }),
         h('i', { class: 'radar-sweep' }),
-        h('span', { class: 'radar-core' }, getDeck(deck.archetype).icon)),
+        h('span', { class: 'radar-core' }, deckEmblem(getDeck(deck.archetype)))),
       h('div', { class: 'waiting-body' },
         h('div', { class: 'vs-sub' }, quick ? 'Quick find' : priv ? 'Private room' : 'Open room'),
         h('h2', { class: 'waiting-title' }, quick ? 'Searching for an opponent' : 'Waiting for a challenger', h('span', { class: 'dots' })),
@@ -272,7 +272,7 @@ export function lobby(root, { deck, onBack, matchExtras = () => ({}) }) {
       const d = getDeck(r.deckId);
       const own = r.code === ownCode;
       return h('div', { class: `room-tile rise${own ? ' own' : ''}`, style: { '--deck': d.color, '--i': Math.min(i, 12) } },
-        artSlot('', deckArtUrls(d.id), d.icon),
+        artSlot('', deckArtUrls(d.id), deckEmblem(d)),
         h('div', { class: 'room-info' },
           h('div', { class: 'room-host' }, r.host),
           h('div', { class: 'room-deck' }, d.name),
@@ -287,7 +287,7 @@ export function lobby(root, { deck, onBack, matchExtras = () => ({}) }) {
     const mineDeck = getDeck(msg.state.players[msg.seat].deckId);
     const theirDeck = getDeck(msg.state.players[1 - msg.seat].deckId);
     const side = (d, name, cls) => h('div', { class: `found-side ${cls}`, style: { '--deck': d.color } },
-      artSlot('', deckArtUrls(d.id), d.icon),
+      artSlot('', deckArtUrls(d.id), deckEmblem(d)),
       h('div', { class: 'found-name' }, name),
       h('div', { class: 'found-deck' }, d.name));
     const el = h('div', { class: 'match-found', role: 'status' },

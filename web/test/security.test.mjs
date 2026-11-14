@@ -7,6 +7,9 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import net from 'node:net';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { acceptWebSocket } from '../server/ws.mjs';
@@ -14,10 +17,11 @@ import { createLobby } from '../server/lobby.mjs';
 import { starterDecks } from '../src/data/index.js';
 import { decisionPlayer } from '../src/engine/game.js';
 
-let site, siteUrl, server, lobby, wsUrl;
+let site, siteUrl, server, lobby, wsUrl, dataDir;
 
 before(async () => {
-  site = spawn(process.execPath, [fileURLToPath(new URL('../serve.mjs', import.meta.url)), '0'], { stdio: ['ignore', 'pipe', 'inherit'] });
+  dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'metadeck-site-'));
+  site = spawn(process.execPath, [fileURLToPath(new URL('../serve.mjs', import.meta.url)), '0'], { stdio: ['ignore', 'pipe', 'inherit'], env: { ...process.env, DATA_DIR: dataDir } });
   siteUrl = await new Promise((resolve, reject) => {
     site.stdout.on('data', d => { const m = /http:\/\/localhost:(\d+)/.exec(String(d)); if (m) resolve(`http://127.0.0.1:${m[1]}`); });
     site.on('exit', () => reject(new Error('serve.mjs exited')));
@@ -30,8 +34,10 @@ before(async () => {
   wsUrl = `ws://127.0.0.1:${server.address().port}/ws`;
 });
 
-after(() => {
+after(async () => {
   site.kill();
+  await new Promise(r => site.once('exit', r));
+  fs.rmSync(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   lobby.close();
   server.close();
 });

@@ -9,7 +9,7 @@ import { normalizeProfile, runOp, unopenedPacks, seasonTier } from '../data/econ
 
 const KEY = 'metadeck.profile';
 let current = null;
-let account = null;   // { name } while signed in
+let account = null;   // { name, created, recovery, devices } while signed in
 let serverTestPurchases = false;
 
 export const signedIn = () => account;
@@ -33,7 +33,7 @@ async function api(path, body) {
 }
 
 function adopt(data) {
-  account = { name: data.name };
+  account = { name: data.name, ...data.info };
   current = normalizeProfile(data.profile);
   serverTestPurchases = !!data.testPurchases;
   refreshWallets();
@@ -47,11 +47,14 @@ export async function initAccount() {
   } catch { /* offline or no server: guest */ }
 }
 
-export async function signUp(name, password) { return authenticate('signup', name, password); }
-export async function signIn(name, password) { return authenticate('signin', name, password); }
-async function authenticate(path, name, password) {
+// Each resolves to the server's answer: { ok, reason? , ... }. Sign-up and reset also carry the
+// account's new `recoveryCode`, for the player to save.
+export async function signUp(name, password) { return authenticate('signup', { name, password }); }
+export async function signIn(name, password) { return authenticate('signin', { name, password }); }
+export async function resetPassword(name, code, password) { return authenticate('reset', { name, code, password }); }
+async function authenticate(path, body) {
   try {
-    const { data } = await api(path, { name, password });
+    const { data } = await api(path, body);
     if (data.ok) adopt(data);
     return data;
   } catch {
@@ -59,19 +62,66 @@ async function authenticate(path, name, password) {
   }
 }
 
-export async function signOut() {
-  try { await api('signout', {}); } catch { /* signed out locally anyway */ }
+// Account management while signed in. A 401 means the session ended elsewhere: drop to guest.
+async function manage(path, body = {}) {
+  try {
+    const { status, data } = await api(path, body);
+    if (status === 401) forget();
+    return data;
+  } catch {
+    return { ok: false, reason: 'Can’t reach the server. Check your connection.' };
+  }
+}
+export async function changePassword(current, password) {
+  const r = await manage('newpassword', { current, password });
+  if (r.ok && account) account.devices = 1;
+  return r;
+}
+export async function newRecoveryCode(password) {
+  const r = await manage('recovery', { password });
+  if (r.ok && account) account.recovery = true;
+  return r;
+}
+export async function signOutOthers() {
+  const r = await manage('signoutothers');
+  if (r.ok && account) account.devices = 1;
+  return r;
+}
+export async function deleteAccount(password, confirm) {
+  const r = await manage('delete', { password, confirm });
+  if (r.ok) forget();
+  return r;
+}
+
+function forget() {
   account = null;
   current = null;
   serverTestPurchases = false;
   refreshWallets();
 }
 
+export async function signOut() {
+  try { await api('signout', {}); } catch { /* signed out locally anyway */ }
+  forget();
+}
+
+// A vs-AI match for an account is dealt by the server and checked by it at the end (server/ai-match.mjs).
+// startAiMatch resolves to { ok, ticket, seed, firstPlayer }; finishAiMatch to { ok, won, out } and
+// updates the profile with the rewards.
+export async function startAiMatch(deal) {
+  return manage('aistart', deal);
+}
+export async function finishAiMatch(ticket, moves) {
+  const r = await manage('aifinish', { ticket, moves });
+  if (r.profile) { current = normalizeProfile(r.profile); refreshWallets(); }
+  return r;
+}
+
 // Re-read the account's profile (after the server changed it, e.g. online match rewards).
 export async function reload() {
   if (!account) return;
   const { status, data } = await api('me');
-  if (status === 200 && data.ok) adopt(data); else if (status === 401) { account = null; current = null; refreshWallets(); }
+  if (status === 200 && data.ok) adopt(data); else if (status === 401) forget();
 }
 
 // Apply one economy operation (see OPS in data/economy.js). Resolves to its result: { ok, reason?, ... }.
@@ -85,8 +135,7 @@ export async function act(op, args = {}) {
   try {
     const { status, data } = await api('act', { op, args });
     if (data.profile) current = normalizeProfile(data.profile);
-    if (status === 401) { account = null; current = null; }
-    refreshWallets();
+    if (status === 401) forget(); else refreshWallets();
     return data;
   } catch {
     return { ok: false, reason: 'Can’t reach the server. Check your connection.' };

@@ -2,7 +2,7 @@
 // starter decks) and the season track with its free and premium rewards.
 
 import { h } from './dom.js';
-import { removeFx, sparkle, confetti, motionOK } from './fx.js';
+import { removeFx, sparkle, confetti, motionOK, deckEmblem, currency } from './fx.js';
 import { profile, act, walletBar } from './profile.js';
 import { toast } from './packs.js';
 import {
@@ -12,7 +12,8 @@ import {
 } from '../data/economy.js';
 import { DECKS, starterDecks } from '../data/index.js';
 
-const REWARD_ICONS = { gold: '🪙', gems: '💎', dust: '✨', pack: '🎴', cosmetic: '🎨', premiumCard: '🌟', cards: '📦' };
+const REWARD_ICONS = { pack: '🎴', cosmetic: '🎨', premiumCard: '🌟', holoCard: '💠', cards: '📦' };
+const rewardIcon = type => (['gold', 'gems', 'dust'].includes(type) ? currency(type) : REWARD_ICONS[type]);
 
 export function season(root, { onBack, nav }) {
   removeFx();
@@ -47,7 +48,7 @@ export function season(root, { onBack, nav }) {
           h('div', { class: 'meter' }, h('i', { style: { '--pct': `${(q.progress / q.goal) * 100}%` } })),
           h('div', { class: 'quest-foot' },
             h('span', null, `${q.progress} / ${q.goal}`),
-            h('span', { class: 'quest-reward' }, `🪙 ${q.gold}`),
+            h('span', { class: 'quest-reward' }, currency('gold'), ` ${q.gold}`),
             reroll ? h('button', { class: 'btn ghost small', onclick: async () => { const r = await act('rerollQuest', { id: q.id }); if (!r.ok) toast(r.reason, 'bad'); render(); } }, 'Swap') : null)))
           : h('p', { class: 'muted' }, 'All done for today. Come back tomorrow for a new quest.')),
       h('div', { class: 'daily' },
@@ -92,7 +93,7 @@ export function season(root, { onBack, nav }) {
         onclick: ready ? e => claim(track, t, e.currentTarget) : null,
         onkeydown: ready ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); claim(track, t, e.currentTarget); } } : null,
       },
-        h('span', { class: 'reward-icon', 'aria-hidden': 'true' }, REWARD_ICONS[r.type]),
+        h('span', { class: 'reward-icon', 'aria-hidden': 'true' }, rewardIcon(r.type)),
         h('span', { class: 'reward-label' }, r.type === 'cosmetic' ? cosmetic(r.id).name : rewardLabel(r)),
         claimed ? h('span', { class: 'reward-state' }, '✔') : locked ? h('span', { class: 'reward-state' }, '🔒') : null);
     };
@@ -111,7 +112,7 @@ export function season(root, { onBack, nav }) {
               class: 'btn primary online', disabled: p.gems < SEASON_PASS_GEMS || null,
               title: p.gems < SEASON_PASS_GEMS ? 'Get Gems in the shop' : null,
               onclick: async () => { const r = await act('buySeasonPass'); if (!r.ok) return toast(r.reason, 'bad'); toast('Premium track unlocked!'); if (motionOK()) confetti(); render(); },
-            }, `Unlock premium · 💎 ${SEASON_PASS_GEMS}`),
+            }, 'Unlock premium · ', currency('gems'), ` ${SEASON_PASS_GEMS}`),
           !p.season.premium && p.gems < SEASON_PASS_GEMS && nav.shop ? h('button', { class: 'btn ghost small', onclick: nav.shop }, 'Get Gems') : null)),
       h('div', { class: 'track-rows' },
         h('div', { class: 'track-labels' }, h('span', null, 'Free'), h('span', { class: 'gold-text' }, 'Premium')),
@@ -135,7 +136,7 @@ export function season(root, { onBack, nav }) {
         const into = lv >= ARCH_MAX_LEVEL ? ARCH_LEVEL_XP : a.xp % ARCH_LEVEL_XP;
         const nextUnlock = Object.keys(STARTER_UNLOCKS).map(Number).find(l => l > lv);
         return h('div', { class: 'level-card rise', style: { '--deck': d.color, '--i': i } },
-          h('div', { class: 'level-head' }, h('span', { class: 'chip-emblem' }, d.icon), h('b', null, d.name), h('span', { class: 'level-num' }, `Lv ${lv}`)),
+          h('div', { class: 'level-head' }, deckEmblem(d, 'chip-emblem'), h('b', null, d.name), h('span', { class: 'level-num' }, `Lv ${lv}`)),
           h('div', { class: 'meter' }, h('i', { style: { '--pct': `${(into / ARCH_LEVEL_XP) * 100}%` } })),
           h('div', { class: 'muted small' }, nextUnlock
             ? `Level ${nextUnlock}: ${starterDecks(d.id)[STARTER_UNLOCKS[nextUnlock]].name}`

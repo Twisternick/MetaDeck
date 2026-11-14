@@ -25,7 +25,7 @@ const TRIGGER_PREFIX = {
   death: 'Death: ',
   turnStart: 'Turn start: ',
   turnEnd: 'Turn end: ',
-  draw: 'Whenever you draw a card, ',
+  draw: 'Whenever you draw an extra card, ',
   allyDeath: 'Whenever another friendly monster dies, ',
 };
 
@@ -101,7 +101,7 @@ function sentence(e, t, prev) {
     case 'Generate': return `gain ${n} temporary Bandwidth`;
     case 'GainMaxBandwidth': return n === 1 ? 'gain an empty Bandwidth crystal' : `gain ${n} empty Bandwidth crystals`;
     case 'ShuffleGraveyardIntoDeck': return 'shuffle your graveyard into your deck';
-    case 'CopyRandomHandCard': return 'copy a random card in your hand';
+    case 'CopyBestHandCard': return 'copy the most expensive card in your hand';
     default: return `[${e.effectType}]`;
   }
 }

@@ -22,6 +22,10 @@ export const RARITY = {
 export const RARITY_ORDER = ['common', 'rare', 'epic', 'legendary'];
 export const PREMIUM_MULT = 4;      // a premium (animated) copy costs and disenchants for 4x
 export const PREMIUM_CHANCE = 0.05; // per card in a pack
+// Hologram: the finish above premium, its art projected above the card. Made by upgrading a premium
+// copy, found in about 1 pack card in 100, and given on two premium season tiers.
+export const HOLO_MULT = 12;
+export const HOLO_CHANCE = 0.01;
 export const LEGENDARY_PITY = 30;   // a pack without a Legendary in this many is guaranteed one
 
 // Each archetype's first starter is its core set: all Common, and every new player owns it. Of the 10
@@ -39,7 +43,7 @@ for (const deck of DECKS) {
 }
 export const rarityOf = id => CARD_RARITY[id] ?? 'common';
 export const craftCost = (id, premium = false) => RARITY[rarityOf(id)].craft * (premium ? PREMIUM_MULT : 1);
-export const dustValue = (id, premium = false) => RARITY[rarityOf(id)].dust * (premium ? PREMIUM_MULT : 1);
+export const dustValue = (id, premium = false, holo = false) => RARITY[rarityOf(id)].dust * (holo ? HOLO_MULT : premium ? PREMIUM_MULT : 1);
 
 // ---------------------------------------------------------------- time
 
@@ -55,6 +59,7 @@ export const seasonName = key => {
 // ---------------------------------------------------------------- cosmetics
 
 // `gems` is the shop price; `season` is where the track gives it ({ track, tier }). Defaults cost nothing.
+// `deck` marks a genre's own back and arena: every deck has exactly one of each.
 export const COSMETICS = [
   { id: 'back:classic', kind: 'back', name: 'Classic', blurb: 'The standard MetaDeck back.', default: true },
   { id: 'back:neon-grid', kind: 'back', name: 'Neon Grid', blurb: 'A scrolling synth grid.', gems: 300 },
@@ -62,12 +67,32 @@ export const COSMETICS = [
   { id: 'back:gold-circuit', kind: 'back', name: 'Gold Circuit', blurb: 'Pulsing gold traces on black.', gems: 500 },
   { id: 'back:pixel-pop', kind: 'back', name: 'Pixel Pop', blurb: 'Retro pixels in candy colours.', season: { track: 'premium', tier: 10 } },
   { id: 'back:void-rift', kind: 'back', name: 'Void Rift', blurb: 'A swirling tear in space.', season: { track: 'free', tier: 30 } },
+  { id: 'back:midnight-tape', kind: 'back', name: 'Midnight Tape', blurb: 'Found footage that watches back.', gems: 300, deck: 'Horror' },
+  { id: 'back:dragon-hoard', kind: 'back', name: 'Dragon Hoard', blurb: 'A gold dragon coiled around its treasure.', gems: 700, deck: 'RPG' },
+  { id: 'back:dog-tags', kind: 'back', name: 'Dog Tags', blurb: 'Steel tags on rain-soaked camo.', gems: 300, deck: 'FPS' },
+  { id: 'back:cloud-hop', kind: 'back', name: 'Cloud Hop', blurb: 'Pixel islands drifting through a bright sky.', gems: 300, deck: 'Platformer' },
+  { id: 'back:chequered-flag', kind: 'back', name: 'Chequered Flag', blurb: 'The flag drops. Floor it.', gems: 300, deck: 'Racing' },
+  { id: 'back:dojo-seal', kind: 'back', name: 'Dojo Seal', blurb: 'An ink-brush circle burning with fighting spirit.', gems: 300, deck: 'Fighting' },
+  { id: 'back:stadium-lights', kind: 'back', name: 'Stadium Lights', blurb: 'Floodlights blazing over fresh-cut turf.', gems: 300, deck: 'Sports' },
+  { id: 'back:war-banner', kind: 'back', name: 'War Banner', blurb: 'Raise the standard and march.', gems: 300, deck: 'Strategy' },
+  { id: 'back:blueprint', kind: 'back', name: 'Blueprint', blurb: 'A whole city, drawn up in teal ink.', gems: 300, deck: 'CityBuilder' },
+  { id: 'back:house-deck', kind: 'back', name: 'House Deck', blurb: 'The back of every card in the shop.', gems: 300, deck: 'CardGame' },
   { id: 'arena:standard', kind: 'arena', name: 'Standard Arena', blurb: 'The classic battlefield.', default: true },
   { id: 'arena:synthwave', kind: 'arena', name: 'Synthwave', blurb: 'Sunset gradient and a rolling grid.', gems: 600 },
   { id: 'arena:deep-space', kind: 'arena', name: 'Deep Space', blurb: 'Nebulae drifting behind the board.', gems: 600 },
   { id: 'arena:sunset-court', kind: 'arena', name: 'Sunset Court', blurb: 'Warm dusk over the arena.', season: { track: 'free', tier: 20 } },
   { id: 'arena:molten-core', kind: 'arena', name: 'Molten Core', blurb: 'Lava light pulsing from below.', season: { track: 'premium', tier: 20 } },
   { id: 'arena:crystal-vault', kind: 'arena', name: 'Crystal Vault', blurb: 'Prismatic light on ice.', season: { track: 'premium', tier: 40 } },
+  { id: 'arena:haunted-manor', kind: 'arena', name: 'Haunted Manor', blurb: 'Candlelight, fog and something in the corner.', gems: 600, deck: 'Horror' },
+  { id: 'arena:night-circuit', kind: 'arena', name: 'Night Circuit', blurb: 'Floodlit asphalt and passing light trails.', gems: 600, deck: 'Racing' },
+  { id: 'arena:killhouse', kind: 'arena', name: 'Killhouse', blurb: 'Wet concrete, sandbags and rain that never stops.', gems: 600, deck: 'FPS' },
+  { id: 'arena:sky-islands', kind: 'arena', name: 'Sky Islands', blurb: 'Floating platforms under a twinkling dusk.', gems: 600, deck: 'Platformer' },
+  { id: 'arena:tavern-table', kind: 'arena', name: 'Tavern Table', blurb: 'Candles, a quest map and a round on the house.', gems: 600, deck: 'RPG' },
+  { id: 'arena:dojo-floor', kind: 'arena', name: 'Dojo Floor', blurb: 'Tatami, paper lanterns and sparks in the air.', gems: 600, deck: 'Fighting' },
+  { id: 'arena:home-turf', kind: 'arena', name: 'Home Turf', blurb: 'Striped grass under the floodlights.', gems: 600, deck: 'Sports' },
+  { id: 'arena:war-table', kind: 'arena', name: 'War Table', blurb: 'A campaign map under drifting fog of war.', gems: 600, deck: 'Strategy' },
+  { id: 'arena:model-city', kind: 'arena', name: 'Model City', blurb: 'A tiny town lighting up at dusk.', gems: 600, deck: 'CityBuilder' },
+  { id: 'arena:card-table', kind: 'arena', name: 'Card Table', blurb: 'Tournament felt, deck boxes and dice.', gems: 600, deck: 'CardGame' },
 ];
 export const cosmetic = id => COSMETICS.find(c => c.id === id);
 export const ownsCosmetic = (p, id) => !!cosmetic(id)?.default || p.cosmetics.owned.includes(id);
@@ -79,7 +104,7 @@ export const STARTING_DUST = 100;
 
 export function newProfile(now = new Date()) {
   const cards = {};
-  for (const [id, n] of Object.entries(CORE_COPIES)) cards[id] = { n, p: 0 };
+  for (const [id, n] of Object.entries(CORE_COPIES)) cards[id] = { n, p: 0, h: 0 };
   const p = {
     v: PROFILE_VERSION,
     gold: STARTING_GOLD, gems: 0, dust: STARTING_DUST,
@@ -108,12 +133,13 @@ export function normalizeProfile(raw, now = new Date(), rng = Math.random) {
   const cards = {};
   for (const [id, c] of Object.entries(raw.cards ?? {})) {
     if (!CARDS[id]?.deckId) continue;
-    const prem = Math.min(MAX_COPIES, num(c?.p));
-    cards[id] = { n: Math.min(MAX_COPIES - prem, num(c?.n)), p: prem };
+    const holo = Math.min(MAX_COPIES, num(c?.h));
+    const prem = Math.min(MAX_COPIES - holo, num(c?.p));
+    cards[id] = { n: Math.min(MAX_COPIES - holo - prem, num(c?.n)), p: prem, h: holo };
   }
   for (const [id, n] of Object.entries(CORE_COPIES)) {
-    const c = (cards[id] ??= { n: 0, p: 0 });
-    if (c.n + c.p < n) c.n = n - c.p; // nobody ever loses their core set
+    const c = (cards[id] ??= { n: 0, p: 0, h: 0 });
+    if (c.n + c.p + c.h < n) c.n = n - c.p - c.h; // nobody ever loses their core set
   }
   p.cards = cards;
   p.cosmetics = { ...newProfile(now).cosmetics, ...raw.cosmetics };
@@ -127,9 +153,15 @@ export function normalizeProfile(raw, now = new Date(), rng = Math.random) {
 
 // ---------------------------------------------------------------- collection
 
-export const owned = (p, id) => p.cards[id] ?? { n: 0, p: 0 };
-export const ownedTotal = (p, id) => owned(p, id).n + owned(p, id).p;
+const NO_COPIES = Object.freeze({ n: 0, p: 0, h: 0 });
+export const owned = (p, id) => (p.cards[id] ? { ...NO_COPIES, ...p.cards[id] } : NO_COPIES);
+export const ownedTotal = (p, id) => { const c = owned(p, id); return c.n + c.p + c.h; };
 export const hasPremium = (p, id) => owned(p, id).p > 0;
+export const hasHolo = (p, id) => owned(p, id).h > 0;
+// The best finish the player owns of a card: 'holo', 'premium' or null.
+export const bestFinish = (p, id) => (hasHolo(p, id) ? 'holo' : hasPremium(p, id) ? 'premium' : null);
+// A card's copy counts, created on first use (older saves have no hologram count yet).
+const copies = (p, id) => { const c = (p.cards[id] ??= { n: 0, p: 0, h: 0 }); c.h ??= 0; return c; };
 
 // Cards a deck list needs that the player doesn't own: [{ id, need }].
 export function missingCards(p, cards) {
@@ -149,29 +181,34 @@ export function craft(p, id, premium = false) {
   const cost = craftCost(id, premium);
   if (p.dust < cost) return { ok: false, reason: `Needs ${cost} Dust.` };
   p.dust -= cost;
-  const c = (p.cards[id] ??= { n: 0, p: 0 });
+  const c = copies(p, id);
   premium ? c.p++ : c.n++;
   return { ok: true, cost };
 }
 
-// Turn one normal copy into a premium one, for the difference in price.
-export const upgradeCost = id => craftCost(id, true) - craftCost(id);
-export function upgrade(p, id) {
+// Turn one normal copy into a premium one, or (holo) one premium copy into a hologram, for the
+// difference in price.
+export const upgradeCost = (id, holo = false) => (holo
+  ? RARITY[rarityOf(id)].craft * (HOLO_MULT - PREMIUM_MULT)
+  : craftCost(id, true) - craftCost(id));
+export function upgrade(p, id, holo = false) {
   const c = owned(p, id);
-  if (!c.n) return { ok: false, reason: 'No normal copy to upgrade.' };
-  const cost = upgradeCost(id);
+  if (holo ? !c.p : !c.n) return { ok: false, reason: holo ? 'No premium copy to upgrade.' : 'No normal copy to upgrade.' };
+  const cost = upgradeCost(id, holo);
   if (p.dust < cost) return { ok: false, reason: `Needs ${cost} Dust.` };
   p.dust -= cost;
-  p.cards[id].n--; p.cards[id].p++;
+  const k = copies(p, id);
+  if (holo) { k.p--; k.h++; } else { k.n--; k.p++; }
   return { ok: true, cost };
 }
 
-export function disenchant(p, id, premium = false) {
+export function disenchant(p, id, premium = false, holo = false) {
   const c = owned(p, id);
   if (!spareCopies(p, id)) return { ok: false, reason: 'Core set copies can’t be disenchanted.' };
-  if (premium ? !c.p : !c.n) return { ok: false, reason: 'No such copy.' };
-  premium ? p.cards[id].p-- : p.cards[id].n--;
-  const value = dustValue(id, premium);
+  if (holo ? !c.h : premium ? !c.p : !c.n) return { ok: false, reason: 'No such copy.' };
+  const k = copies(p, id);
+  if (holo) k.h--; else if (premium) k.p--; else k.n--;
+  const value = dustValue(id, premium, holo);
   p.dust += value;
   return { ok: true, value };
 }
@@ -197,7 +234,7 @@ function rollRarity(rng, floor = 'common') {
 // Open a pack: 5 cards, at least one Rare or better, a Legendary at least every LEGENDARY_PITY packs.
 // Duplicate protection: a card you already own MAX_COPIES of is only drawn when every card of that
 // rarity is maxed, and then it turns straight into Dust.
-// Returns [{ id, rarity, premium, fresh (first copy), dust (if converted) }].
+// Returns [{ id, rarity, premium, holo, fresh (first copy), dust (if converted) }].
 export function openPack(p, kind, rng = Math.random) {
   const pool = packPool(kind);
   if (!pool.length) throw new Error(`Unknown pack ${kind}`);
@@ -213,18 +250,20 @@ export function openPack(p, kind, rng = Math.random) {
     const open = ofRarity.filter(id => ownedTotal(p, id) + (pending.get(id) ?? 0) < MAX_COPIES);
     const from = open.length ? open : ofRarity;
     const id = from[Math.floor(rng() * from.length)];
-    const premium = rng() < PREMIUM_CHANCE;
+    const finish = rng();
+    const holo = finish < HOLO_CHANCE;
+    const premium = !holo && finish < HOLO_CHANCE + PREMIUM_CHANCE;
     if (!open.length) {
-      const dust = dustValue(id, premium);
+      const dust = dustValue(id, premium, holo);
       p.dust += dust;
-      pulled.push({ id, rarity, premium, fresh: false, dust });
+      pulled.push({ id, rarity, premium, holo, fresh: false, dust });
       continue;
     }
     const fresh = ownedTotal(p, id) === 0 && !pending.has(id);
     pending.set(id, (pending.get(id) ?? 0) + 1);
-    const c = (p.cards[id] ??= { n: 0, p: 0 });
-    premium ? c.p++ : c.n++;
-    pulled.push({ id, rarity, premium, fresh, dust: 0 });
+    const c = copies(p, id);
+    if (holo) c.h++; else if (premium) c.p++; else c.n++;
+    pulled.push({ id, rarity, premium, holo, fresh, dust: 0 });
   }
   return pulled;
 }
@@ -300,7 +339,7 @@ export const TIER_XP = 500;
 export const seasonTier = p => Math.min(SEASON_TIERS, Math.floor(p.season.xp / TIER_XP));
 
 // What each tier gives. The free track pays out Gold, Dust and packs; the premium track adds
-// cosmetics, premium cards, extra packs and some of its Gems back.
+// cosmetics, premium and hologram cards, extra packs and some of its Gems back.
 export function seasonReward(track, tier) {
   const cos = COSMETICS.find(c => c.season?.track === track && c.season.tier === tier);
   if (cos) return { type: 'cosmetic', id: cos.id };
@@ -309,6 +348,7 @@ export function seasonReward(track, tier) {
     return tier % 2 ? { type: 'gold', n: 40 } : { type: 'dust', n: 40 };
   }
   if (tier % 5 === 0) return { type: 'pack', kind: 'any', n: 2 };
+  if (tier === 28 || tier === 36) return { type: 'holoCard', rarity: tier === 36 ? 'epic' : 'rare' };
   if (tier % 4 === 0) return { type: 'premiumCard', rarity: tier >= 24 ? 'epic' : 'rare' };
   if (tier % 3 === 0) return { type: 'gems', n: 75 };
   return tier % 2 ? { type: 'gold', n: 60 } : { type: 'dust', n: 60 };
@@ -325,18 +365,19 @@ export function grantReward(p, reward, rng = Math.random) {
     case 'dust': p.dust += reward.n; return { ...reward };
     case 'pack': addPacks(p, reward.kind, reward.n); return { ...reward };
     case 'cosmetic': if (!p.cosmetics.owned.includes(reward.id)) p.cosmetics.owned.push(reward.id); return { ...reward };
-    case 'premiumCard': {
+    case 'premiumCard': case 'holoCard': {
+      const holo = reward.type === 'holoCard';
       const pool = Object.keys(CARD_RARITY).filter(id => rarityOf(id) === reward.rarity);
       const open = pool.filter(id => ownedTotal(p, id) < MAX_COPIES);
       const id = (open.length ? open : pool)[Math.floor(rng() * (open.length || pool.length))];
-      if (!open.length) { const n = dustValue(id, true); p.dust += n; return { type: 'dust', n }; }
-      (p.cards[id] ??= { n: 0, p: 0 }).p++;
+      if (!open.length) { const n = dustValue(id, !holo, holo); p.dust += n; return { type: 'dust', n }; }
+      copies(p, id)[holo ? 'h' : 'p']++;
       return { ...reward, id };
     }
     case 'cards': {
       for (const [id, n] of countCards(reward.cards)) {
-        const c = (p.cards[id] ??= { n: 0, p: 0 });
-        if (c.n + c.p < n) c.n = n - c.p;
+        const c = copies(p, id);
+        if (c.n + c.p + c.h < n) c.n = n - c.p - c.h;
       }
       return { ...reward };
     }
@@ -493,6 +534,7 @@ export function rewardLabel(r) {
     case 'pack': return `${r.n > 1 ? `${r.n}× ` : ''}${deckName(r.kind)} pack`;
     case 'cosmetic': return `${cosmetic(r.id)?.kind === 'arena' ? 'Arena' : 'Card back'}: ${cosmetic(r.id)?.name}`;
     case 'premiumCard': return r.id ? `Premium ${CARDS[r.id].displayName}` : `Premium ${RARITY[r.rarity].name} card`;
+    case 'holoCard': return r.id ? `Hologram ${CARDS[r.id].displayName}` : `Hologram ${RARITY[r.rarity].name} card`;
     case 'cards': return `Starter deck: ${r.name}`;
     default: return '';
   }
@@ -539,8 +581,8 @@ export const OPS = {
   buySeasonPass: p => buySeasonPass(p),
   craft: (p, a) => craft(p, str(a.id), a.premium === true),
   craftDeck: (p, a) => craftDeck(p, a.cards),
-  upgrade: (p, a) => upgrade(p, str(a.id)),
-  disenchant: (p, a) => disenchant(p, str(a.id), a.premium === true),
+  upgrade: (p, a) => upgrade(p, str(a.id), a.holo === true),
+  disenchant: (p, a) => disenchant(p, str(a.id), a.premium === true, a.holo === true),
   claimSeason: (p, a, ctx) => {
     const r = claimSeason(p, a.track === 'premium' ? 'premium' : 'free', Number(a.tier), ctx.rng);
     return r ? { ok: true, reward: r } : fail('Nothing to claim there.');
