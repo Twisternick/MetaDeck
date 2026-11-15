@@ -28,7 +28,7 @@ export const HOLO_MULT = 12;
 export const HOLO_CHANCE = 0.01;
 export const LEGENDARY_PITY = 30;   // a pack without a Legendary in this many is guaranteed one
 
-// Each archetype's first starter is its core set: all Common, and every new player owns it. Of the 10
+// Each archetype's first starter is its core set: all Common, and every new player owns it. Of the 15
 // cards the core set leaves out, the two most expensive are Legendary, the next three Epic, the rest Rare.
 // Rarity says how hard a card is to collect, not how strong it is.
 export const CARD_RARITY = {};

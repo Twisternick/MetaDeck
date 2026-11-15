@@ -9,8 +9,9 @@
 
 import {
   legalActions, applyAction, cloneState, decisionPlayer, monsters, getAttack, getHealth,
-  hasKeyword, defOf, effectiveCost,
+  hasKeyword, defOf, effectiveCost, handAttack,
 } from './game.js';
+import { PAUPER_MAX_COST } from './constants.js';
 
 // Bandwidth left unspent at end of turn is wasted, so spending it is worth a little on its own.
 // This is what makes the AI cycle card-neutral spells (Draw 1, Copy Card) instead of passing.
@@ -45,20 +46,69 @@ function monsterValue(state, m) {
 // Life is worth more the lower it gets.
 const lifeValue = hp => (hp <= 0 ? -1000 : hp * 0.8 - Math.max(0, 12 - hp) * 0.7);
 
+// How each play style weighs the board, so the AI plays a deck the way it's built (a side's style is set
+// when the game is created, from its deck list: data/index.js deckStyle). Every move is scored the same
+// way; only what counts for more changes:
+//   Aggro    the enemy's life above all: hits face rather than trading, cares little for its own life
+//   Control  a clear enemy board and its own life: trades and sweeps, rarely races
+//   Combo    cards in hand: digs for its pieces and keeps the hand full
+//   Ramp     Bandwidth: spends early turns growing it, and stays alive for the big cards
+//   Midrange the balance in between (the weights the AI always had)
+// Weights: own / enemy life, own / enemy board, own / enemy hand, Bandwidth, and the penalty for an enemy
+// board that could kill next turn.
+export const STYLE_WEIGHTS = {
+  Midrange: { myLife: 1, theirLife: 1, myBoard: 1, theirBoard: 1.05, myHand: 1.4, theirHand: 1, bw: 1.2, lethal: 30 },
+  Aggro: { myLife: 0.9, theirLife: 1.25, myBoard: 1, theirBoard: 0.95, myHand: 1.1, theirHand: 0.8, bw: 1, lethal: 28 },
+  Control: { myLife: 1.3, theirLife: 0.6, myBoard: 0.9, theirBoard: 1.5, myHand: 1.7, theirHand: 1.2, bw: 1.2, lethal: 45 },
+  Combo: { myLife: 1.1, theirLife: 0.9, myBoard: 1, theirBoard: 1.1, myHand: 2, theirHand: 0.8, bw: 1.3, lethal: 35 },
+  Ramp: { myLife: 1.2, theirLife: 0.8, myBoard: 1, theirBoard: 1.3, myHand: 1.5, theirHand: 1, bw: 2.2, lethal: 40 },
+};
+
 export function evaluate(state, pid) {
   if (state.over) return state.winner === pid ? 1e6 : state.winner === 'draw' ? -5e5 : -1e6;
   const me = state.players[pid];
   const them = state.players[1 - pid];
-  let s = lifeValue(me.hp) - lifeValue(them.hp);
-  for (const m of monsters(state, pid)) s += monsterValue(state, m);
-  for (const m of monsters(state, 1 - pid)) s -= monsterValue(state, m) * 1.05;
-  s += Math.min(me.hand.length, 9) * 1.4 - Math.min(them.hand.length, 9) * 1.0;
-  s += me.maxBw * 1.2 - them.maxBw * 1.2;
+  const w = STYLE_WEIGHTS[me.style] ?? STYLE_WEIGHTS.Midrange;
+  let s = lifeValue(me.hp) * w.myLife - lifeValue(them.hp) * w.theirLife;
+  for (const m of monsters(state, pid)) s += monsterValue(state, m) * w.myBoard;
+  for (const m of monsters(state, 1 - pid)) s -= monsterValue(state, m) * w.theirBoard;
+  s += Math.min(me.hand.length, 9) * w.myHand - Math.min(them.hand.length, 9) * w.theirHand;
+  s += (me.maxBw - them.maxBw) * w.bw;
   s += Math.min(me.nitro, 5) * 0.6;
   // Threat: how much the enemy board could hit us for next turn.
   const threat = monsters(state, 1 - pid).reduce((t, m) => t + (hasKeyword(m, 'Structure') ? 0 : getAttack(state, m)), 0);
-  if (threat >= me.hp) s -= 30;
-  return s;
+  if (threat >= me.hp) s -= w.lethal;
+  return s + rulesValue(state, me, them);
+}
+
+// The Card Game deck's rule edits pay off later than one ply can see, so the board alone would miss
+// them. Rough worth: a board cap favours whoever has more monsters; Pauper Format hurts big hands (ours
+// we can see; theirs we guess from their Bandwidth); a pending Objection is a spell lost; Draft Night
+// feeds Topdeckers; Hand Size Errata favours the bigger hand; Balance Patch favours whoever has the
+// weaker monsters. Rewritten hand cards (Alt Art, Typo) are worth the Bandwidth saved and Attack gained.
+function rulesValue(state, me, them) {
+  let s = 0;
+  const count = pid => monsters(state, pid).length;
+  const topdeckers = pid => monsters(state, pid).filter(m => hasKeyword(m, 'Topdeck')).length;
+  const strongest = pid => Math.max(0, ...monsters(state, pid).map(m => getAttack(state, m)));
+  switch (state.rule?.id) {
+    case 'LimitedFormat': s += 0.8 * (count(me.id) - count(them.id)); break;
+    case 'PauperFormat':
+      s -= 0.8 * me.hand.filter(c => effectiveCost(state, c) > PAUPER_MAX_COST).length;
+      if (them.maxBw > PAUPER_MAX_COST) s += 1.5;
+      break;
+    case 'DraftNight': s += 0.8 * (topdeckers(me.id) - topdeckers(them.id)); break;
+    case 'HandSize': s += 0.3 * Math.max(-3, Math.min(3, me.hand.length - them.hand.length)); break; // the Attack bonus itself is on the board
+    case 'BalancePatch': s += 0.5 * Math.max(-3, Math.min(3, strongest(them.id) - strongest(me.id))); break;
+  }
+  if (them.objection) s += 1.5;
+  if (me.objection) s -= 1.5;
+  const rewritten = p => p.hand.reduce((v, c) => {
+    if (c.cost === undefined) return v;
+    const def = defOf(c);
+    return v + (def.cost - c.cost) * 0.5 + (handAttack(c) - def.baseAttack) * 0.3;
+  }, 0);
+  return s + rewritten(me) - rewritten(them);
 }
 
 function simulate(state, action) {

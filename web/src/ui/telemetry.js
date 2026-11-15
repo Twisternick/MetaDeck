@@ -10,6 +10,7 @@ const ERRORS_PER_PAGE = 10;
 const VERSION_CHECK_MS = 10 * 60_000;
 
 let version = null; // the version this page loaded, from /api/version
+export const pageVersion = () => version;
 let errors = 0;
 const reported = new Set();
 

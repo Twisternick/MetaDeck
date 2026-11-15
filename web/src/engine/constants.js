@@ -10,6 +10,13 @@ export const TURN_LIMIT = 90; // safety valve: a match this long is declared a d
 export const LEVEL_UP_XP = 3;
 export const LEVEL_UP_BONUS = 2;
 
+// House Rules (RULES below): one at a time, shared by both players, for RULE_TURNS turns after the one
+// it's played on, so the opponent plays under it twice and its caster once more.
+export const RULE_TURNS = 3;
+export const LIMITED_BOARD = 4;
+export const PAUPER_MAX_COST = 4;
+export const RULE_HAND = 12;
+
 // Keywords: rules live in game.js; `text` is the player-facing reminder.
 export const KEYWORDS = {
   Rush: { name: 'Rush', text: 'Can attack the turn it is summoned.' },
@@ -37,7 +44,7 @@ export const KEYWORDS = {
   Tax: { name: 'Tax', text: 'Enemy spells cost 1 more.' },
   Populate: { name: 'Populate', text: 'When played, summon a 1/1 Citizen.' },
   Topdeck: { name: 'Topdeck', text: "Whenever you draw an extra card (not your turn's normal draw), this gains +1/+1." },
-  Errata: { name: 'Errata', text: 'When played, Silence a random enemy monster.' },
+  JudgeCall: { name: 'Judge Call', text: 'When played, Silence a random enemy monster.' },
   Copy: { name: 'Copy', text: 'When played, shuffle a copy of this into the top 3 cards of your deck.' },
   Overtake: { name: 'Overtake', text: 'After this attacks and survives, gain 1 Nitro.' },
   Slipstream: { name: 'Slipstream', text: 'Has +1 ATK while you have any Nitro.' },
@@ -54,7 +61,25 @@ export const TERMS = {
   Bandwidth: 'Spent to play cards. Max goes up by 1 each turn (up to 10) and refills at the start of your turn. Unspent Bandwidth can pay for Quick cards on the enemy turn.',
   Quick: 'Can also be played from your hand in response to an enemy attack.',
   Revive: 'Return your most recently destroyed monster to the board (it is summoned fresh, without its When-played effects).',
+  Errata: "Rewrites a monster's printed stats: its current Attack becomes its Health and its current Health becomes its Attack. Buffs and damage are folded in, so a 0-Attack monster dies.",
+  'Alt Art': "Rewrites the cards in your hand: each monster's cost and Attack trade places until it's played.",
+  'House Rule': `Changes the rules for both players for the next ${RULE_TURNS} turns. Only one House Rule is in play at a time: a new one replaces it.`,
+  Objection: 'The next spell that player casts is paid for, then does nothing.',
+  Typo: "A misprinted price: the card costs 1 more until it's played.",
+  Exile: "Gone for good: not in the graveyard, so it can't be revived or returned.",
 };
+
+// The House Rules a card can put in play, by id. The engine applies each one (game.js).
+export const RULES = {
+  LimitedFormat: { name: 'Limited Format', icon: '📏', text: `Boards hold only ${LIMITED_BOARD} monsters.` },
+  PauperFormat: { name: 'Pauper Format', icon: '🪙', text: `Cards costing ${PAUPER_MAX_COST + 1} or more can't be played.` },
+  ErrataWeek: { name: 'Errata Week', icon: '📝', text: 'The most common keyword on the enemy board stops working for every monster.' },
+  DraftNight: { name: 'Draft Night', icon: '🎲', text: 'Both players draw an extra card at the start of their turns.' },
+  BalancePatch: { name: 'Balance Patch', icon: '🩹', text: 'At the start of each turn, the strongest monster gets -1 Attack and the weakest gets +1 Attack.' },
+  HandSize: { name: 'Hand Size Errata', icon: '🗂️', text: `Hands hold up to ${RULE_HAND} cards. Monsters have +1 Attack while their owner holds more cards than the opponent.` },
+};
+// Keywords that only do something as the monster is played; Errata Week never picks these.
+export const ON_PLAY_KEYWORDS = new Set(['Populate', 'JudgeCall', 'Copy']);
 
 export const TRIGGERS = ['play', 'death', 'turnStart', 'turnEnd', 'draw', 'allyDeath'];
 

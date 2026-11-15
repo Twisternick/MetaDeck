@@ -34,7 +34,7 @@ export default {
     M('PLA_M15_FinalBoss', 'Final Boss', 7, 6, 7, ['Guard', 'Checkpoint']),
 
     S('PLA_S01_DoubleJump', 'Double Jump', 2, [fx('Buff', 1, 'FriendlyMonster'), fx('GrantKeyword', 0, 'FriendlyMonster', { keyword: 'DoubleJump' })]),
-    S('PLA_S02_BouncePad', 'Bounce Pad', 1, [fx('Bounce', 0, 'FriendlyMonster')], QUICK),
+    S('PLA_S02_BouncePad', 'Bounce Pad', 1, [fx('Bounce', 0, 'FriendlyMonster'), fx('Draw', 1)], QUICK),
     S('PLA_S04_Checkpoint', 'Checkpoint', 2, [fx('GrantKeyword', 0, 'FriendlyMonster', { keyword: 'Checkpoint' })]),
     S('PLA_S07_Springboard', 'Springboard', 1, [fx('BuffAttackThisTurn', 2, 'FriendlyMonster'), fx('GrantKeywordThisTurn', 0, 'FriendlyMonster', { keyword: 'DoubleJump' })]),
     S('PLA_S03_PowerUpMushroom', 'Power-Up Mushroom', 3, [fx('Buff', 1, 'FriendlyMonster'), fx('GrantKeyword', 0, 'FriendlyMonster', { keyword: 'PoweredUp' })]),

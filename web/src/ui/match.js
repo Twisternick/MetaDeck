@@ -13,10 +13,11 @@ import {
 import {
   createGame, applyAction, legalActions, decisionPlayer, playInfo, attackInfo, attackTargets,
   effectiveCost, findMonster, playerRef, defOf, hasKeyword, hasGuard, attackBonuses, canBoost, boostCost,
+  printedCost, handAttack, canSummon, ruleTurnsLeft,
 } from '../engine/game.js';
 import { chooseAction } from '../engine/ai.js';
 import { getDeck, deckList, CARDS } from '../data/index.js';
-import { BOARD_SLOTS, START_HP, KEYWORDS } from '../engine/constants.js';
+import { BOARD_SLOTS, START_HP, KEYWORDS, RULES, TERMS, LIMITED_BOARD } from '../engine/constants.js';
 import { rulesLines } from '../engine/text.js';
 import { kwName, kwIcon, kwColor, kwKind, kwText, kwHint, richText, glossaryList } from './keywords.js';
 import { sfx, music, playEvents } from './audio.js';
@@ -827,6 +828,8 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
       if (e.type === 'keyword') { callout(key, { keyword: e.keyword, text: e.text }); continue; }
       if (e.type === 'suppress') { callout(key, { keyword: 'Suppression', name: 'Suppressed', text: "Can't attack next turn" }); continue; }
       if (e.type === 'silence') { callout(key, { keyword: 'Silence', name: 'Silenced', text: 'Loses keywords and text' }); continue; }
+      if (e.type === 'rule' && e.id) { callout(key, { keyword: 'House Rule', icon: RULES[e.id].icon, name: RULES[e.id].name, text: e.keyword ? `${kwName(e.keyword)} switched off` : 'New House Rule' }); continue; }
+      if (e.type === 'altart') { callout(key, { keyword: 'Alt Art', text: `${e.count} card${e.count === 1 ? '' : 's'} rewritten` }); continue; }
       if (e.type === 'fizzle' && !e.keyword) callout(key, { keyword: 'Quick', icon: '💨', name: 'Fizzle', text: e.why, color: '#9aa3c2' });
       let text = null, cls = '';
       switch (e.type) {
@@ -1072,7 +1075,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
 
   function renderHud() {
     return h('div', { class: 'hud' },
-      settingsButton(),
+      settingsButton({ screen: 'match' }),
       online && !state.over
         ? h('button', { class: `btn small ${ui.armedLeave ? 'danger' : 'ghost'}`, onclick: armLeave }, ui.armedLeave ? 'Forfeit & leave?' : '← Leave')
         : h('button', { class: 'btn ghost small', onclick: exit }, online ? '← Lobby' : '← Menu'),
@@ -1180,6 +1183,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
         h('div', { class: 'hero-meta' },
           p.nitro || p.deckId === 'Racing' ? h('span', { class: 'nitro', title: 'Nitro' }, 'Nitro', h('b', null, p.nitro)) : null,
           p.fatigue ? h('span', { title: 'Fatigue' }, 'Fatigue', h('b', null, p.fatigue)) : null,
+          p.objection ? h('span', { class: 'objection', 'data-tip': `Rules Lawyer: ${TERMS.Objection}`, 'data-tip-title': `${kwIcon('Objection')} Objection` }, `${kwIcon('Objection')} Next spell blocked`) : null,
           p.hand.length && pid !== HUMAN ? h('span', { title: 'Cards in hand' }, 'Hand', h('b', null, p.hand.length)) : null),
       ),
     );
@@ -1235,6 +1239,8 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
         ].join(' ');
         return zoomable(renderCard(def, {
           cost: effectiveCost(state, card),
+          printed: printedCost(card),
+          atk: handAttack(card),
           classes,
           ownerDeckId: p.deckId,
           premium: isPremium(def, pid),
@@ -1254,9 +1260,16 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
   function renderBoard(pid) {
     const p = state.players[pid];
     const slots = [];
+    // Under Limited Format a side at the cap shows its free slots sealed off.
+    const sealed = !canSummon(state, pid) && p.board.includes(null);
     for (let i = 0; i < BOARD_SLOTS; i++) {
       const m = p.board[i];
-      if (!m) { slots.push(h('div', { class: 'slot empty' })); continue; }
+      if (!m) {
+        slots.push(sealed
+          ? h('div', { class: 'slot empty sealed', 'data-tip': `Limited Format: boards hold ${LIMITED_BOARD} monsters while the House Rule lasts.`, 'data-tip-title': `${RULES.LimitedFormat.icon} Limited Format` })
+          : h('div', { class: 'slot empty' }));
+        continue;
+      }
       const canAttack = pid === HUMAN && humanCanAct() && !state.pending && attackInfo(state, m).ok;
       const classes = [
         canAttack && ui.mode === 'idle' ? 'can-attack' : '',
@@ -1327,7 +1340,27 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     }
     else if (decisionPlayer(state) === OPP) { message = state.pending ? 'Opponent is deciding on a response' : 'Opponent is thinking'; thinking = true; }
     else { message = 'Your turn · drag cards onto the mat · drag monsters to attack'; cls = 'mine'; }
-    return h('div', { class: 'divider' }, h('div', { class: `mid-msg ${cls}${thinking ? ' thinking' : ''}` }, message));
+    return h('div', { class: 'divider' }, renderRule(), h('div', { class: `mid-msg ${cls}${thinking ? ' thinking' : ''}` }, message));
+  }
+
+  // The House Rule in play, pinned to the left of the divider: what it does and how long it has left.
+  function renderRule() {
+    const r = state.rule;
+    if (!r) return null;
+    const def = RULES[r.id];
+    const left = ruleTurnsLeft(state);
+    const keyword = r.keyword ? `${kwIcon(r.keyword)} ${kwName(r.keyword)}` : null;
+    const fresh = ui.ruleSeen !== `${r.id}:${r.until}`;
+    ui.ruleSeen = `${r.id}:${r.until}`;
+    return h('div', {
+      class: `rule-banner${fresh ? ' enter' : ''}${left === 0 ? ' last' : ''}`,
+      'data-tip': `${def.text}${keyword ? ` Switched off: ${kwName(r.keyword)}.` : ''} ${TERMS['House Rule']}`,
+      'data-tip-title': `${kwIcon('House Rule')} House Rule · played by ${state.players[r.owner].name}`,
+    },
+      h('i', { 'aria-hidden': 'true' }, def.icon),
+      h('span', { class: 'rule-text' },
+        h('b', null, def.name),
+        h('small', null, keyword ? [h('s', null, keyword), ' · '] : null, left === 0 ? 'last turn' : `${left} more turn${left === 1 ? '' : 's'}`)));
   }
 
   function renderDock(responding) {

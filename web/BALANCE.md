@@ -760,3 +760,103 @@ Drone Network        43.7%    42%
 ```
 
 The field now runs from 42% to 58%, against 42% to 61% before. The snowball check is at the top of its target band. Still open: Blitzkrieg and Overwatch at 58%, and Drone Network (42%), Defensive Line (44%) and Last Survivor (44%) at the bottom.
+
+## House Rules pass: the Card Game deck edits the game
+
+Errata used to mean "Silence a monster", which isn't editing anything. Six Card Game cards now rewrite cards or the rules themselves. Each keeps its slot in the pool (the same `CCG_S03`-style code), so the starters and the core set still line up; the card ids changed with the names, so copies of the old cards in a collection are dropped, and a saved deck that used one is short a card until it is rebuilt.
+
+**New rules** (`src/engine/game.js`, `src/engine/constants.js`):
+- **House Rules.** A spell can put one House Rule in play for both players, for the 3 turns after the one it's played on (the opponent plays under it twice, its caster once more). Only one is in play at a time: a new one replaces it. A banner on the mat shows it and counts it down.
+- **Errata** (an effect): a monster's current Attack and Health trade places and become its new printed stats. Buffs and damage are folded in, so a 0-Attack monster dies. Silence doesn't undo it.
+- **Alt Art** (an effect): every monster in your hand swaps its cost and Attack until it's played.
+- **Objection** (an effect): that player's next spell is paid for, then does nothing.
+- The old Errata keyword (Silence a random enemy when played) is now **Judge Call**, unchanged.
+
+| Card | Before | After |
+|---|---|---|
+| **Errata** | 3 · Silence a monster. Draw a card. | 2 · Errata a monster: swap its Attack and Health. Draw a card. |
+| **Alt Art** (was Search Card) | 1 · Draw a card. | 2 · Alt Art: swap the cost and Attack of each monster in your hand. Draw a card. (1 cost at first; see the starter pass below.) |
+| **Limited Format** (was Shuffle Deck) | 3 · Shuffle your graveyard into your deck. Draw 2 cards. | 2 · House Rule: boards hold only 4 monsters. Draw a card. |
+| **Pauper Format** (was Sideboard Swap) | 3 · Return the last card in your graveyard to your hand. Draw a card. | 3 · House Rule: cards costing 5 or more can't be played. Draw a card. |
+| **Errata Week** (was Copy Card) | 2 · Copy a random card in your hand. Draw a card. | 2 · House Rule: the most common keyword on the enemy board stops working for every monster. |
+| **Rules Lawyer** (was Rule Reminder) | 3 · 2/3 · Errata | 3 · 2/3 · Play: your opponent's next spell does nothing. |
+| Wild Card, Judge, Mythic Rare | Errata | Judge Call (same rule, new name) |
+
+Starters: Topdeck Tempo doubles Topdeck instead of Search Card. Copy Combo doubles Reverse Card, Deckbox Mimic and Topdeck instead of the three cards that left. Banlist Control doubles Pauper Format and Errata Week, and cuts Alt Art.
+
+The AI values what one ply can't see: a board cap by monster counts, Pauper Format by big cards in hand, a pending Objection, and Alt Art by the Bandwidth saved and Attack gained.
+
+**Result** (`node tools/simulate.mjs --deck CardGame --cards`, 1,000 games per pairing): the full Card Game pool wins 51% overall (it was 50.5%), with matchups from 43% (vs Racing and Sports) to 58% (vs Strategy). Its starters win 61%, 58% and 55% against the other starters. Errata Week is among the weaker cards in AI hands (−9% when played), like most cheap utility spells in this measure.
+
+### Second batch: three more House Rules, Typo, Rotation and Alternate Printing
+
+Six more cards edit the game, replacing cards the starters mostly cut or that only drew cards. As before, each keeps its pool code.
+
+| Card | Before | After |
+|---|---|---|
+| **Draft Night** (was Mulligan) | 1 · Discard a random card. Draw 2 cards. | 2 · House Rule: both players draw an extra card at the start of their turns (an extra draw, so Topdeck counts it). Draw a card. |
+| **Balance Patch** (was Proxy Swarm) | 2 · Summon three 1/1 Proxies. | 3 · House Rule: at the start of each turn, the strongest monster gets -1 Attack and the weakest +1. Draw a card. |
+| **Hand Size Errata** (was Hand Reveal) | 1 · Reveal your opponent's hand this turn. Draw a card. | 2 · House Rule: hands hold up to 12 cards, and monsters have +1 Attack while their owner holds more cards than the opponent. Draw a card. |
+| **Rotation** (was Reprint) | 4 · Revive your most recently destroyed monster. | 1 · Exile both graveyards. Draw a card. |
+| **Typo** (was Discard Card) | 2 · Quick · Your opponent discards a random card. | 2 · Your opponent's monsters in hand cost 1 more until played. Draw a card. |
+| **Alternate Printing** (was Bulk Common) | 1 · 2/2 | 4 · 2/2 · Play: summon a copy of another friendly monster with its printed Attack and Health swapped (a token). |
+
+Balance Patch ranks monsters by Attack without this turn's bonuses, then Health, then the oldest. Starters: Topdeck Tempo doubles Combo Piece instead of Hand Reveal; Copy Combo doubles Alternate Printing instead of Sleeve Guardian.
+
+Hand Size Errata first capped hands at 6, burning cards drawn past that. It worked against the deck's own card draw: the AI played it in 5% of games and won 11% less when it did, even at 1 cost. It now raises the limit and rewards the bigger hand instead. That suits a deck that draws a lot, and hurts the fast decks that empty their hands.
+
+**Result** (1,000 games per pairing): the full pool wins 50% overall (51% after the first batch). It's 59% against Strategy and 40% against Racing and Sports, whose fast starts it still struggles to slow down. Its starters win 54%, 51% and 51% against the other starters (they were 61%, 58% and 55%), so a new Card Game player no longer starts with the strongest deck. Hand Size Errata is no longer among the under-performing or rarely played cards.
+
+## Starter pass: complete decks with one play style each
+
+Starters used to be the archetype's whole 40-card pool with 10 cards doubled and 10 cut. That left 20 single copies in every deck that no one had chosen: Blitz Squad (Aggro) still ran Titan Operator and Juggernaut, Speedrun (built to jump past Guards) ran Final Boss, Arcane Academy (Ramp) ran 1-cost XP fighters. No deck could lean on its plan, because the cards that made it showed up too rarely.
+
+Each starter is now an explicit list (`src/data/starters.js`): **15 cards that make the plan, twice each, and 10 that support it, once**. The other 15 cards of the pool are left out. Each list follows its style:
+
+| Style | Shape |
+|---|---|
+| Aggro | average cost 2.4–2.9, 27–30 monsters, at most a couple of cards above 5 |
+| Midrange | average about 3.0, a steady curve and some card draw |
+| Control | Guards, removal and sweepers early, one or two finishers |
+| Ramp | Bandwidth cards early, the biggest cards in the deck late |
+| Combo | the engine pieces twice, the payoff once or twice |
+
+**Tuning.** Focused lists first spread the starters from 31% to 70% (each starter against every starter of the other decks, `tools/simulate.mjs --variants`): ramp and control decks with two copies of their best finishers ran away, and aggro decks without the stray big cards fell behind. Four passes swapped cards between the two lists. Strong decks keep one copy of their biggest finishers (Arcane Academy's Ancient Dragon and Raid Boss, Overwatch's Juggernaut and Airstrike, the Final Bosses), and weak ones swap their thinnest cards for removal or a real threat (Speedrun gets Secret Stage Beast, Speedrun Legend and Ground Pound; Combo Rush gets Shoto Master, Super Art and Hidden Boss).
+
+Two cards changed along the way:
+- **Alt Art** costs 2 (was 1). In a list full of monsters whose Attack is below their cost, it turned a 3-cost 1-Attack Booster Pack into a 1-cost 3-Attack one and replaced itself; Topdeck Tempo won 67% with two of them.
+- **Bounce Pad** also draws a card. Returning your own monster on its own was rarely worth a card (played in 4% of games).
+
+**Result** (300 games per pairing, 130,500 games): every starter wins between **43% and 58%** (before this pass: 42% to 60%, with unfocused lists). Top: Topdeck Tempo and Team Spirit 58%. Bottom: Adventuring Party 43%, Combo Rush, Blitz Squad, Turtle Defense and Speedrun 44–45%. Aggro and combo starters sit lowest because the greedy AI plays them worst: it doesn't race or sequence a combo turn the way a person does.
+
+**Collections.** Each archetype's first starter is its core set, which every new player owns and which is all Common. A focused first starter holds 25 different cards instead of 30, so each archetype now has 25 Commons, 10 Rares, 3 Epics and 2 Legendaries (it was 30, 5, 3 and 2).
+
+## AI play styles
+
+The AI used to play every deck the same way: try each move, score the board, take the best. So an aggro deck traded its attackers into blockers like any other deck, and a control deck raced when it should have been clearing the board. Now it plays each deck by its style (`STYLE_WEIGHTS` in `src/engine/ai.js`). Every move is still scored the same way; what each style counts for more changes:
+
+| Style | Weighs more | Weighs less |
+|---|---|---|
+| Aggro | the enemy hero's life | its own life, the enemy board, cards in hand |
+| Control | a clear enemy board, its own life, cards in hand | the enemy hero's life |
+| Combo | cards in hand | |
+| Ramp | Bandwidth, its own life, the enemy board | the enemy hero's life |
+| Midrange | (the weights the AI always had) | |
+
+A side's style is set when the game is created, from its deck list (`deckStyle` in `src/data/index.js`): a starter plays by its own style, any other list by a guess from its curve, and the full archetype pools play Midrange, so pool simulations (and the meta report) play as before. The server's replay of a vs-AI match derives the same style from the same lists, so replays stay exact. A vs-AI match started before an update that changes the weights would fail its replay, as with any AI change: update between matches (`npm run maintenance`).
+
+`tools/simulate.mjs --variants` now reports how each style played, and `--no-styles` plays every deck the old way for comparison (300 games per pairing):
+
+| Style | Attacks at the enemy hero | Enemy monsters destroyed per game | Game length |
+|---|---|---|---|
+| Aggro | 61% → **69%** | 6.6 → 5.6 | 19.6 → 19.5 turns |
+| Midrange | 59% → 59% | 7.3 → 7.7 | 20.7 → 21.7 |
+| Combo | 58% → 55% | 6.6 → 7.6 | 19.9 → 21.1 |
+| Ramp | 56% → 50% | 8.7 → 10.7 | 23.3 → 25.9 |
+| Control | 55% → **44%** | 9.1 → **11.5** | 24.2 → 27.4 |
+
+The first Aggro weights went face on 77% of attacks but won only 41%: with 35 HP heroes, ignoring the enemy board threw away games. The weights in use go face on 69% and still remove a blocker when it matters.
+
+**Starters retuned for it.** Playing to plan shifted the starters (40%–63%), so a pass restored decks that had drifted off their plan in the starter pass and evened out the ends: Fright Night (Aggro) dropped its two 6-cost Things in the Walls and its defensive 1/3s for Plague Rats, Banshees, Cursed Relics and Night Falls; Team Spirit runs two Star Quarterbacks again; Adventuring Party is now **Midrange** (its heroes Level Up over several turns, which is a board plan rather than a race) and runs Paladins and Guardian Golems. **Tactical Breacher** (FPS) is now 3/2 Rush (was 2/2): the cheap Rush cards were the weak point of Blitz Squad's race.
+
+**Result** (300 games per pairing): every starter wins between **42% and 61%**. Top: Team Spirit 61%, Restless Dead and Arcane Academy 57%. Bottom: Blitz Squad 42%, Defensive Line and Fright Night 43%. Aggro is still the weakest style overall (45%), because a race against 35 HP heroes is hard; it's the first thing to look at if aggro decks feel weak in real play.

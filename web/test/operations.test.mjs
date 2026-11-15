@@ -159,6 +159,22 @@ test('analytics events and error reports are accepted only from the game page', 
   assert.match(log, /client: test error from operations\.test/);
 });
 
+test('feedback is taken from the game page only, and the admin route lists and resolves it', async () => {
+  const body = { kind: 'bug', message: 'feedback from operations.test', screen: 'menu' };
+  assert.equal((await request('/api/feedback', { method: 'POST', body, headers: { origin: 'https://evil.example' } })).status, 403);
+  assert.equal((await request('/api/feedback', { method: 'GET' })).status, 405);
+  assert.equal((await request('/api/feedback', { method: 'POST', body: { kind: 'bug', message: '' } })).status, 400);
+  const sent = await request('/api/feedback', { method: 'POST', body });
+  assert.equal(sent.status, 200, sent.text);
+  assert.equal((await request('/api/admin/feedback', { method: 'POST', body: {} })).status, 403);
+  const admin = h => request(h.route, { method: 'POST', body: h.body ?? {}, headers: { 'x-admin-token': adminToken } });
+  const list = await admin({ route: '/api/admin/feedback' });
+  const mine = list.json.feedback.find(x => x.message === body.message);
+  assert.ok(mine);
+  assert.equal((await admin({ route: '/api/admin/feedbackdone', body: { id: mine.id } })).json.ok, true);
+  assert.equal((await admin({ route: '/api/admin/feedback' })).json.feedback.some(x => x.id === mine.id), false);
+});
+
 test('telemetry keeps only listed events and fields, and no raw address', () => {
   const db = openDb(null);
   const t = createTelemetry({ db });

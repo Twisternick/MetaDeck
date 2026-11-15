@@ -16,7 +16,7 @@ export default {
     M('FPS_M06_CombatMedic', 'Combat Medic', 2, 2, 2, [], [fx('Buff', 1, 'OtherFriendlyMonster')]),
     M('FPS_M07_CoverEngineer', 'Cover Engineer', 2, 1, 4, ['Guard']),
     M('FPS_M08_DroneSpotter', 'Drone Spotter', 2, 1, 2, ['Drone'], [fx('Draw', 1)]),
-    M('FPS_M09_TacticalBreacher', 'Tactical Breacher', 2, 2, 2, ['Rush']),
+    M('FPS_M09_TacticalBreacher', 'Tactical Breacher', 2, 3, 2, ['Rush']),
     M('FPS_M25_DesignatedMarksman', 'Designated Marksman', 2, 2, 2, ['Headshot'], [], NEW),
     M('FPS_M10_SniperOperative', 'Sniper Operative', 3, 2, 2, ['FirstStrike', 'Headshot']),
     M('FPS_M11_SuppressionGunner', 'Suppression Gunner', 3, 2, 4, ['Suppression']),

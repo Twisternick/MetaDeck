@@ -21,6 +21,7 @@ import { installAudio, music } from './audio.js';
 import { settingsButton } from './settings.js';
 import { tutorial as startTutorial, tutorialSeen, dismissTutorial, tip } from './tutorial.js';
 import { founderPitch } from './founder.js';
+import { feedbackDialog, installFeedbackLink } from './feedback.js';
 import { accountScreen } from './account.js';
 import { collection } from './collection.js';
 import { shop } from './shop.js';
@@ -335,6 +336,8 @@ function menu() {
 // The menu's footer: link columns over the oversized wordmark, which lights up under the pointer.
 function siteFoot() {
   const link = (text, onclick) => h('li', null, h('button', { class: 'foot-link', onclick }, text));
+  // The server adds the operator's address from DATA_DIR/site.json; without one there's no Contact link.
+  const contactEmail = document.querySelector('meta[name="contact"]')?.content;
   const legal = (text, page) => h('li', null, h('a', { class: 'foot-link', href: `legal/${page}.html`, target: '_blank', rel: 'noopener' }, text));
   const mark = h('div', { class: 'foot-mark', 'aria-hidden': 'true' }, 'MetaDeck');
   mark.addEventListener('pointermove', e => {
@@ -345,7 +348,8 @@ function siteFoot() {
     h('div', { class: 'foot-cols' },
       h('div', { class: 'foot-about' },
         h('b', null, 'MetaDeck'),
-        h('p', null, `A card battler where every deck is a video game genre. ${DECKS.length} decks, one arena.`)),
+        h('p', null, `A card battler where every deck is a video game genre. ${DECKS.length} decks, one arena.`),
+        h('button', { class: 'btn ghost small foot-feedback', onclick: () => feedbackDialog({ screen: 'menu' }) }, 'Send feedback')),
       h('nav', { 'aria-label': 'Play' }, h('h3', null, 'Play'), h('ul', null,
         link('Play the tutorial', tutorial),
         link('How to play', rules),
@@ -359,7 +363,8 @@ function siteFoot() {
       h('nav', { 'aria-label': 'Legal' }, h('h3', null, 'Legal'), h('ul', null,
         legal('Privacy', 'privacy'),
         legal('Terms', 'terms'),
-        legal('Refunds', 'refunds')))),
+        legal('Refunds', 'refunds'),
+        ...(contactEmail ? [h('li', null, h('a', { class: 'foot-link', href: `mailto:${contactEmail}` }, 'Contact'))] : [])))),
     mark,
     h('p', { class: 'foot-fine' }, `© ${new Date().getFullYear()} MetaDeck`));
 }
@@ -552,5 +557,7 @@ let spotsNow = null;
 founderSpots.then(s => { spotsNow = s; });
 ready.then(() => { const notice = signedIn()?.rank?.notice; if (notice) seasonEnded(notice); });
 ready.then(() => { shopConfig(); returnedFromCheckout(); });
+// A #feedback link opens the Feedback dialog at once, over the title screen if need be.
+ready.then(installFeedbackLink);
 if (net.inMatch) ready.finally(online);
 else Promise.all([ready, titleScreen(), founderSpots]).then(([, intent]) => (intent === 'signup' ? signUpScreen() : menu()));

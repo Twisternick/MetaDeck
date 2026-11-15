@@ -38,7 +38,7 @@ export const KW_META = {
   Tax: { icon: '💰', kind: 'economy', hint: 'Enemy spells cost 1 more' },
   Populate: { icon: '👥', kind: 'trigger', hint: 'Arrives with a 1/1 Citizen' },
   Topdeck: { icon: '🃏', kind: 'trigger', hint: '+1/+1 per extra card drawn' },
-  Errata: { icon: '📝', kind: 'trigger', hint: 'Silences a random enemy when played' },
+  JudgeCall: { icon: '⚖️', kind: 'trigger', hint: 'Silences a random enemy when played' },
   Copy: { icon: '📑', kind: 'economy', hint: 'Shuffles a copy into the top of your deck' },
   Overtake: { icon: '🏁', kind: 'economy', hint: '+1 Nitro after it attacks' },
   Slipstream: { icon: '💨', kind: 'bonus', hint: '+1 ATK while you hold Nitro' },
@@ -54,6 +54,15 @@ export const TERM_META = {
   Bandwidth: { icon: '💠', kind: 'economy' },
   Quick: { icon: '⏱️', kind: 'trigger' },
   Revive: { icon: '💫', kind: 'trigger' },
+  Errata: { icon: '📝', kind: 'combat' },
+  'Alt Art': { icon: '🎨', kind: 'economy' },
+  'House Rule': { icon: '📜', kind: 'passive' },
+  Objection: { icon: '✋', kind: 'trigger' },
+  Typo: { icon: '✏️', kind: 'economy' },
+  Exile: { icon: '🕳️', kind: 'combat' },
+  'Draft Night': { icon: '🎲', kind: 'economy' },
+  'Balance Patch': { icon: '🩹', kind: 'bonus' },
+  'Hand Size Errata': { icon: '🗂️', kind: 'bonus' },
 };
 
 export const KIND_COLORS = {

@@ -17,6 +17,7 @@
     "backup": "node tools/backup.mjs",
     "report": "node tools/report.mjs",
     "moderate": "node tools/moderate.mjs",
-    "reports": "node tools/moderate.mjs reports"
+    "reports": "node tools/moderate.mjs reports",
+    "feedback": "node tools/feedback.mjs"
   }
 }

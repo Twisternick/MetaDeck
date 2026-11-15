@@ -1,7 +1,7 @@
 // Builds readable rules text from effect data (port of the C# EffectText formatter).
 
 import { CARDS } from '../data/index.js';
-import { KEYWORDS, CHOSEN_TARGETINGS } from './constants.js';
+import { KEYWORDS, CHOSEN_TARGETINGS, RULES, RULE_TURNS } from './constants.js';
 
 const TARGET_NOUN = {
   Self: 'this',
@@ -106,6 +106,13 @@ function sentence(e, t, prev) {
     case 'GainMaxBandwidth': return n === 1 ? 'gain an empty Bandwidth crystal' : `gain ${n} empty Bandwidth crystals`;
     case 'ShuffleGraveyardIntoDeck': return 'shuffle your graveyard into your deck';
     case 'CopyBestHandCard': return 'copy the most expensive card in your hand';
+    case 'SwapStats': return `Errata ${t}: swap its Attack and Health`;
+    case 'AltArt': return 'Alt Art: swap the cost and Attack of each monster in your hand';
+    case 'SetRule': { const r = RULES[e.rule].text.replace(/.$/, ''); return `House Rule for ${RULE_TURNS} turns: ${r.charAt(0).toLowerCase()}${r.slice(1)}`; }
+    case 'Objection': return "Objection: your opponent's next spell does nothing";
+    case 'ExileGraveyards': return 'Exile both graveyards';
+    case 'Typo': return "Typo: your opponent's monsters in hand cost 1 more until played";
+    case 'ReprintErrata': return `summon a copy of ${t} with its printed Attack and Health swapped`;
     default: return `[${e.effectType}]`;
   }
 }

@@ -88,6 +88,8 @@ export function createAccounts({ file = null, legacy = null, now = () => new Dat
     forgetMatches1: db.prepare('UPDATE matches SET p1 = NULL WHERE p1 = ?'),
     forgetEvents: db.prepare('DELETE FROM events WHERE user = ?'),
     forgetReports: db.prepare('UPDATE reports SET reporter = NULL WHERE reporter = ?'),
+    forgetFeedback: db.prepare('UPDATE feedback SET user = NULL, user_name = NULL WHERE user = ?'),
+    userFeedback: db.prepare('SELECT at, kind, message FROM feedback WHERE user = ? ORDER BY at'),
     forgetPurchases: db.prepare('UPDATE purchases SET user = NULL, user_name = NULL WHERE user = ?'),
     session: db.prepare('SELECT user FROM sessions WHERE hash = ? AND expires >= ?'),
     addSession: db.prepare('INSERT INTO sessions (hash, user, expires) VALUES (?, ?, ?)'),
@@ -288,6 +290,7 @@ export function createAccounts({ file = null, legacy = null, now = () => new Dat
         q.forgetMatches1.run(user.key);
         q.forgetEvents.run(user.key);
         q.forgetReports.run(user.key);
+        q.forgetFeedback.run(user.key);
         q.forgetPurchases.run(user.key); // the payment record stays (for accounting), without the account
       });
       cache.delete(user.key);
@@ -333,6 +336,7 @@ export function createAccounts({ file = null, legacy = null, now = () => new Dat
         profile: profileOf(user),
         matches: q.userMatches.all(user.key, user.key, user.key).map(({ seat0, ...m }) => ({ ...m, you: seat0 ? 0 : 1 })),
         events: q.userEvents.all(user.key).map(e => ({ ...e, data: e.data ? JSON.parse(e.data) : null })),
+        feedback: q.userFeedback.all(user.key),
       };
     },
 
@@ -437,7 +441,7 @@ export function createAccounts({ file = null, legacy = null, now = () => new Dat
         db.exec('PRAGMA defer_foreign_keys = ON');
         db.prepare('UPDATE users SET key = ?, name = ? WHERE key = ?').run(newKey, to, oldKey);
         for (const [table, col] of [['sessions', 'user'], ['tickets', 'user'], ['matches', 'p0'], ['matches', 'p1'], ['events', 'user'],
-          ['friends', 'user'], ['friends', 'friend'], ['blocks', 'user'], ['blocks', 'blocked'], ['reports', 'reporter'], ['reports', 'reported']]) {
+          ['friends', 'user'], ['friends', 'friend'], ['blocks', 'user'], ['blocks', 'blocked'], ['reports', 'reporter'], ['reports', 'reported'], ['feedback', 'user']]) {
           db.prepare(`UPDATE ${table} SET ${col} = ? WHERE ${col} = ?`).run(newKey, oldKey);
         }
       });

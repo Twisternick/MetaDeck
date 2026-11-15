@@ -13,7 +13,8 @@
 //
 // Environment: PORT, DATA_DIR, TRUST_PROXY=1, LOG_DIR (default DATA_DIR/logs), BACKUP_DIR (nightly
 // database copies, kept BACKUP_DAYS days, default 14). Real-money Gem purchases are configured in
-// DATA_DIR/paddle.json (server/payments.mjs).
+// DATA_DIR/paddle.json (server/payments.mjs). Who runs the game and the contact address shown to players
+// are in DATA_DIR/site.json (server/site.mjs).
 
 import http from 'node:http';
 import fs from 'node:fs';
@@ -28,6 +29,8 @@ import { createPayments, loadPaddleConfig } from './server/payments.mjs';
 import { loadBlockedNames } from './server/names.mjs';
 import { createAiMatches } from './server/ai-match.mjs';
 import { createTelemetry } from './server/telemetry.mjs';
+import { createFeedback } from './server/feedback.mjs';
+import { createSite, loadSiteConfig } from './server/site.mjs';
 import { installLog } from './server/log.mjs';
 import { backup } from './server/db.mjs';
 import { handleAccountApi, sessionToken } from './server/account-api.mjs';
@@ -79,8 +82,11 @@ const accounts = accountsIn(dataDir, process.env.FOUNDER_SLOTS !== undefined ? {
 const social = createSocial({ accounts });
 const payments = createPayments({ accounts, config: loadPaddleConfig(path.join(dataDir, 'paddle.json')) });
 if (payments.enabled) console.log(`Gem purchases are on (Paddle ${payments.publicConfig().sandbox ? 'sandbox' : 'live'}).`);
+const site = createSite(loadSiteConfig(path.join(dataDir, 'site.json')));
+if (site.missing.length) console.warn(`The legal pages still show placeholders for ${site.missing.join(', ')}. Fill them in DATA_DIR/site.json (see HOSTING.md).`);
 const aiMatches = createAiMatches({ accounts });
 const telemetry = createTelemetry({ db: accounts.db });
+const feedback = createFeedback({ db: accounts.db });
 const lobby = createLobby({ accounts, social });
 const adminToken = crypto.randomBytes(24).toString('base64url');
 fs.writeFileSync(path.join(dataDir, 'admin-token'), adminToken, { mode: 0o600 });
@@ -238,7 +244,10 @@ function serveStatic(req, res) {
   if (!ok) { res.writeHead(404).end('Not found'); return; }
   fs.stat(file, (err, stat) => {
     if (err || !stat.isFile()) { res.writeHead(404).end('Not found'); return; }
-    const etag = `W/"${stat.size.toString(36)}-${Math.floor(stat.mtimeMs).toString(36)}"`;
+    // index.html and the legal pages are filled in from the settings as they're sent, so their ETag
+    // covers those too.
+    const filled = urlPath === '/index.html' || /^\/legal\/.+\.html$/.test(urlPath);
+    const etag = `W/"${stat.size.toString(36)}-${Math.floor(stat.mtimeMs).toString(36)}${filled ? `-${site.tag}` : ''}"`;
     const media = urlPath.startsWith('/assets/') && !localHost(req.headers.host);
     const headers = {
       ...securityHeaders(req, { checkout: urlPath === '/checkout.html' }),
@@ -247,10 +256,19 @@ function serveStatic(req, res) {
     };
     if (req.headers['if-none-match'] === etag) { res.writeHead(304, headers).end(); return; }
     const type = types[path.extname(file)] ?? 'application/octet-stream';
-    if (urlPath === '/index.html' && publicUrl) {
-      const page = Buffer.from(fs.readFileSync(file, 'utf8')
-        .replaceAll('content="assets/', `content="${publicUrl}/assets/`)
-        .replace('<meta property="og:type"', `<meta property="og:url" content="${publicUrl}/">\n  <meta property="og:type"`));
+    if (filled) {
+      let html = fs.readFileSync(file, 'utf8');
+      if (urlPath === '/index.html') {
+        if (publicUrl) {
+          html = html.replaceAll('content="assets/', `content="${publicUrl}/assets/`)
+            .replace('<meta property="og:type"', `<meta property="og:url" content="${publicUrl}/">\n  <meta property="og:type"`);
+        }
+        // The footer's Contact link reads this.
+        if (site.contactEmail) html = html.replace('<meta name="theme-color"', `<meta name="contact" content="${site.contactEmail}">\n  <meta name="theme-color"`);
+      } else {
+        html = site.fill(html);
+      }
+      const page = Buffer.from(html);
       res.writeHead(200, { ...headers, 'Content-Type': type, 'Content-Length': page.length });
       res.end(req.method === 'HEAD' ? undefined : page);
       return;
@@ -298,6 +316,7 @@ function health(res) {
 //   POST /api/admin/maintenance { minutes, exit }   POST /api/admin/backup   POST /api/admin/ping
 //   POST /api/admin/reports { resolved }   resolve { id }   rename { from, to }   ban { name, on }
 //   POST /api/admin/founders   founder { name, on }   resetfounders
+//   POST /api/admin/feedback { resolved }   feedbackdone { id }
 function admin(req, res, route) {
   if (req.method !== 'POST') { res.writeHead(405, { Allow: 'POST' }).end(); return; }
   if (!isAdmin(req)) return json(res, 403, { ok: false, reason: 'Admin only, from this machine.' });
@@ -311,6 +330,9 @@ function admin(req, res, route) {
     if (route === 'founders') return json(res, 200, { ok: true, founders: accounts.founders() });
     if (route === 'founder') { const r = accounts.setFounder(body?.name, body?.on !== false); return json(res, r.ok ? 200 : 400, r); }
     if (route === 'resetfounders') return json(res, 200, { ok: true, reset: accounts.resetFounders() });
+    // Player feedback (tools/feedback.mjs).
+    if (route === 'feedback') return json(res, 200, { ok: true, feedback: feedback.list({ resolved: body?.resolved === true }) });
+    if (route === 'feedbackdone') return json(res, 200, { ok: feedback.resolve(body?.id) });
     if (route === 'backup') {
       if (!backupDir) return json(res, 400, { ok: false, reason: 'Set BACKUP_DIR to turn on backups.' });
       const file = runBackup(true);
@@ -376,6 +398,13 @@ const server = http.createServer((req, res) => {
         });
         return;
       }
+      case '/api/feedback':
+        if (req.method !== 'POST') { res.writeHead(405, { Allow: 'POST' }).end(); return; }
+        if (!sameOrigin(req) || !isJson(req)) return json(res, 403, { ok: false });
+        return readBody(req, res, 8192, body => {
+          const r = feedback.submit(body, { ip: clientIp(req), user: accounts.accountFor(sessionToken(req)) });
+          json(res, r.ok ? 200 : r.status ?? 400, r);
+        });
       case '/api/event':
       case '/api/client-error':
         if (req.method !== 'POST') { res.writeHead(405, { Allow: 'POST' }).end(); return; }

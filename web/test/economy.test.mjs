@@ -14,10 +14,10 @@ const mulberry32 = seed => { const s = { rng: seed }; return () => nextRandom(s)
 
 const at = (s = '2026-11-12T12:00:00') => new Date(s);
 
-test('every archetype has 30 commons, 5 rares, 3 epics and 2 legendaries', () => {
+test('every archetype has 25 commons, 10 rares, 3 epics and 2 legendaries', () => {
   for (const d of DECKS) {
     const n = r => d.cards.filter(c => rarityOf(c.cardId) === r).length;
-    assert.deepEqual([n('common'), n('rare'), n('epic'), n('legendary')], [30, 5, 3, 2], d.id);
+    assert.deepEqual([n('common'), n('rare'), n('epic'), n('legendary')], [25, 10, 3, 2], d.id);
   }
   assert.equal(Object.keys(CARD_RARITY).length, DECKS.length * 40);
 });

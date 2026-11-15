@@ -13,6 +13,7 @@
 //   reports   players reported by other players, for the operator (npm run reports)
 //   purchases real-money Gem purchases (server/payments.mjs): kept for accounting even if the account goes
 //   webhook_events  ids of payment webhooks already handled, so a retried one does nothing
+//   feedback  bug reports, ideas and balance notes from the Feedback dialog (npm run feedback)
 //
 // Schema changes are numbered steps in MIGRATIONS, tracked by PRAGMA user_version: add a step, never
 // edit one that has shipped.
@@ -78,6 +79,12 @@ const MIGRATIONS = [
    );
    CREATE INDEX purchases_user ON purchases(user, created);
    CREATE TABLE webhook_events (id TEXT PRIMARY KEY, at TEXT NOT NULL);`,
+  // 5: player feedback (server/feedback.mjs).
+  `CREATE TABLE feedback (
+     id INTEGER PRIMARY KEY, at TEXT NOT NULL, kind TEXT NOT NULL, message TEXT NOT NULL, screen TEXT, version TEXT,
+     user TEXT, user_name TEXT, resolved INTEGER NOT NULL DEFAULT 0
+   );
+   CREATE INDEX feedback_open ON feedback(resolved, at);`,
 ];
 
 // Open (or create) the database and bring its schema up to date. `file` null or ':memory:' keeps it in memory.

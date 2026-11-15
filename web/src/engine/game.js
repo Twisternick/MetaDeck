@@ -6,10 +6,11 @@
 // picks one of legalActions(state); applyAction(state, action) validates and resolves it, appends
 // UI events to state.events and readable lines to state.log, then sweeps deaths and checks for a win.
 
-import { CARDS } from '../data/index.js';
+import { CARDS, deckStyle } from '../data/index.js';
 import {
   START_HP, BOARD_SLOTS, MAX_HAND, MAX_BANDWIDTH, OPENING_HAND, TURN_LIMIT,
   LEVEL_UP_XP, LEVEL_UP_BONUS, CHOSEN_TARGETINGS,
+  RULES, RULE_TURNS, LIMITED_BOARD, PAUPER_MAX_COST, RULE_HAND, ON_PLAY_KEYWORDS,
 } from './constants.js';
 import { pick, randInt, shuffleInPlace } from './rng.js';
 
@@ -25,10 +26,14 @@ export function createGame({ decks, names = ['Player 1', 'Player 2'], deckIds = 
     uidSeq: 1,
     players: [0, 1].map(pid => ({
       id: pid, name: names[pid], deckId: deckIds[pid],
+      style: deckIds[pid] ? deckStyle(deckIds[pid], decks[pid]) : 'Midrange', // how the AI plays this side
       hp: START_HP, maxBw: 0, bw: 0, nitro: 0, fatigue: 0,
       deck: [], hand: [], grave: [], board: Array(BOARD_SLOTS).fill(null),
       playedThisTurn: 0, attacksThisTurn: 0, revealedTurn: -1,
+      objection: false, // Rules Lawyer: this player's next spell does nothing
     })),
+    // The House Rule in play: { id, owner, until (its last turn), keyword (Errata Week) }, or null.
+    rule: null,
     pending: null,
     over: false,
     winner: null, // 0 | 1 | 'draw'
@@ -69,6 +74,7 @@ export function cloneState(state) {
     ...state,
     rng: (state.rng ^ 0x5bd1e995) | 0, // simulations must not "see" the real future draws
     players: state.players.map(clonePlayer),
+    rule: state.rule && { ...state.rule },
     pending: state.pending && { ...state.pending },
     log: [],
     events: [],
@@ -116,8 +122,12 @@ export function hasKeyword(m, k) {
   return m.kw.includes(k) || m.tempKw.includes(k);
 }
 
+// A monster's printed stats, unless Errata rewrote them (baseAtk / baseHp on the monster).
+export const baseAttackOf = m => m.baseAtk ?? defOf(m).baseAttack;
+export const baseHealthOf = m => m.baseHp ?? defOf(m).baseHealth;
+
 export function getMaxHealth(m) {
-  return defOf(m).baseHealth + m.mods.reduce((s, x) => s + (x.hp || 0), 0);
+  return baseHealthOf(m) + m.mods.reduce((s, x) => s + (x.hp || 0), 0);
 }
 
 export function getHealth(m) {
@@ -147,11 +157,12 @@ export function attackBonuses(state, m) {
     if (ally !== m && hasKeyword(ally, 'Inspire') && alive(ally)) inspire += 1;
   }
   if (inspire) out.push({ keyword: 'Inspire', amount: inspire });
+  if (state.rule?.id === 'HandSize' && owner.hand.length > P(state, opp(m.owner)).hand.length) out.push({ keyword: 'Hand Size Errata', amount: 1 });
   return out;
 }
 
 export function getAttack(state, m) {
-  let atk = defOf(m).baseAttack + m.mods.reduce((s, x) => s + (x.atk || 0), 0);
+  let atk = baseAttackOf(m) + m.mods.reduce((s, x) => s + (x.atk || 0), 0);
   for (const b of attackBonuses(state, m)) atk += b.amount;
   return Math.max(0, atk);
 }
@@ -161,11 +172,93 @@ export function boardPower(state, pid) {
   return monsters(state, pid).reduce((t, m) => t + getAttack(state, m) + getHealth(m), 0);
 }
 
+// A hand card's cost before Tax: printed, unless Alt Art rewrote it (card.cost; card.atk is its new Attack).
+export const printedCost = card => card.cost ?? defOf(card).cost;
+export const handAttack = card => card.atk ?? defOf(card).baseAttack;
+
 export function effectiveCost(state, card) {
   const def = defOf(card);
-  if (def.type !== 'Spell') return def.cost;
+  if (def.type !== 'Spell') return printedCost(card);
   const tax = monsters(state, opp(card.owner)).filter(m => hasKeyword(m, 'Tax')).length;
-  return def.cost + tax;
+  return printedCost(card) + tax;
+}
+
+// ---------------------------------------------------------------- House Rules
+
+// How many monsters a side may have: fewer under Limited Format.
+export const boardLimit = state => (state.rule?.id === 'LimitedFormat' ? LIMITED_BOARD : BOARD_SLOTS);
+export const canSummon = (state, pid) => P(state, pid).board.includes(null) && monsters(state, pid).length < boardLimit(state);
+// How many cards a hand may hold: more under Hand Size Errata.
+export const handLimit = state => (state.rule?.id === 'HandSize' ? RULE_HAND : MAX_HAND);
+// Turns a House Rule has left after the current one (0: this is its last turn).
+export const ruleTurnsLeft = state => (state.rule ? state.rule.until - state.turn : 0);
+
+// The keyword Errata Week would switch off if `pid` played it now: the one most common on the enemy
+// board (first on the board breaks a tie), never one that only acts as a monster is played. Null if none.
+export function errataWeekKeyword(state, pid) {
+  const counts = new Map();
+  for (const m of monsters(state, opp(pid))) {
+    if (!alive(m)) continue;
+    for (const k of m.kw) if (!ON_PLAY_KEYWORDS.has(k) && k !== 'Drone') counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
+  let best = null;
+  for (const [k, n] of counts) if (!best || n > counts.get(best)) best = k;
+  return best;
+}
+
+const ruleOf = def => def.effects.find(e => e.effectType === 'SetRule')?.rule ?? null;
+
+function setRule(state, pid, id) {
+  if (state.rule) endRule(state);
+  const rule = { id, owner: pid, until: state.turn + RULE_TURNS, keyword: null };
+  state.rule = rule;
+  if (id === 'ErrataWeek') {
+    rule.keyword = errataWeekKeyword(state, pid);
+    for (const m of allMonsters(state)) errataKeyword(state, m);
+  }
+  state.events.push({ type: 'rule', id, pid, keyword: rule.keyword });
+  log(state, `House Rule: ${RULES[id].name}${rule.keyword ? ` (${rule.keyword})` : ''} for ${RULE_TURNS} turns.`);
+}
+
+function endRule(state) {
+  const { id, keyword } = state.rule;
+  state.rule = null;
+  for (const m of allMonsters(state)) {
+    if (!m.ruled) continue;
+    if (!m.silenced) addKeyword(m, m.ruled);
+    m.ruled = null;
+  }
+  state.events.push({ type: 'rule', id: null, ended: id, keyword });
+  log(state, `${RULES[id].name} ends.`);
+}
+
+// A monster's Attack before this turn's bonuses: what Balance Patch and Errata go by.
+const standingAttack = m => Math.max(0, baseAttackOf(m) + m.mods.reduce((s, x) => s + (x.temp ? 0 : x.atk || 0), 0));
+
+// Balance Patch, at the start of each turn: the strongest monster on the board (highest Attack, then
+// Health, then the oldest) gets -1 Attack and the weakest (lowest Attack, then Health, then the oldest)
+// +1. With fewer than two monsters there's nothing to balance.
+function balancePatch(state) {
+  const all = allMonsters(state).filter(alive);
+  if (all.length < 2) return;
+  const by = (a, b) => standingAttack(a) - standingAttack(b) || getHealth(a) - getHealth(b);
+  const strongest = all.reduce((x, m) => (by(m, x) > 0 || (by(m, x) === 0 && m.uid < x.uid) ? m : x));
+  const weakest = all.reduce((x, m) => (by(m, x) < 0 || (by(m, x) === 0 && m.uid < x.uid) ? m : x));
+  if (strongest === weakest) return;
+  strongest.mods.push({ atk: -1, hp: 0 });
+  weakest.mods.push({ atk: 1, hp: 0 });
+  keywordEvent(state, 'Balance Patch', strongest, 'Nerfed: -1 ATK');
+  keywordEvent(state, 'Balance Patch', weakest, 'Buffed: +1 ATK');
+  log(state, `Balance Patch: ${defOf(strongest).displayName} -1 Attack, ${defOf(weakest).displayName} +1 Attack.`);
+}
+
+// Under Errata Week, take the rule's keyword off a monster; it comes back when the rule ends.
+function errataKeyword(state, m) {
+  const k = state.rule?.keyword;
+  if (!k || !(m.kw.includes(k) || m.tempKw.includes(k))) return;
+  if (m.kw.includes(k)) m.ruled = k;
+  m.kw = m.kw.filter(x => x !== k);
+  m.tempKw = m.tempKw.filter(x => x !== k);
 }
 
 const controls = (state, pid, kw) => monsters(state, pid).some(m => alive(m) && hasKeyword(m, kw));
@@ -237,7 +330,11 @@ export function playInfo(state, pid, card, { asResponse = false } = {}) {
   }
   const cost = effectiveCost(state, card);
   if (p.bw < cost) return { ok: false, reason: `Needs ${cost} Bandwidth.` };
-  if (def.type === 'Monster' && !p.board.includes(null)) return { ok: false, reason: 'Your board is full.' };
+  if (state.rule?.id === 'PauperFormat' && cost > PAUPER_MAX_COST) return { ok: false, reason: `Pauper Format: cards costing ${PAUPER_MAX_COST + 1} or more can't be played.` };
+  if (def.type === 'Monster' && !canSummon(state, pid)) {
+    return { ok: false, reason: p.board.includes(null) ? `Limited Format: boards hold ${LIMITED_BOARD} monsters.` : 'Your board is full.' };
+  }
+  if (ruleOf(def) === 'ErrataWeek' && !errataWeekKeyword(state, pid)) return { ok: false, reason: 'No enemy keyword to errata.' };
   const targets = validTargets(state, pid, def);
   if (def.type === 'Spell' && targets && targets.length === 0) return { ok: false, reason: 'No valid target.' };
   return { ok: true, targets };
@@ -355,9 +452,9 @@ function doPlay(state, action, asResponse) {
   p.bw -= cost;
   p.hand = p.hand.filter(c => c !== card);
   state.events.push({ type: 'play', pid, id: card.id, uid: card.uid });
-  if (cost > def.cost) {
+  if (cost > printedCost(card)) {
     const taxer = monsters(state, opp(pid)).find(m => alive(m) && hasKeyword(m, 'Tax'));
-    if (taxer) keywordEvent(state, 'Tax', taxer, `+${cost - def.cost} cost`);
+    if (taxer) keywordEvent(state, 'Tax', taxer, `+${cost - printedCost(card)} cost`);
   }
   log(state, `${says(p, 'play', 'plays')} ${def.displayName}${describeTarget(state, target)}.`);
 
@@ -367,9 +464,9 @@ function doPlay(state, action, asResponse) {
     if (hasKeyword(m, 'Populate') && summonToken(state, pid, 'token_citizen')) {
       keywordEvent(state, 'Populate', m, 'Summons a Citizen');
     }
-    if (hasKeyword(m, 'Errata')) {
+    if (hasKeyword(m, 'JudgeCall')) {
       const victim = pick(state, monsters(state, opp(pid)).filter(e => alive(e) && !e.silenced));
-      if (victim) { keywordEvent(state, 'Errata', m); silence(state, victim); }
+      if (victim) { keywordEvent(state, 'JudgeCall', m); silence(state, victim); }
     }
     if (hasKeyword(m, 'Copy')) {
       // The deck is drawn from the end, so this lands somewhere in the top 3 cards.
@@ -378,6 +475,13 @@ function doPlay(state, action, asResponse) {
       keywordEvent(state, 'Copy', m, 'Copy shuffled near the top');
       log(state, `A copy of ${def.displayName} is shuffled into the top of the deck.`);
     }
+  } else if (p.objection) {
+    // Rules Lawyer: paid for, then nothing happens.
+    p.objection = false;
+    keywordEvent(state, 'Objection', { pid }, 'Spell does nothing');
+    state.events.push({ type: 'countered', pid, id: card.id });
+    log(state, `Objection! ${def.displayName} does nothing.`);
+    p.grave.push(strip(card));
   } else {
     resolveEffects(state, card, 'play', target, boost);
     p.grave.push(strip(card));
@@ -538,6 +642,7 @@ function doEndTurn(state) {
   }
   state.active = opp(ap);
   state.turn++;
+  if (state.rule && state.turn > state.rule.until) endRule(state);
   for (const p of state.players) {
     p.playedThisTurn = 0;
     p.attacksThisTurn = 0;
@@ -556,6 +661,11 @@ function doEndTurn(state) {
     return OK;
   }
   draw(state, np.id, 1, { triggers: false }); // Topdeck and draw triggers count only extra draws
+  if (state.rule?.id === 'DraftNight') {
+    keywordEvent(state, 'Draft Night', { pid: np.id }, 'Extra card');
+    draw(state, np.id, 1); // the extra card is an extra draw: Topdeck counts it
+  }
+  if (state.rule?.id === 'BalancePatch') balancePatch(state);
   runTriggers(state, np.id, 'turnStart');
   return OK;
 }
@@ -568,16 +678,18 @@ function strip(card) {
 
 function summon(state, pid, card, { played = false } = {}) {
   const p = P(state, pid);
+  if (!canSummon(state, pid)) return null;
   const slot = p.board.indexOf(null);
-  if (slot < 0) return null;
   const def = defOf(card);
   const m = {
     uid: card.uid, id: card.id, owner: pid,
     damage: 0, mods: [], kw: [...def.keywords], tempKw: [],
     silenced: false, xp: 0,
     summonedTurn: state.turn, playedTurn: played ? state.turn : -1,
-    attacks: 0, suppressedUntil: 0, isToken: !!def.isToken,
+    attacks: 0, suppressedUntil: 0, isToken: !!def.isToken, ruled: null,
   };
+  if (card.atk !== undefined) m.baseAtk = card.atk; // played after Alt Art
+  errataKeyword(state, m);
   p.board[slot] = m;
   state.events.push({ type: 'summon', uid: m.uid, deckId: p.deckId });
   return m;
@@ -607,7 +719,7 @@ function removeFromBoard(state, m) {
 
 function addToHand(state, pid, card) {
   const p = P(state, pid);
-  if (p.hand.length >= MAX_HAND) {
+  if (p.hand.length >= handLimit(state)) {
     p.grave.push(strip(card));
     state.events.push({ type: 'burn', pid, id: card.id });
     log(state, `${p.name === 'You' ? 'Your' : `${p.name}'s`} hand is full — ${defOf(card).displayName} is burned.`);
@@ -799,7 +911,7 @@ function applyEffect(state, src, e, targets) {
     case 'Equip':
       for (const m of mons) {
         m.mods.push({ atk: e.attack ?? n, hp: e.health ?? n });
-        if (e.keyword) addKeyword(m, e.keyword);
+        if (e.keyword) { addKeyword(m, e.keyword); errataKeyword(state, m); }
         state.events.push({ type: 'buff', uid: m.uid });
       }
       break;
@@ -831,12 +943,21 @@ function applyEffect(state, src, e, targets) {
         if (!m.isToken) addToHand(state, m.owner, m);
       }
       break;
-    case 'GrantKeyword': for (const m of mons) { addKeyword(m, e.keyword); keywordEvent(state, e.keyword, m, 'Gained'); } break;
-    case 'GrantKeywordThisTurn': for (const m of mons) if (!m.tempKw.includes(e.keyword)) { m.tempKw.push(e.keyword); keywordEvent(state, e.keyword, m, 'This turn'); } break;
+    case 'GrantKeyword':
+      for (const m of mons) {
+        addKeyword(m, e.keyword);
+        errataKeyword(state, m);
+        keywordEvent(state, e.keyword, m, state.rule?.keyword === e.keyword ? 'Errata Week: no effect' : 'Gained');
+      }
+      break;
+    case 'GrantKeywordThisTurn':
+      if (state.rule?.keyword === e.keyword) break;
+      for (const m of mons) if (!m.tempKw.includes(e.keyword)) { m.tempKw.push(e.keyword); keywordEvent(state, e.keyword, m, 'This turn'); }
+      break;
     case 'RemoveKeyword': for (const m of mons) { removeKeyword(m, e.keyword); keywordEvent(state, e.keyword, m, 'Lost'); } break;
     case 'SummonToken': for (let i = 0; i < Math.max(1, n); i++) summonToken(state, pid, e.token); break;
     case 'Revive': {
-      if (!p.board.includes(null)) break;
+      if (!canSummon(state, pid)) break;
       const idx = p.grave.map(c => defOf(c).type).lastIndexOf('Monster');
       if (idx < 0) break;
       const [card] = p.grave.splice(idx, 1);
@@ -878,6 +999,62 @@ function applyEffect(state, src, e, targets) {
       }
       break;
     }
+    case 'SwapStats': for (const m of mons) swapStats(state, m); break;
+    case 'AltArt': {
+      let count = 0;
+      for (const c of p.hand) {
+        const def = defOf(c);
+        if (def.type !== 'Monster') continue;
+        const cost = printedCost(c), atk = handAttack(c);
+        c.cost = atk;
+        c.atk = cost;
+        if (c.cost === def.cost && c.atk === def.baseAttack) { delete c.cost; delete c.atk; } // back to the print
+        count++;
+      }
+      state.events.push({ type: 'altart', pid, count });
+      log(state, `${says(p, 'swap', 'swaps')} the cost and Attack of ${count} monster${count === 1 ? '' : 's'} in hand.`);
+      break;
+    }
+    case 'SetRule': setRule(state, pid, e.rule); break;
+    case 'ExileGraveyards': {
+      const n = state.players.reduce((s, x) => s + x.grave.length, 0);
+      for (const x of state.players) x.grave = [];
+      keywordEvent(state, 'Exile', { pid }, `${n} card${n === 1 ? '' : 's'} exiled`);
+      state.events.push({ type: 'exile', pid, count: n });
+      log(state, `Both graveyards are exiled (${n} card${n === 1 ? '' : 's'}).`);
+      break;
+    }
+    case 'Typo':
+      for (const t of players) {
+        const tp = P(state, t);
+        let count = 0;
+        for (const c of tp.hand) if (defOf(c).type === 'Monster') { c.cost = printedCost(c) + 1; count++; }
+        keywordEvent(state, 'Typo', { pid: t }, `${count} monster${count === 1 ? '' : 's'} cost +1`);
+        log(state, `Typo! ${count} monster${count === 1 ? '' : 's'} in ${tp.name === 'You' ? 'your' : `${tp.name}'s`} hand cost 1 more.`);
+      }
+      break;
+    case 'ReprintErrata':
+      // A copy of the monster as printed, with its printed Attack and Health swapped. It's a token: it
+      // never reaches the graveyard.
+      for (const m of mons) {
+        const def = defOf(m);
+        const copy = summon(state, pid, newCard(state, m.id, pid));
+        if (!copy) break;
+        copy.isToken = true;
+        copy.baseAtk = def.baseHealth;
+        copy.baseHp = def.baseAttack;
+        keywordEvent(state, 'Errata', copy, `Reprinted ${def.baseHealth}/${def.baseAttack}`);
+        log(state, `An alternate printing of ${def.displayName} arrives as a ${def.baseHealth}/${def.baseAttack}.`);
+      }
+      break;
+    case 'Objection':
+      for (const t of players) {
+        const tp = P(state, t);
+        tp.objection = true;
+        keywordEvent(state, 'Objection', { pid: t }, 'Next spell does nothing');
+        log(state, `Objection! ${tp.name === 'You' ? 'Your' : `${tp.name}'s`} next spell will do nothing.`);
+      }
+      break;
     default: throw new Error(`Unknown effect type: ${e.effectType}`);
   }
 }
@@ -891,11 +1068,26 @@ function removeKeyword(m, k) {
   m.tempKw = m.tempKw.filter(x => x !== k);
 }
 
+// Errata: the monster's current Attack (without this turn's bonuses) and Health trade places, as its new
+// printed stats. Buffs and damage are folded in; Silence doesn't undo it.
+function swapStats(state, m) {
+  const atk = standingAttack(m);
+  const hp = getHealth(m);
+  m.baseAtk = hp;
+  m.baseHp = atk;
+  m.mods = [];
+  m.damage = 0;
+  keywordEvent(state, 'Errata', m, `Now ${hp}/${atk}`);
+  state.events.push({ type: 'swap', uid: m.uid });
+  log(state, `${defOf(m).displayName} is Errata'd: now ${hp}/${atk}.`);
+}
+
 function silence(state, m) {
   m.kw = [];
   m.tempKw = [];
   m.mods = [];
   m.xp = 0;
+  m.ruled = null;
   m.silenced = true;
   m.damage = Math.min(m.damage, getMaxHealth(m) - 1);
   state.events.push({ type: 'silence', uid: m.uid });

@@ -15,7 +15,7 @@ A new player starts with 300 Gold (three packs of their choice) and 100 Dust.
 ## Collection and new players
 
 - Every archetype's first starter deck is its **core set**. Every player owns it from the start, so all ten archetypes are playable on day one, and core copies can't be disenchanted.
-- Rarity is about collecting, not power. The 30 core cards are Common. Of the 10 cards outside the core set, the two most expensive are Legendary, the next three Epic and the other five Rare.
+- Rarity is about collecting, not power. The 25 cards in each archetype's first starter deck (its core set) are Common. Of the 15 cards outside the core set, the two most expensive are Legendary, the next three Epic and the other ten Rare.
 - **Archetype levels.** A win gives that archetype 3 XP and a loss 1 (10 XP a level, max level 10). Every level gives one of its packs, level 4 gives the cards for its second starter deck, and level 7 the third. A locked starter can also be crafted right away from the menu.
 - The deck builder only adds copies you own. A list with cards you don't own shows what's missing and what crafting them costs.
 - **New player check** (Balance lab → *Check starter decks*): plays each free starter against every other archetype's full deck. The target is 45% or better, and under 40% means the starter needs a buff (to the starter list, not the meta).

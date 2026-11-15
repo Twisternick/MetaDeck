@@ -28,6 +28,20 @@ Copy `tools\windows\server-env.example.cmd` to `tools\windows\server-env.cmd` (g
 | `PORT` | 5173 unless something else uses it. |
 | `LOG_DIR` | Optional; defaults to `DATA_DIR\logs`. |
 
+### Who runs the game: `site.json`
+
+The privacy policy, terms and refund policy name who runs MetaDeck and how to reach them. Those details are kept in `DATA_DIR\site.json`, not in the repo, so the public source names no one. Copy `tools\site.example.json` there and fill it in:
+
+| Field | What it's for |
+|---|---|
+| `operator` | Who runs the game, as the legal pages name them: your company, or your name if you don't have one. |
+| `country` | Where the operator is, e.g. `the United States`. |
+| `governingLaw` | Optional. The law the terms are under, e.g. `the State of Delaware`. Defaults to `country`. |
+| `contactEmail` | The game's own address (see `INDEPENDENCE.md`), never a personal one. Shown on the legal pages and as **Contact** in the menu footer. |
+| `updated` | The legal pages' "Last updated" date. Change it whenever you change the pages. |
+
+Restart the server after editing it. While a field is empty, the server logs which placeholders are still showing, and the pages show them highlighted.
+
 Run `tools\windows\run-server.cmd` once by hand and open http://localhost:5173 to check it works. That script restarts the server whenever it exits. Close the window to stop it.
 
 ## 3. Cloudflare Tunnel
@@ -150,6 +164,13 @@ The server copies the database to `BACKUP_DIR` shortly after it starts and then 
   ```
 
   Lists open player reports. Deal with them using `npm run moderate -- resolve <id>`, `rename <name> <new name>`, `ban <name>` or `unban <name>`. To block more words in account names, list them one per line in `DATA_DIR\blocked-names.txt` and restart the server.
+- **Player feedback:**
+
+  ```bash
+  npm run feedback
+  ```
+
+  Lists open feedback from the game's Feedback dialog (bugs, ideas, balance notes), oldest first. Add `--kind bug` for one kind or `--all` for resolved ones too, and resolve with `npm run feedback -- done <id>`. Share `https://<your domain>/#feedback` in posts and on Discord: it opens the dialog.
 - **Players:**
 
   ```bash

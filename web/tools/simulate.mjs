@@ -1,6 +1,6 @@
 // Balance simulator: AI-vs-AI round robin between every pair of decks (mirrors excluded).
 //
-//   node tools/simulate.mjs [--games 20] [--deck FPS] [--seed 1] [--variants] [--cards] [--json out.json]
+//   node tools/simulate.mjs [--games 20] [--deck FPS] [--seed 1] [--variants] [--cards] [--no-styles] [--json out.json]
 //
 // By default the decks are the ten archetype pools. --variants plays every starter variant instead: each one
 // against the other themes' variants and against its own theme's other variants. Win rates then count only
@@ -9,6 +9,8 @@
 // Prints each deck's overall win rate, the full matchup grid, first-player win rate and game length.
 // --cards adds each card's "win rate when played" against its deck's win rate from the same turn and lead (see
 // src/engine/card-stats.js). The outliers are the cards most worth re-costing.
+// The AI plays each deck by its style (Aggro races, Control clears the board; engine/ai.js); --no-styles
+// plays every deck the same way instead, for comparison. With --variants it reports how each style played.
 
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 import os from 'node:os';
@@ -36,7 +38,7 @@ async function main() {
   for (let i = 0; i < ids.length; i++) {
     for (let j = i + 1; j < ids.length; j++) {
       if (args.deck && decks[i].arch !== args.deck && decks[j].arch !== args.deck) continue;
-      for (let g = 0; g < games; g++) jobs.push({ a: ids[i], b: ids[j], aArch: decks[i].arch, bArch: decks[j].arch, aCards: decks[i].cards, bCards: decks[j].cards, first: g % 2, seed: baseSeed * 100003 + jobs.length });
+      for (let g = 0; g < games; g++) jobs.push({ a: ids[i], b: ids[j], aArch: decks[i].arch, bArch: decks[j].arch, aCards: decks[i].cards, bCards: decks[j].cards, first: g % 2, seed: baseSeed * 100003 + jobs.length, noStyles: 'no-styles' in args });
     }
   }
 
@@ -50,6 +52,7 @@ async function main() {
   })))).flat();
 
   report(ids, byKey, results, (Date.now() - started) / 1000);
+  styleReport(results);
   await snowballReport(ids, byKey, results);
   if ('cards' in args) await cardReport(results, byKey);
   if (args.json) fs.writeFileSync(args.json, JSON.stringify(results));
@@ -57,24 +60,34 @@ async function main() {
 
 async function work() {
   const { createGame, applyAction } = await import('../src/engine/game.js');
-  const { chooseAction } = await import('../src/engine/ai.js');
+  const { chooseAction, STYLE_WEIGHTS } = await import('../src/engine/ai.js');
+  // --no-styles: every deck plays with the Midrange weights, as the AI did before it had styles.
+  if (workerData[0]?.noStyles) for (const k of Object.keys(STYLE_WEIGHTS)) STYLE_WEIGHTS[k] = STYLE_WEIGHTS.Midrange;
   const { leadTracker } = await import('../src/engine/snowball.js');
   const out = [];
   for (const job of workerData) {
     const state = createGame({ decks: [job.aCards, job.bCards], deckIds: [job.aArch, job.bArch], seed: job.seed, firstPlayer: job.first });
     const played = [new Map(), new Map()]; // card id -> turn it was first played
     const lead = leadTracker();
+    // How each side played: attacks, attacks at the enemy hero, enemy monsters it destroyed.
+    const how = [0, 1].map(() => ({ attacks: 0, face: 0, kills: 0 }));
     let guard = 0;
     while (!state.over && guard++ < 4000) {
       const action = chooseAction(state);
+      const actor = state.pending ? state.pending.responder : state.active;
+      if (action.type === 'attack') { how[actor].attacks++; if (typeof action.target === 'string') how[actor].face++; }
       const res = applyAction(state, action);
       if (!res.ok) throw new Error(`AI chose an illegal action: ${JSON.stringify(action)} (${res.reason})`);
-      for (const e of state.events) if (e.type === 'play' && !played[e.pid].has(e.id)) played[e.pid].set(e.id, state.turn);
+      for (const e of state.events) {
+        if (e.type === 'play' && !played[e.pid].has(e.id)) played[e.pid].set(e.id, state.turn);
+        if (e.type === 'death') how[1 - e.owner].kills++;
+      }
       lead.watch(state);
       state.log.length = 0;
       state.events.length = 0;
     }
-    out.push({ a: job.a, b: job.b, first: job.first, winner: state.winner, turns: state.turn, played: played.map(p => [...p]), ...lead.result() });
+    out.push({ a: job.a, b: job.b, first: job.first, winner: state.winner, turns: state.turn, played: played.map(p => [...p]),
+      styles: state.players.map(p => p.style), how, ...lead.result() });
   }
   parentPort.postMessage(out);
 }
@@ -127,6 +140,30 @@ function report(ids, byKey, results, seconds) {
     for (const r of vs) {
       console.log(byKey[r].name.slice(0, 19).padEnd(20) + vs.map(c => (r === c ? '      ·' : grid[r][c] ? pct(...grid[r][c]).padStart(7) : '      -')).join('') + `   ${pct(wins[r], played[r])}`);
     }
+  }
+}
+
+// Whether the AI plays each style as designed (engine/ai.js STYLE_WEIGHTS): how many of its attacks go at the
+// enemy hero rather than a monster, how many enemy monsters it destroys a game, and how long its games last.
+function styleReport(results) {
+  const by = {};
+  for (const r of results) {
+    for (const side of [0, 1]) {
+      const st = (by[r.styles[side]] ??= { games: 0, wins: 0, attacks: 0, face: 0, kills: 0, turns: 0 });
+      st.games++;
+      if (r.winner === side) st.wins++;
+      st.attacks += r.how[side].attacks;
+      st.face += r.how[side].face;
+      st.kills += r.how[side].kills;
+      st.turns += r.turns;
+    }
+  }
+  if (Object.keys(by).length < 2) return;
+  console.log('\nPlay styles (how the AI plays each one)');
+  console.log(`${'Style'.padEnd(10)}${'games'.padStart(7)}${'wins'.padStart(7)}${'at hero'.padStart(9)}${'kills/game'.padStart(12)}${'turns'.padStart(7)}`);
+  for (const [style, st] of Object.entries(by).sort((x, y) => y[1].face / y[1].attacks - x[1].face / x[1].attacks)) {
+    console.log(style.padEnd(10) + String(st.games).padStart(7) + `${((100 * st.wins) / st.games).toFixed(0)}%`.padStart(7)
+      + `${((100 * st.face) / (st.attacks || 1)).toFixed(0)}%`.padStart(9) + (st.kills / st.games).toFixed(1).padStart(12) + (st.turns / st.games).toFixed(1).padStart(7));
   }
 }
 

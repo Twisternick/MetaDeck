@@ -158,7 +158,7 @@ test('Tax raises enemy spell costs only', () => {
   assert.equal(effectiveCost(s, monster), 2);
 });
 
-test('Errata never picks a monster that is already Silenced', () => {
+test('Judge Call never picks a monster that is already Silenced', () => {
   for (let seed = 1; seed <= 20; seed++) {
     const s = setup(seed);
     const muted = placeMonster(s, 1, 'CCG_M03_MonsterCard');
@@ -171,7 +171,7 @@ test('Errata never picks a monster that is already Silenced', () => {
   placeMonster(s, 1, 'CCG_M03_MonsterCard').silenced = true;
   s.events = [];
   ok(applyAction(s, { type: 'play', uid: giveCard(s, 0, 'CCG_M04_WildCard').uid }));
-  assert.ok(!s.events.some(e => e.type === 'silence'), 'no target left: Errata does nothing');
+  assert.ok(!s.events.some(e => e.type === 'silence'), 'no target left: Judge Call does nothing');
 });
 
 test('a Stealthed Guard stops guarding instead of locking out every attack', () => {

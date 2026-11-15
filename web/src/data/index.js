@@ -53,8 +53,18 @@ const byCode = (archetypeId, code) => {
 
 // Starter decks as { key, archetype, name, blurb, cards }. The key ('RPG:starter:0') is stable for prefs.
 export const starterDecks = archetypeId => (STARTERS[archetypeId] ?? []).map((s, i) => {
-  const cut = new Set(s.cut.map(code => byCode(archetypeId, code)));
-  const cards = deckList(archetypeId).filter(id => !cut.has(id));
-  for (const code of s.double) cards.push(byCode(archetypeId, code));
+  const cards = [...s.two, ...s.two, ...s.one].map(code => byCode(archetypeId, code));
   return { key: `${archetypeId}:starter:${i}`, archetype: archetypeId, name: s.name, style: s.style, blurb: s.blurb, cards, starter: true };
 });
+
+// The play style a deck list is built for, which the AI plays it by (engine/ai.js): a starter's own style,
+// or for any other list a guess from its curve (low is Aggro, high is Control, the rest Midrange).
+const listKey = cards => [...cards].sort().join();
+let starterStyles = null; // list key -> style, built on first use
+export function deckStyle(archetypeId, cards) {
+  starterStyles ??= new Map(DECKS.flatMap(d => starterDecks(d.id).map(s => [`${d.id}|${listKey(s.cards)}`, s.style])));
+  const known = starterStyles.get(`${archetypeId}|${listKey(cards)}`);
+  if (known) return known;
+  const avg = cards.reduce((t, id) => t + (CARDS[id]?.cost ?? 0), 0) / Math.max(1, cards.length);
+  return avg <= 2.6 ? 'Aggro' : avg >= 3.4 ? 'Control' : 'Midrange';
+}

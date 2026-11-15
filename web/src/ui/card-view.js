@@ -8,7 +8,7 @@ import { h } from './dom.js';
 import { DECKS } from '../data/index.js';
 import { KEYWORDS, TERMS, LEVEL_UP_XP } from '../engine/constants.js';
 import { rulesLines } from '../engine/text.js';
-import { getAttack, getHealth, getMaxHealth, hasKeyword, defOf, attackBonuses } from '../engine/game.js';
+import { getAttack, getHealth, getMaxHealth, hasKeyword, defOf, attackBonuses, baseAttackOf, baseHealthOf } from '../engine/game.js';
 import { artSlot, deckEmblem, cardArtUrls, cardBackUrls, backSkinUrls } from './fx.js';
 import { kwChip, richText, kwIcon, kwKind, kwColor, kwName, glossaryList } from './keywords.js';
 import { rarityOf, RARITY } from '../data/economy.js';
@@ -35,17 +35,21 @@ function typeLine(def, deck) {
 
 // `premium` draws a finish the player owns (a cosmetic; it plays the same): true or 'premium' for the
 // animated premium version, 'holo' for the hologram, whose art is projected up out of the card.
-export function renderCard(def, { cost = def.cost, classes = '', onclick, attrs = {}, ownerDeckId = null, large = false, premium = false } = {}) {
+// `printed` and `atk` are a hand card's cost before Tax and its Attack, when Alt Art rewrote them.
+export function renderCard(def, { cost = def.cost, printed = def.cost, atk = def.baseAttack, classes = '', onclick, attrs = {}, ownerDeckId = null, large = false, premium = false } = {}) {
   const { deck, style } = deckStyle(def, ownerDeckId);
   const holo = premium === 'holo';
-  const costClass = cost > def.cost ? ' cost-up' : '';
-  const costTip = cost > def.cost ? `Costs ${cost - def.cost} more: an enemy Tax monster is on the board.` : null;
+  const altArt = printed !== def.cost || atk !== def.baseAttack;
+  const altTip = altArt ? `Rewritten in your hand (Alt Art or Typo): printed as ${def.cost} cost and ${def.baseAttack} Attack.` : null;
+  const costClass = cost > printed ? ' cost-up' : altArt ? ' edited' : '';
+  const costTip = cost > printed ? `Costs ${cost - printed} more: an enemy Tax monster is on the board.` : altTip;
   const rarity = def.deckId ? rarityOf(def.cardId) : null;
   return h('div', {
     class: `card ${def.type === 'Spell' ? 'spell' : 'monster'}${def.speedWindow === 'Quick' ? ' quick' : ''}${rarity ? ` rarity-${rarity}` : ''}${holo ? ' holo' : premium ? ' premium' : ''} ${classes}`,
     style, onclick, 'data-tilt': '12', 'data-deck': themeFrame(/\bframe-founder\b/.test(classes) ? FOUNDER_FRAME : deck, rarity ?? 'common'), ...attrs,
   },
-    h('div', { class: `card-cost${costClass}`, 'data-kw': costTip ? null : 'Bandwidth', 'data-tip': costTip, 'data-tip-title': costTip ? `${kwIcon('Tax')} Taxed` : null }, cost),
+    h('div', { class: `card-cost${costClass}`, 'data-kw': costTip ? null : 'Bandwidth', 'data-tip': costTip,
+      'data-tip-title': cost > printed ? `${kwIcon('Tax')} Taxed` : altArt ? `${kwIcon('Alt Art')} Rewritten` : null }, cost),
     def.isNew ? h('div', { class: 'card-new' }, 'NEW') : null,
     artSlot('card-art', cardArtUrls(def, ownerDeckId), deckEmblem(deck), { label: large || classes.includes('large'), alt: '' }),
     h('div', { class: 'card-title' },
@@ -58,7 +62,7 @@ export function renderCard(def, { cost = def.cost, classes = '', onclick, attrs 
     ),
     def.type === 'Monster'
       ? h('div', { class: 'card-stats' },
-          h('span', { class: 'stat atk', 'data-tip': 'Attack: damage this deals when it fights.', 'data-tip-title': 'Attack' }, def.baseAttack),
+          h('span', { class: `stat atk${altArt ? ' edited' : ''}`, 'data-tip': altTip ?? 'Attack: damage this deals when it fights.', 'data-tip-title': altArt ? `${kwIcon('Alt Art')} Rewritten` : 'Attack' }, atk),
           h('span', { class: 'stat hp', 'data-tip': 'Health: it is destroyed when this reaches 0.', 'data-tip-title': 'Health' }, def.baseHealth))
       : null,
     // The rarity frame (ui/frame-<rarity>) is drawn over the art; tokens get the common one.
@@ -219,6 +223,7 @@ export function renderMinion(state, m, { classes = '', onclick, onmouseenter, pr
   const sleeping = freshSummon && !hasKeyword(m, 'Rush') && !hasKeyword(m, 'Structure');
   const rushReady = freshSummon && hasKeyword(m, 'Rush') && m.attacks === 0 && !state.over;
   const suppressed = state.turn <= m.suppressedUntil;
+  const errata = m.baseAtk !== undefined;
   if (rushReady) lit.add('Rush');
   if (hasKeyword(m, 'Guard')) lit.add('Guard');
   if (hasKeyword(m, 'Stealth')) lit.add('Stealth');
@@ -251,9 +256,11 @@ export function renderMinion(state, m, { classes = '', onclick, onmouseenter, pr
     rushReady ? h('div', { class: 'minion-status good', 'data-kw': 'Rush' }, `${kwIcon('Rush')} Rush`) : null,
     suppressed ? h('div', { class: 'minion-status bad', 'data-kw': 'Suppress' }, `${kwIcon('Suppression')} Suppressed`) : null,
     m.silenced && !suppressed ? h('div', { class: 'minion-status bad', 'data-kw': 'Silence' }, `${kwIcon('Silence')} Silenced`) : null,
-    h('span', { class: `stat atk${atk > def.baseAttack ? ' up' : atk < def.baseAttack ? ' down' : ''}` }, atk),
+    h('span', { class: `stat atk${atk > baseAttackOf(m) ? ' up' : atk < baseAttackOf(m) ? ' down' : ''}${errata ? ' edited' : ''}` }, atk),
     bonusTotal ? h('span', { class: 'minion-bonus', 'data-tip': `${bonusTip} — this bonus is active right now.`, 'data-tip-title': '⚡ Attack bonus' }, `+${bonusTotal}`) : null,
-    h('span', { class: `stat hp${hp < maxHp ? ' down' : maxHp > def.baseHealth ? ' up' : ''}` }, hp),
+    h('span', { class: `stat hp${hp < maxHp ? ' down' : maxHp > baseHealthOf(m) ? ' up' : ''}${errata ? ' edited' : ''}` }, hp),
+    m.ruled ? h('div', { class: 'minion-ruled', 'data-tip': `Errata Week has switched off ${kwName(m.ruled)}. It comes back when the House Rule ends.`, 'data-tip-title': `${kwIcon('House Rule')} House Rule` },
+      h('s', null, `${kwIcon(m.ruled)} ${kwName(m.ruled)}`)) : null,
     h('div', { class: 'minion-glow', 'aria-hidden': 'true' }),
     h('div', { class: 'minion-ring', 'aria-hidden': 'true' }),
   );
@@ -278,6 +285,11 @@ export function statusLines(state, instance) {
   for (const b of attackBonuses(state, instance)) status.push(`${kwIcon(b.keyword)} ${kwName(b.keyword)}: +${b.amount} ATK right now`);
   if (instance.xp) status.push(`${kwIcon('Level Up')} ${xpStatus(instance)} toward next level (${instance.xp} XP total)`);
   if (instance.silenced) status.push(`${kwIcon('Silence')} Silenced: no keywords or card text`);
+  if (instance.baseAtk !== undefined) {
+    const def = defOf(instance);
+    status.push(`${kwIcon('Errata')} Errata'd: printed ${def.baseAttack}/${def.baseHealth}, now reads ${instance.baseAtk}/${instance.baseHp}`);
+  }
+  if (instance.ruled) status.push(`${kwIcon('House Rule')} Errata Week: ${kwName(instance.ruled)} is switched off`);
   if (state.turn <= instance.suppressedUntil) status.push(`${kwIcon('Suppression')} Suppressed — can't attack this turn`);
   if (instance.tempKw.length) status.push(`This turn only: ${instance.tempKw.map(k => `${kwIcon(k)} ${kwName(k)}`).join(', ')}`);
   const temp = instance.mods.filter(x => x.temp).reduce((s, x) => s + x.atk, 0);
