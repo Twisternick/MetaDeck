@@ -3821,3 +3821,13 @@ body:has(#app > .match) .bg-grain { opacity: .045; }
   .rule-text b { font-size: 10px; letter-spacing: .5px; }
   .rule-text small { font-size: 9px; }
 }
+
+/* The plain-HTML intro in index.html, for search engines and anyone whose game fails to start. The title
+   screen replaces it straight away, so it only fades in if the game hasn't started after a moment. */
+.seo-intro { position: relative; z-index: 1; max-width: 640px; margin: 0 auto; padding: 48px 16px; opacity: 0; animation: seo-intro-in .4s ease 1.5s forwards; }
+.seo-intro h1 { font-family: var(--display); font-size: 40px; margin: 0 0 8px; }
+.seo-intro h2 { font-size: 18px; margin: 28px 0 8px; }
+.seo-intro p, .seo-intro li { color: var(--muted); }
+.seo-intro strong { color: var(--text); }
+.seo-intro a { color: var(--accent); }
+@keyframes seo-intro-in { to { opacity: 1; } }

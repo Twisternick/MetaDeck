@@ -229,6 +229,38 @@ function saveReport(req, res) {
   });
 }
 
+// For search engines. Crawlers may read everything the game serves except the API. The sitemap and
+// the game's structured data (schema.org) need absolute URLs, so they're only sent when PUBLIC_URL is set.
+const crawlerPages = ['/', '/legal/terms.html', '/legal/privacy.html', '/legal/refunds.html'];
+function serveCrawlerFile(req, res, urlPath) {
+  if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405, { Allow: 'GET, HEAD' }).end(); return; }
+  let body;
+  if (urlPath === '/robots.txt') {
+    body = `User-agent: *\nDisallow: /api/\n${publicUrl ? `\nSitemap: ${publicUrl}/sitemap.xml\n` : ''}`;
+  } else {
+    if (!publicUrl) { res.writeHead(404).end('Not found'); return; }
+    body = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+      + crawlerPages.map(p => `  <url><loc>${publicUrl}${p}</loc></url>\n`).join('') + '</urlset>\n';
+  }
+  const type = urlPath === '/robots.txt' ? 'text/plain; charset=utf-8' : 'application/xml; charset=utf-8';
+  res.writeHead(200, { 'Content-Type': type, 'Content-Length': Buffer.byteLength(body), 'Cache-Control': 'public, max-age=3600', 'X-Content-Type-Options': 'nosniff' });
+  res.end(req.method === 'HEAD' ? undefined : body);
+}
+const gameJsonLd = () => JSON.stringify({
+  '@context': 'https://schema.org',
+  '@type': 'VideoGame',
+  name: 'MetaDeck',
+  url: `${publicUrl}/`,
+  image: `${publicUrl}/assets/img/ui/key-art.webp`,
+  description: 'A free online card battler where every deck is a video game genre: FPS, Horror, Platformer, RPG, Racing, Fighting, Sports, Strategy, City Builder and Card Game.',
+  genre: ['Card battler', 'Collectible card game', 'Strategy'],
+  gamePlatform: 'Web browser',
+  applicationCategory: 'Game',
+  operatingSystem: 'Any',
+  playMode: ['SinglePlayer', 'MultiPlayer'],
+  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+}).replaceAll('<', '\\u003c');
+
 // Static files. Each has an ETag, so a browser revalidating gets a tiny 304 instead of the file.
 // Art, sound and fonts may be cached for a day (and used stale for a week while refreshing), so a
 // proxy like Cloudflare can serve them; the code is always revalidated so updates show up at once.
@@ -237,6 +269,7 @@ function serveStatic(req, res) {
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405, { Allow: 'GET, HEAD' }).end(); return; }
   let urlPath;
   try { urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname); } catch { res.writeHead(400).end('Bad request'); return; }
+  if (urlPath === '/robots.txt' || urlPath === '/sitemap.xml') { serveCrawlerFile(req, res, urlPath); return; }
   if (urlPath === '/') urlPath = '/index.html';
   const file = path.resolve(root, '.' + urlPath);
   const ok = !urlPath.includes('\0') && !urlPath.split(/[\\/]/).some(part => part.startsWith('.'))
@@ -261,7 +294,8 @@ function serveStatic(req, res) {
       if (urlPath === '/index.html') {
         if (publicUrl) {
           html = html.replaceAll('content="assets/', `content="${publicUrl}/assets/`)
-            .replace('<meta property="og:type"', `<meta property="og:url" content="${publicUrl}/">\n  <meta property="og:type"`);
+            .replace('<meta property="og:type"', `<meta property="og:url" content="${publicUrl}/">\n  <meta property="og:type"`)
+            .replace('</head>', `  <link rel="canonical" href="${publicUrl}/">\n  <script type="application/ld+json">${gameJsonLd()}</script>\n</head>`);
         }
         // The footer's Contact link reads this.
         if (site.contactEmail) html = html.replace('<meta name="theme-color"', `<meta name="contact" content="${site.contactEmail}">\n  <meta name="theme-color"`);

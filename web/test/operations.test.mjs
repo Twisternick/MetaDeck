@@ -55,6 +55,43 @@ function request(pathname, { method = 'GET', headers = {}, body = null } = {}) {
   });
 }
 
+test('search engines get readable text and a robots.txt; the sitemap waits for PUBLIC_URL', async () => {
+  const page = await request('/');
+  assert.match(page.text, /<h1>MetaDeck<\/h1>/);
+  assert.doesNotMatch(page.text, /rel="canonical"|ld\+json/, 'absolute URLs only with PUBLIC_URL');
+  const robots = await request('/robots.txt');
+  assert.equal(robots.status, 200);
+  assert.match(robots.text, /Disallow: \/api\//);
+  assert.doesNotMatch(robots.text, /Sitemap:/);
+  assert.equal((await request('/sitemap.xml')).status, 404);
+});
+
+test('with PUBLIC_URL the page gets a canonical link and structured data, and the sitemap lists the pages', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'metadeck-seo-'));
+  const proc = spawn(process.execPath, [fileURLToPath(new URL('../serve.mjs', import.meta.url)), '0'], {
+    stdio: ['ignore', 'pipe', 'inherit'], env: { ...process.env, DATA_DIR: dir, PUBLIC_URL: 'https://play.example.com/' },
+  });
+  try {
+    const base = await new Promise((resolve, reject) => {
+      proc.stdout.on('data', d => { const m = /http:\/\/localhost:(\d+)/.exec(String(d)); if (m) resolve(`http://127.0.0.1:${m[1]}`); });
+      proc.on('exit', () => reject(new Error('serve.mjs exited')));
+    });
+    const page = await (await fetch(`${base}/`)).text();
+    assert.match(page, /<link rel="canonical" href="https:\/\/play\.example\.com\/">/);
+    const ld = JSON.parse(/<script type="application\/ld\+json">(.*?)<\/script>/.exec(page)[1]);
+    assert.equal(ld['@type'], 'VideoGame');
+    assert.equal(ld.image, 'https://play.example.com/assets/img/ui/key-art.webp');
+    assert.match(await (await fetch(`${base}/robots.txt`)).text(), /Sitemap: https:\/\/play\.example\.com\/sitemap\.xml/);
+    const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
+    assert.match(sitemap, /<loc>https:\/\/play\.example\.com\/<\/loc>/);
+    assert.match(sitemap, /<loc>https:\/\/play\.example\.com\/legal\/privacy\.html<\/loc>/);
+  } finally {
+    proc.kill();
+    await new Promise(r => proc.once('exit', r));
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  }
+});
+
 test('the privacy and terms pages are served, and nothing else in legal/', async () => {
   for (const page of ['privacy', 'terms']) {
     const r = await request(`/legal/${page}.html`);

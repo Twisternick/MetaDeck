@@ -24,7 +24,7 @@ Copy `tools\windows\server-env.example.cmd` to `tools\windows\server-env.cmd` (g
 | `BACKUP_DIR` | Where nightly copies of the database go. A OneDrive folder is fine here: backups are finished files, and syncing them gives you an offsite copy. |
 | `BACKUP_DAYS` | How many days of backups to keep (14). |
 | `TRUST_PROXY=1` | Required behind the tunnel. Without it every player looks like `127.0.0.1` and they all share one rate limit. The server logs a warning if it sees tunnel traffic without it. |
-| `PUBLIC_URL=https://play.yourdomain.com` | Recommended. Link previews on Discord, X, Facebook and so on need absolute URLs, so the server adds this address to the share image and page link in `index.html`. Without it, shared links may show no picture. |
+| `PUBLIC_URL=https://play.yourdomain.com` | Recommended. Link previews on Discord, X, Facebook and so on need absolute URLs, so the server adds this address to the share image and page link in `index.html`. It also turns on the search-engine extras: a canonical link, the game's structured data and `/sitemap.xml` (submit that in Google Search Console and Bing Webmaster Tools). Without it, shared links may show no picture. |
 | `PORT` | 5173 unless something else uses it. |
 | `LOG_DIR` | Optional; defaults to `DATA_DIR\logs`. |
 
