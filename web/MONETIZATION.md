@@ -37,7 +37,12 @@ Every pack has a Rare or better, and a Legendary comes at least once every 30 pa
 
 - **Premium cards**: an animated version (spinning prismatic frame, shimmering art, rising motes, foil name). It comes from packs, crafting or upgrading a copy, or the season track. Your premium copies show in your hand and on your board; you can turn them off in Collection → Cosmetics.
 - **Card backs** and **arenas**: sold for Gems or given on the season track, and equipped in Collection → Cosmetics.
+- **Per-deck looks**: Collection → Cosmetics → *Equip for* picks an archetype, which can then have its own back, arena and card frame (Racing on the Chequered Flag and Night Circuit, say). Anything a deck doesn't pick uses the default. Matches use the loadout of the deck being played, an online opponent sees that deck's frame, and opening a deck's pack shows its back (`loadoutFor` in `economy.js`).
 - The default look is fully finished. Paid cosmetics are alternatives, not upgrades that fix a plain default.
+
+## Meta Founders
+
+The first 100 accounts (`FOUNDER` in `economy.js`; `FOUNDER_SLOTS` on the server) are numbered Meta Founders. Each gets the title "Meta Founder #n", three cosmetics that are never sold (the Founder's Seal back, the Founders' Hall arena and the Founder Gold card frame) and 7,000 Gems, the size of the $49.99 bundle. The Gems unlock after the account's first 3 completed matches, which the server records, so a throwaway account can't collect them just by signing up. The title, back and frame show to opponents online.
 
 ## Season and quests
 

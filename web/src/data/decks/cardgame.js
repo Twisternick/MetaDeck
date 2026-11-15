@@ -46,7 +46,7 @@ export default {
     S('CCG_S11_ProxySwarm', 'Proxy Swarm', 2, [fx('SummonToken', 3, 'None', { token: 'token_proxy' })], NEW),
     S('CCG_S08_Topdeck', 'Topdeck', 3, [fx('Draw', 3)]),
     S('CCG_S10_Reprint', 'Reprint', 4, [fx('Revive')]),
-    S('CCG_S12_BanHammer', 'Ban Hammer', 5, [fx('Destroy', 0, 'EnemyMonster')], NEW),
+    S('CCG_S12_BanHammer', 'Ban Hammer', 5, [fx('Destroy', 0, 'HighAttackMonsters')], NEW),
     S('CCG_S15_BoardWipe', 'Board Wipe', 5, [fx('DealDamage', 3, 'AllMonsters')], NEW),
   ],
 };

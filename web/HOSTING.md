@@ -24,6 +24,7 @@ Copy `tools\windows\server-env.example.cmd` to `tools\windows\server-env.cmd` (g
 | `BACKUP_DIR` | Where nightly copies of the database go. A OneDrive folder is fine here: backups are finished files, and syncing them gives you an offsite copy. |
 | `BACKUP_DAYS` | How many days of backups to keep (14). |
 | `TRUST_PROXY=1` | Required behind the tunnel. Without it every player looks like `127.0.0.1` and they all share one rate limit. The server logs a warning if it sees tunnel traffic without it. |
+| `PUBLIC_URL=https://play.yourdomain.com` | Recommended. Link previews on Discord, X, Facebook and so on need absolute URLs, so the server adds this address to the share image and page link in `index.html`. Without it, shared links may show no picture. |
 | `PORT` | 5173 unless something else uses it. |
 | `LOG_DIR` | Optional; defaults to `DATA_DIR\logs`. |
 
@@ -88,6 +89,16 @@ Create a free [UptimeRobot](https://uptimerobot.com) monitor:
 - **Interval:** 5 minutes, with email alerts.
 
 `/healthz` returns 200 with the version, uptime and player counts while the database answers, and 503 if it doesn't. If the PC, the tunnel or the server is down, the monitor emails you.
+
+## Before launch: free the founder places
+
+The first 100 accounts on the server become Meta Founders, including any test accounts you made while setting up. Just before you open the game to players, run:
+
+```bash
+npm run moderate -- founders --reset
+```
+
+This unmakes every current founder, so the first real player becomes Meta Founder #1. To see who's a founder later, run `npm run moderate -- founders`. To grant or take it away by hand, use `founder <name>` or `unfounder <name>`. Set `FOUNDER_SLOTS` in `server-env.cmd` to change the 100, or `FOUNDER_SLOTS=0` to turn founders off.
 
 ## Updating the game
 

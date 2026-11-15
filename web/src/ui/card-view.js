@@ -6,7 +6,7 @@
 
 import { h } from './dom.js';
 import { DECKS } from '../data/index.js';
-import { KEYWORDS, TERMS } from '../engine/constants.js';
+import { KEYWORDS, TERMS, LEVEL_UP_XP } from '../engine/constants.js';
 import { rulesLines } from '../engine/text.js';
 import { getAttack, getHealth, getMaxHealth, hasKeyword, defOf, attackBonuses } from '../engine/game.js';
 import { artSlot, deckEmblem, cardArtUrls, cardBackUrls, backSkinUrls } from './fx.js';
@@ -43,7 +43,7 @@ export function renderCard(def, { cost = def.cost, classes = '', onclick, attrs 
   const rarity = def.deckId ? rarityOf(def.cardId) : null;
   return h('div', {
     class: `card ${def.type === 'Spell' ? 'spell' : 'monster'}${def.speedWindow === 'Quick' ? ' quick' : ''}${rarity ? ` rarity-${rarity}` : ''}${holo ? ' holo' : premium ? ' premium' : ''} ${classes}`,
-    style, onclick, 'data-tilt': '12', 'data-deck': themeFrame(deck, rarity ?? 'common'), ...attrs,
+    style, onclick, 'data-tilt': '12', 'data-deck': themeFrame(/\bframe-founder\b/.test(classes) ? FOUNDER_FRAME : deck, rarity ?? 'common'), ...attrs,
   },
     h('div', { class: `card-cost${costClass}`, 'data-kw': costTip ? null : 'Bandwidth', 'data-tip': costTip, 'data-tip-title': costTip ? `${kwIcon('Tax')} Taxed` : null }, cost),
     def.isNew ? h('div', { class: 'card-new' }, 'NEW') : null,
@@ -75,6 +75,8 @@ export function renderCard(def, { cost = def.cost, classes = '', onclick, attrs 
 // recoloured on a canvas: the blue (or epic violet) enamel takes the deck's colour and the silver picks up
 // a hint of it, while the gold trim, and with it the rarity read, stays. The plain frame shows until it's ready.
 const themedFrames = new Set();
+// The Founder Gold frame (a Meta Founder's cosmetic, class frame-founder) tints the enamel gold instead.
+const FOUNDER_FRAME = { id: 'founder', color: '#e3a41c' };
 let frameSheet;
 function themeFrame(deck, rarity) {
   if (!deck.id) return null; // tokens keep the plain frame
@@ -183,9 +185,20 @@ export function backSkin(name) {
 // styles.css. Positions are fixed per index so re-renders don't make them jump.
 export function arenaFx(name) {
   if (name === 'standard') return null;
+  if (name === 'founders-hall') {
+    // Align the effects with the painted floor. Match renders rebuild the arena, so keep a common clock.
+    const phase = `-${document.timeline.currentTime ?? 0}ms`;
+    return h('div', { class: 'arena-fx hall-fx', 'aria-hidden': 'true', style: { '--hall-phase': phase } },
+      h('div', { class: 'hall-floor-light' },
+        h('span', { class: 'hall-orbit' }), h('span', { class: 'hall-orbit trailing' }),
+        [[50, 82.4], [50, 10.8], [2.9, 45.2], [97.1, 45.2]].map(([x, y], i) =>
+          h('span', { class: 'hall-gem', style: { left: `${x}%`, top: `${y}%`, '--lag': `-${i * 1.9}s` } }))));
+  }
   return h('div', { class: 'arena-fx', 'data-arena': name, 'aria-hidden': 'true' },
     Array.from({ length: 9 }, (_, i) => h('i', { style: { '--x': `${(i * 37 + 11) % 100}%`, '--y': `${(i * 53 + 7) % 100}%`, '--d': `${-i * 1.7}s`, '--s': `${0.6 + ((i * 29) % 10) / 12}` } })));
 }
+
+const xpStatus = m => `${m.xp % LEVEL_UP_XP}/${LEVEL_UP_XP} XP`;
 
 // Keywords that mean nothing on the board on their own (tags), hidden from badges to save room.
 const TAG_KEYWORDS = new Set(['Drone', 'District']);
@@ -231,7 +244,7 @@ export function renderMinion(state, m, { classes = '', onclick, onmouseenter, pr
         class: `badge kind-${kwKind(k)}${lit.has(k) ? ' lit' : ''}${m.tempKw.includes(k) && !m.kw.includes(k) ? ' temp' : ''}`,
         style: { '--kw': kwColor(k) }, 'data-kw': k, 'aria-label': kwName(k),
       }, h('i', { 'aria-hidden': 'true' }, kwIcon(k)), h('b', null, kwName(k)))),
-      m.xp ? h('span', { class: 'xp', 'data-tip': `${m.xp} XP${m.leveled ? ' · Leveled Up' : ' · Levels Up at 3'}`, 'data-tip-title': `${kwIcon('XP')} XP` }, `${m.xp}xp`) : null,
+      m.xp ? h('span', { class: 'xp', 'data-tip': TERMS['Level Up'], 'data-tip-title': 'Level Up' }, xpStatus(m)) : null,
     ) : null,
     h('div', { class: 'minion-name' }, def.displayName),
     sleeping ? h('div', { class: 'minion-status', 'data-tip': 'Summoning sickness: monsters attack from the turn after they arrive, unless they have Rush.', 'data-tip-title': '💤 Resting' }, 'zzz') : null,
@@ -254,7 +267,7 @@ export function glossaryFor(def, instance) {
   const text = rulesLines(def).join(' ');
   const entries = [...kws].filter(k => KEYWORDS[k]).map(k => [k, KEYWORDS[k].text]);
   for (const [term, explain] of Object.entries(TERMS)) {
-    if (text.includes(term) || (term === 'Quick' && def.speedWindow === 'Quick')) entries.push([term, explain]);
+    if ((term === 'Level Up' && (kws.has('XP') || text.includes('XP'))) || text.includes(term) || (term === 'Quick' && def.speedWindow === 'Quick')) entries.push([term, explain]);
   }
   return entries;
 }
@@ -263,7 +276,7 @@ export function glossaryFor(def, instance) {
 export function statusLines(state, instance) {
   const status = [];
   for (const b of attackBonuses(state, instance)) status.push(`${kwIcon(b.keyword)} ${kwName(b.keyword)}: +${b.amount} ATK right now`);
-  if (instance.xp) status.push(`${kwIcon('XP')} ${instance.xp} XP${instance.leveled ? ' (Leveled Up)' : ' — Levels Up at 3'}`);
+  if (instance.xp) status.push(`${kwIcon('Level Up')} ${xpStatus(instance)} toward next level (${instance.xp} XP total)`);
   if (instance.silenced) status.push(`${kwIcon('Silence')} Silenced: no keywords or card text`);
   if (state.turn <= instance.suppressedUntil) status.push(`${kwIcon('Suppression')} Suppressed — can't attack this turn`);
   if (instance.tempKw.length) status.push(`This turn only: ${instance.tempKw.map(k => `${kwIcon(k)} ${kwName(k)}`).join(', ')}`);

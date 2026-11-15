@@ -3,7 +3,7 @@
 // Offline the human is player 0 and player 1 is the AI (or both are AIs when spectating). Online the
 // server runs the game: this screen sends the human's moves and animates the updates it gets back.
 
-import { h, delay } from './dom.js';
+import { h, delay, rectOf, pt, viewW, viewH, uiZoom } from './dom.js';
 import { renderCard, renderCardBack, renderMinion, glossaryFor, statusLines, backSkin, arenaFx } from './card-view.js';
 import {
   motionOK, artSlot, heroArtUrls, cardArtUrls, impact, sparkle, dissolve, castFly, flyTo, dealFrom, lungeTransform,
@@ -20,7 +20,9 @@ import { BOARD_SLOTS, START_HP, KEYWORDS } from '../engine/constants.js';
 import { rulesLines } from '../engine/text.js';
 import { kwName, kwIcon, kwColor, kwKind, kwText, kwHint, richText, glossaryList } from './keywords.js';
 import { sfx, music, playEvents } from './audio.js';
+import { settingsButton } from './settings.js';
 import { reportDialog } from './report.js';
+import { founderBadge } from './founder.js';
 
 // The preset emotes for online matches (the server only relays these ids: server/lobby.mjs EMOTES).
 const EMOTES = { hello: '👋 Hello!', wellplayed: '👏 Well played', thanks: '🙏 Thanks', oops: '😅 Oops', wow: '😮 Wow!', gg: '🤝 Good game' };
@@ -33,7 +35,7 @@ const LONG_PRESS_MS = 380;
 // online = { seat, state, clock, send(msg), subscribe(fn) } plays a server match instead: state is the
 // server's view for our seat, and onRematch is unused (rematches go through the server).
 // Returns { close } so the caller can tear the screen down (online, when the server restarts the match).
-// cosmetics = { back, arena, finishes: Map of card id -> 'premium' | 'holo' } dresses the human's side. onResult({ won, damage, moves })
+// cosmetics = { back, arena, frame, title, finishes: Map of card id -> 'premium' | 'holo' } dresses the human's side. onResult({ won, damage, moves })
 // is called once when a match the human played ends; whatever it returns (the rewards) is shown on the
 // game-over screen. `moves` is every action the human made, in order: with deal = { seed, firstPlayer }
 // from the server (server/ai-match.mjs), the server replays them to check a vs-AI result.
@@ -45,7 +47,11 @@ const LONG_PRESS_MS = 380;
 //   difficulty              'easy' makes the AI take a weaker move now and then (src/engine/ai.js)
 // shuffle: false keeps both decks in the order given (they're drawn from the end), for a stacked match.
 export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate = false, online = null, onExit, onRematch, cosmetics = null, onResult = null, deal = null, script = null, difficulty = 'normal', shuffle = true }) {
-  const cos = { back: 'back:classic', arena: 'arena:standard', finishes: new Map(), ...cosmetics };
+  const cos = { back: 'back:classic', arena: 'arena:standard', frame: 'frame:standard', title: null, finishes: new Map(), ...cosmetics };
+  // Each side's card frame and title: ours from our cosmetics, an online opponent's from the server.
+  const frameOf = pid => (pid === HUMAN ? cos.frame : online?.opponent?.frame) ?? 'frame:standard';
+  const frameClass = pid => (frameOf(pid) === 'frame:standard' ? '' : `frame-${frameOf(pid).split(':')[1]}`);
+  const titleOf = pid => (pid === HUMAN ? (spectate ? null : cos.title) : online?.opponent?.title ?? null);
   const HUMAN = online ? online.seat : 0;
   const OPP = 1 - HUMAN;
   const me = getDeck(online ? online.state.players[HUMAN].deckId : myDeck);
@@ -131,6 +137,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     }
   }
   function onResize() {
+    hideInspect(); // its position no longer matches (a rotated tablet or phone)
     fitHands();
     drawPendingBeam();
   }
@@ -167,8 +174,8 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     render();
   }
 
-  function toast(text) {
-    sfx('error');
+  function toast(text, sound = 'error') {
+    if (sound) sfx(sound);
     ui.toast = text;
     render();
     const mine = text;
@@ -197,7 +204,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
       const card = state.players[actor].hand.find(c => c.uid === action.uid);
       if (card) {
         const def = defOf(card);
-        const from = before.rects.get(`u${card.uid}`) ?? (ui.reveal ? ui.reveal.el.getBoundingClientRect() : null) ?? before.rects.get(actor === HUMAN ? 'handMine' : 'handTheirs');
+        const from = before.rects.get(`u${card.uid}`) ?? (ui.reveal ? rectOf(ui.reveal.el) : null) ?? before.rects.get(actor === HUMAN ? 'handMine' : 'handTheirs');
         played = { def, uid: card.uid, deck: getDeck(state.players[actor].deckId), pid: actor, from, fontSize: before.fontSizes.get(`u${card.uid}`) ?? (ui.reveal ? '15px' : '9px'), target: action.target };
       }
     }
@@ -209,7 +216,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     ui.targets = [];
     if (!res.ok) { toast(res.reason); return false; }
     const events = res.events;
-    playEvents(events, { humanPid: HUMAN });
+    playEvents(events, { humanPid: spectate ? null : HUMAN });
     if (events.some(e => e.type === 'keyword' || e.type === 'damage')) ui.quietUntil = Date.now() + 1400;
     for (const e of events) {
       if (e.type === 'play' && CARDS[e.id]) {
@@ -257,7 +264,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
         const minionEl = elFor(summoned.uid);
         if (minionEl) {
           minionEl.style.animationDelay = '.3s';
-          flyTo(ghost, played.from, minionEl.getBoundingClientRect(), { duration: 330, onDone: () => impact(minionEl.getBoundingClientRect(), played.deck.color, { sparks: 12, size: .9 }) });
+          flyTo(ghost, played.from, rectOf(minionEl), { duration: 330, onDone: () => impact(rectOf(minionEl), played.deck.color, { sparks: 12, size: .9 }) });
         }
       } else if (played.def.type === 'Spell') {
         const targetRect = played.target !== undefined ? before.rects.get(keyFor(played.target)) : null;
@@ -353,7 +360,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
           return { ok: true, events: msg.events };
         });
         ui.busy = false;
-        if (msg.timeout) toast(mine ? outOfTime(msg) : "The opponent's clock ran out.");
+        if (msg.timeout) toast(mine ? outOfTime(msg) : "The opponent's clock ran out.", null);
         else render();
         return;
       }
@@ -368,12 +375,12 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
       case 'opponentAway':
         ui.oppStatus = 'away';
         ui.awayUntil = Date.now() + (msg.grace ?? 0);
-        toast('Opponent disconnected. Waiting for them to come back…');
+        toast('Opponent disconnected. Waiting for them to come back…', null);
         return;
       case 'opponentBack':
         ui.oppStatus = null;
         ui.awayUntil = null;
-        toast('Opponent reconnected.');
+        toast('Opponent reconnected.', null);
         return;
       case 'opponentLeft':
         ui.oppStatus = 'left';
@@ -387,7 +394,6 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
       case 'emote': {
         if (!EMOTES[msg.id] || (ui.muted && msg.seat !== HUMAN)) return;
         ui.bubbles[msg.seat] = { text: EMOTES[msg.id], until: Date.now() + EMOTE_MS };
-        if (msg.seat !== HUMAN) sfx('keyword');
         if (!ui.busy) render();
         setTimeout(() => { if (!ui.exited && !ui.busy) render(); }, EMOTE_MS + 50);
         return;
@@ -518,7 +524,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
   // ------------------------------------------------------------ pointer: drag & drop, arrow
 
   function refAt(x, y) {
-    const hit = document.elementFromPoint(x, y);
+    const hit = document.elementFromPoint(x * uiZoom(), y * uiZoom());
     const el = hit instanceof Element ? hit.closest('[data-uid],[data-pid]') : null;
     const ref = !el || !view.contains(el) ? null
       : el.dataset.pid !== undefined ? playerRef(Number(el.dataset.pid)) : Number(el.dataset.uid);
@@ -531,13 +537,13 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     if (hit instanceof Element && hit.closest('button, .hud, .log-drawer, .history, .action-dock, .board.mine')) return false;
     const div = view.querySelector('.divider');
     if (!div) return false;
-    const r = div.getBoundingClientRect();
+    const r = rectOf(div);
     return y < r.top + r.height / 2;
   }
   function overMat(x, y) {
     const mat = view.querySelector('.mat');
     if (!mat) return false;
-    const r = mat.getBoundingClientRect();
+    const r = rectOf(mat);
     return x >= r.left && x <= r.right && y >= r.top - 20 && y <= r.bottom + 20;
   }
 
@@ -557,25 +563,25 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
       const uid = Number(cardEl.dataset.uid);
       const card = state.players[HUMAN].hand.find(c => c.uid === uid);
       if (!card) return;
-      ui.drag = { kind: 'card', uid, card, el: cardEl, x0: e.clientX, y0: e.clientY, moved: false };
+      ui.drag = { kind: 'card', uid, card, el: cardEl, x0: pt(e.clientX), y0: pt(e.clientY), moved: false };
       sfx('pickup');
       e.preventDefault();
     } else if (minionEl) {
       const uid = Number(minionEl.dataset.uid);
       const m = findMonster(state, uid);
       if (!m) return;
-      ui.drag = { kind: 'minion', uid, m, el: minionEl, x0: e.clientX, y0: e.clientY, moved: false };
+      ui.drag = { kind: 'minion', uid, m, el: minionEl, x0: pt(e.clientX), y0: pt(e.clientY), moved: false };
       e.preventDefault();
     }
   }
 
   function onPointerMove(e) {
-    ui.pointer = { x: e.clientX, y: e.clientY };
-    if (ui.press && !ui.zoom && Math.hypot(e.clientX - ui.press.x0, e.clientY - ui.press.y0) > DRAG_THRESHOLD) endPress();
+    ui.pointer = { x: pt(e.clientX), y: pt(e.clientY) };
+    if (ui.press && !ui.zoom && Math.hypot(pt(e.clientX) - ui.press.x0, pt(e.clientY) - ui.press.y0) > DRAG_THRESHOLD) endPress();
     const d = ui.drag;
     if (d) {
-      const dx = e.clientX - d.x0;
-      const dy = e.clientY - d.y0;
+      const dx = pt(e.clientX) - d.x0;
+      const dy = pt(e.clientY) - d.y0;
       if (!d.moved && Math.hypot(dx, dy) > DRAG_THRESHOLD) {
         d.moved = true;
         if (d.kind === 'card') {
@@ -616,13 +622,13 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
       d.el.classList.remove('dragging');
       view.querySelector('.arena')?.classList.remove('drag-card');
       d.el.style.transform = '';
-      if (overMat(e.clientX, e.clientY)) beginPlay(d.card);
-      else render();
+      if (overMat(pt(e.clientX), pt(e.clientY))) beginPlay(d.card);
+      else { sfx('drop'); render(); }
       return;
     }
     // Dragged a monster: release over a valid target to attack, anywhere else to cancel
     // (saying why when it was dropped on something it can't hit).
-    const ref = refAt(e.clientX, e.clientY);
+    const ref = refAt(pt(e.clientX), pt(e.clientY));
     if (ref !== null && ui.targets.includes(ref)) clickTarget(ref);
     else {
       const why = ref !== null && ref !== d.uid ? explainBadTarget(ref) : null;
@@ -634,7 +640,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
   // Click-to-attack: a click on the enemy side outside any monster hits the enemy hero.
   function onClick(e) {
     if (ui.mode !== 'attack' || !(e.target instanceof Element) || e.target.closest('[data-uid],[data-pid]')) return;
-    const ref = refAt(e.clientX, e.clientY);
+    const ref = refAt(pt(e.clientX), pt(e.clientY));
     if (ref === playerRef(OPP)) clickTarget(ref);
   }
 
@@ -648,7 +654,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     const get = el && zoomables.get(el);
     if (!get) return;
     ui.press = {
-      x0: e.clientX, y0: e.clientY,
+      x0: pt(e.clientX), y0: pt(e.clientY),
       timer: setTimeout(() => {
         const args = ui.press && el.isConnected ? get() : null;
         if (!args) return;
@@ -689,7 +695,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     if (!ui.arrow) return;
     const src = elFor(ui.source);
     if (!src) return;
-    ui.arrow.update(src.getBoundingClientRect(), x, y);
+    ui.arrow.update(rectOf(src), x, y);
     const ref = refAt(x, y);
     const el = ref !== null && ui.targets.includes(ref) ? elFor(ref) : null;
     if (el !== ui.hoverTarget) {
@@ -711,7 +717,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
   function showInspect(def, inst, anchor, { tipsOnly = false } = {}) {
     hideInspect();
     // Right after an action, keep the hover popup closed so it does not cover the keyword callouts.
-    if (ui.drag || ui.zoom || window.innerWidth < 900 || Date.now() < ui.quietUntil) return;
+    if (ui.drag || ui.zoom || viewW() < 900 || Date.now() < ui.quietUntil) return;
     const ownerDeckId = inst ? state.players[inst.owner].deckId : null;
     const parts = inspectParts(def, inst, { tipsOnly, ownerDeckId });
     if (!parts.length) return;
@@ -732,14 +738,14 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
   function placeInspect(el, anchor, tipsOnly) {
     document.body.append(el);
     ui.inspect = el;
-    const r = anchor.getBoundingClientRect();
+    const r = rectOf(anchor);
     const w = el.offsetWidth;
     const hgt = el.offsetHeight;
     const pad = tipsOnly ? r.width * .2 + 12 : 14;
     let left = r.right + pad;
-    if (left + w > window.innerWidth - 8) left = r.left - w - pad;
+    if (left + w > viewW() - 8) left = r.left - w - pad;
     if (left < 8) left = 8;
-    const top = Math.max(8, Math.min(r.top + r.height / 2 - hgt / 2, window.innerHeight - hgt - 8));
+    const top = Math.max(8, Math.min(r.top + r.height / 2 - hgt / 2, viewH() - hgt - 8));
     el.style.left = `${left}px`;
     el.style.top = `${top}px`;
   }
@@ -752,7 +758,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     hideReveal();
     const mat = view.querySelector('.mat');
     if (!mat) return;
-    const r = mat.getBoundingClientRect();
+    const r = rectOf(mat);
     const wrap = h('div', { class: 'reveal', 'aria-hidden': 'true' }, renderCard(def, { classes: 'large', ownerDeckId: state.players[pid].deckId, premium: isPremium(def, pid) }));
     document.body.append(wrap);
     wrap.style.left = `${r.left + r.width / 2 - wrap.offsetWidth / 2}px`;
@@ -778,7 +784,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     const fontSizes = new Map();
     for (const el of view.querySelectorAll('[data-uid],[data-pid]')) {
       const key = el.dataset.uid ? `u${el.dataset.uid}` : `p${el.dataset.pid}`;
-      rects.set(key, el.getBoundingClientRect());
+      rects.set(key, rectOf(el));
       if (el.classList.contains('minion')) {
         const c = el.cloneNode(true);
         c.classList.remove('can-attack', 'targetable', 'selected', 'tilting', 'enter', 'intent', 'attacking', 'defending', 'intent-target', 'hit', 'hover-target');
@@ -789,7 +795,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
         fontSizes.set(key, getComputedStyle(el).fontSize);
       }
     }
-    const region = (sel, key) => { const el = view.querySelector(sel); if (el) rects.set(key, el.getBoundingClientRect()); };
+    const region = (sel, key) => { const el = view.querySelector(sel); if (el) rects.set(key, rectOf(el)); };
     region('.hand.mine', 'handMine');
     region('.hand.theirs', 'handTheirs');
     region('.mat', 'mat');
@@ -806,7 +812,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     // A keyword announcement above a monster or hero: icon + KEYWORD + what it just did.
     const callout = (key, { keyword, icon, name, text, color }) => {
       const el = elOf(key);
-      const rect = el ? el.getBoundingClientRect() : before.rects.get(key);
+      const rect = el ? rectOf(el) : before.rects.get(key);
       if (!rect) return;
       const n = stacks.get(key) ?? 0;
       stacks.set(key, n + 1);
@@ -836,7 +842,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
         default: continue;
       }
       const el = elOf(key);
-      const rect = el ? el.getBoundingClientRect() : before.rects.get(key);
+      const rect = el ? rectOf(el) : before.rects.get(key);
       if (!rect) continue;
 
       if (e.type === 'death') {
@@ -937,14 +943,14 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     if (ui.exited || !state.pending || state.pending.attacker === undefined) return;
     const a = elFor(state.pending.attacker);
     const t = elFor(state.pending.target);
-    if (a && t) drawBeam(a.getBoundingClientRect(), t.getBoundingClientRect());
+    if (a && t) drawBeam(rectOf(a), rectOf(t));
   }
 
   function announceTurn() {
     const key = `${state.turn}:${state.active}`;
     if (key === ui.lastTurnKey || state.over) return;
     ui.lastTurnKey = key;
-    sfx(!spectate && state.active === HUMAN ? 'your-turn' : 'enemy-turn', { delay: ui.firstRender ? 500 : 0 });
+    if (!spectate) sfx(state.active === HUMAN ? 'your-turn' : 'enemy-turn', { delay: ui.firstRender ? 500 : 0 });
     const p = state.players[state.active];
     const text = spectate ? `${p.name}` : state.active === HUMAN ? 'YOUR TURN' : 'ENEMY TURN';
     const cls = state.active === HUMAN ? 'good' : 'enemy';
@@ -959,7 +965,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
       const hand = view.querySelector(pid === HUMAN ? '.hand.mine' : '.hand.theirs');
       const pile = view.querySelector(`.piles.${pid === HUMAN ? 'mine' : 'theirs'} .pile.deck`);
       if (!hand || !pile) continue;
-      const pileRect = pile.getBoundingClientRect();
+      const pileRect = rectOf(pile);
       const cards = [...hand.children];
       let fresh = cards.filter(c => c.classList.contains('enter-hand'));
       if (!fresh.length && cards.length && !cards[0].dataset.uid) {
@@ -1023,7 +1029,8 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     if (state.over && !ui.celebrated) {
       ui.celebrated = true;
       stopArrow();
-      if (!spectate) sfx(state.winner === HUMAN ? 'victory' : 'defeat', { delay: 150 });
+      if (state.winner === 'draw') sfx('tie', { delay: 150 });
+      else if (!spectate) sfx(state.winner === HUMAN ? 'victory' : 'defeat', { delay: 150 });
       if (state.winner === HUMAN || (spectate && state.winner !== 'draw')) {
         const deck = state.players[state.winner].deckId === me.id ? me : them;
         setTimeout(() => confetti(['#ffc53d', '#ffffff', deck.color, '#22d3ee', '#f472b6']), 200);
@@ -1065,6 +1072,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
 
   function renderHud() {
     return h('div', { class: 'hud' },
+      settingsButton(),
       online && !state.over
         ? h('button', { class: `btn small ${ui.armedLeave ? 'danger' : 'ghost'}`, onclick: armLeave }, ui.armedLeave ? 'Forfeit & leave?' : '← Leave')
         : h('button', { class: 'btn ghost small', onclick: exit }, online ? '← Lobby' : '← Menu'),
@@ -1165,6 +1173,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
       ),
       h('div', { class: 'hero-info' },
         h('div', { class: 'hero-name' }, p.name),
+        titleOf(pid) ? h('div', { class: 'hero-title' }, founderBadge(titleOf(pid))) : null,
         h('div', { class: 'hero-deckname' }, deck.name),
         h('div', { class: 'hp-bar', 'aria-hidden': 'true' }, h('i', { class: pct > 34 ? 'good' : '', style: { '--hp-pct': `${pct}%` } })),
         pid === HUMAN ? null : renderBandwidth(pid, false),
@@ -1219,7 +1228,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
         const def = defOf(card);
         const info = mine && humanCanAct() ? playInfo(state, pid, card, { asResponse: responding }) : { ok: false };
         const classes = [
-          mine ? '' : 'small',
+          mine ? frameClass(pid) : 'small',
           info.ok ? 'playable' : '',
           ui.source === card.uid && ui.mode === 'target' ? 'selected' : '',
           !ui.seenHand.has(card.uid) ? 'enter-hand' : '',
@@ -1256,6 +1265,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
         state.pending && state.pending.attacker === m.uid ? 'attacking' : '',
         state.pending && state.pending.target === m.uid ? 'defending' : '',
         !ui.seenBoard.has(m.uid) ? 'enter' : '',
+        frameClass(m.owner),
       ].join(' ');
       slots.push(h('div', { class: 'slot' }, zoomable(renderMinion(state, m, {
         classes,
@@ -1364,7 +1374,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     const cls = draw ? 'draw' : (won || spectate) ? 'won' : '';
     const forfeitLine = state.log.length && /forfeits\.$/.test(state.log[state.log.length - 1].text) ? state.log[state.log.length - 1].text : null;
     return h('div', { class: 'overlay' },
-      h('div', { class: `dialog ${cls}`, role: 'dialog', 'aria-modal': 'true' },
+      h('div', { class: `dialog match-result ${cls}`, role: 'dialog', 'aria-modal': 'true' },
         h('h2', null, title),
         h('p', { class: 'muted' }, online
           ? `${state.players[HUMAN].name} (${me.name}) vs ${state.players[OPP].name} (${them.name}) · ${state.turn} turns`

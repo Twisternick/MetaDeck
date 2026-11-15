@@ -10,6 +10,7 @@ import {
   setBirthYear, downloadMyData,
 } from './profile.js';
 import { toast } from './packs.js';
+import { founderWelcome, founderBadge } from './founder.js';
 import { seasonTier, unopenedPacks } from '../data/economy.js';
 
 const NAME_RE = /^[A-Za-z0-9_]{3,20}$/;
@@ -227,6 +228,7 @@ export function accountScreen(root, { onBack, nav, mode = 'signin' }) {
       h('section', { class: 'acct-card rise' },
         h('div', { class: 'acct-avatar', 'aria-hidden': 'true' }, me.name.slice(0, 1).toUpperCase()),
         h('h2', null, me.name),
+        founderBadge(p.founder),
         since ? h('p', { class: 'acct-since' }, `Member since ${since}`) : null,
         h('p', { class: 'muted' }, 'Your cards, currencies, quests and season progress are saved to this account and follow you to any device.'),
         h('div', { class: 'acct-stats' },
@@ -476,7 +478,12 @@ export function accountScreen(root, { onBack, nav, mode = 'signin' }) {
           draftName = '';
           if (motionOK()) confetti();
           toast(`Welcome, ${r.name}! Your account is ready.`);
-          reveal = { code: r.recoveryCode, title: 'Save your recovery code', intro: `Your account is ready, ${r.name}. One last step: save this code.` };
+          // A Meta Founder hears about it once the code is safely saved.
+          const founder = profile().founder;
+          reveal = {
+            code: r.recoveryCode, title: 'Save your recovery code', intro: `Your account is ready, ${r.name}. One last step: save this code.`,
+            after: founder ? () => founderWelcome(founder) : null,
+          };
           render();
         },
       });

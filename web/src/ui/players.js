@@ -8,10 +8,11 @@ import { getDeck, DECKS } from '../data/index.js';
 import { seasonName, seasonKey } from '../data/economy.js';
 import { rankBadge } from './rank-badge.js';
 import {
-  signedIn, walletBar, matchHistory, leaderboard, friendsList, addFriend, removeFriend, blockPlayer, unblockPlayer,
+  signedIn, profile, walletBar, matchHistory, leaderboard, friendsList, addFriend, removeFriend, blockPlayer, unblockPlayer,
 } from './profile.js';
 import { toast } from './packs.js';
 import { tip } from './tutorial.js';
+import { founderBadge } from './founder.js';
 
 const TABS = [['rank', 'Rank & history'], ['leaderboard', 'Leaderboard'], ['friends', 'Friends']];
 const MODE = { ai: 'vs AI', online: 'Online' };
@@ -64,6 +65,7 @@ export function playerHub(root, { onBack, nav, tab = 'rank', onChallenge }) {
   function rankView({ rank, matches, decks }) {
     const card = h('section', { class: 'hub-rank rise', style: { '--tier': rank.color } },
       rankBadge(rank, { big: true }),
+      signedIn() && profile().founder ? founderBadge(profile().founder) : null,
       h('div', { class: 'hub-rank-info' },
         h('div', { class: 'vs-sub' }, `${seasonName(rank.season)} · ${daysLeft()} days left`),
         h('p', null, rank.games ? `${rank.wins} wins in ${rank.games} ranked games` : 'No ranked games yet this season. Quick find against another signed-in player is ranked.'),
@@ -85,7 +87,7 @@ export function playerHub(root, { onBack, nav, tab = 'rank', onChallenge }) {
 
     const history = h('section', { class: 'rise', style: { '--i': 2 } },
       h('h2', null, 'Recent matches'),
-      matches.length ? h('ol', { class: 'history' }, matches.map(m => {
+      matches.length ? h('ol', { class: 'match-history-list' }, matches.map(m => {
         const mine = getDeck(m.deck), theirs = getDeck(m.oppDeck);
         return h('li', { class: `history-row ${m.result}` },
           h('span', { class: 'history-result' }, m.result === 'win' ? 'Win' : m.result === 'loss' ? 'Loss' : 'Draw'),
@@ -103,9 +105,9 @@ export function playerHub(root, { onBack, nav, tab = 'rank', onChallenge }) {
     if (!players.length) return h('p', { class: 'muted' }, 'Nobody has played ranked this season yet. Be the first!');
     return h('section', { class: 'rise' },
       h('h2', null, `${seasonName(seasonKey())} leaderboard`),
-      h('ol', { class: 'board' }, players.map(p => h('li', { class: `board-row${p.name === me ? ' me' : ''}` },
+      h('ol', { class: 'leaderboard-list' }, players.map(p => h('li', { class: `board-row${p.name === me ? ' me' : ''}` },
         h('span', { class: 'board-place' }, `#${p.place}`),
-        h('span', { class: 'board-name' }, p.name),
+        h('span', { class: 'board-name' }, p.name, ' ', founderBadge(p.title)),
         rankBadge(p),
         h('span', { class: 'board-record muted' }, `${p.wins}–${p.games - p.wins}`)))));
   }
@@ -133,7 +135,7 @@ export function playerHub(root, { onBack, nav, tab = 'rank', onChallenge }) {
       const [label, cls] = presence(f.presence);
       return h('li', { class: 'friend-row' },
         h('span', { class: `presence ${cls}`, 'aria-hidden': 'true' }),
-        h('span', { class: 'friend-name' }, f.name, h('small', null, label)),
+        h('span', { class: 'friend-name' }, h('span', null, f.name, ' ', founderBadge(f.title)), h('small', null, label)),
         h('button', {
           class: 'btn primary small', disabled: f.presence !== 'lobby' || null,
           title: f.presence === 'lobby' ? `Challenge ${f.name} to a friendly match` : 'They need to be in the online lobby',

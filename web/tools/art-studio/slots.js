@@ -161,6 +161,11 @@ export const COSMETIC_ART = {
     + 'trees and a fountain packed round the edges, teal #3f8f8c roofs, warm dusk light, strong blur at the top and bottom.',
   'arena:card-table': 'A tournament play table seen from straight above: smooth charcoal felt filling the middle with a thin red #d23b4a trim line round it, '
     + 'deck boxes, dice and a scorepad along the edges, a single gold spotlight glint. No cards. Clean, premium.',
+  'back:founder': 'A founding crest: a faceted gold M monogram shield set in the centre, crowned by a small star, framed by a laurel wreath of gold leaves, '
+    + 'on deep midnight-blue #0a0d1c lacquer with fine gold engraving radiating outwards, a heavy ornate gold border with tiny inset gems at the corners. '
+    + 'Regal, rare and celebratory, like a first-edition seal.',
+  'arena:founders-hall': 'A grand hall\'s marble floor seen from straight above: polished dark navy marble filling the middle, a thin inlaid gold ring around it, '
+    + 'gold-trimmed pillars\' bases, velvet banners and warm candelabra light only along the edges and corners, a few gold confetti flecks. Prestigious, celebratory, calm in the centre.',
   'arena:synthwave': 'A neon synthwave floor: black glass with a glowing magenta and cyan grid, a sunset gradient glowing along the top edge, chrome trim down the sides, '
     + 'palm-leaf silhouettes only in the far corners.',
   'arena:deep-space': 'A table of dark glass floating in deep space: violet and cyan nebulae seen through it, scattered stars, a ringed planet and asteroids only at the corners.',
@@ -366,7 +371,8 @@ export function allSlots() {
   add('back', 'ui/card-back', 'Extras', 'Card back',
     prompt('back', 'Subject: the back of a playing card. A symmetrical ornamental emblem on dark navy, gold filigree and neon glow, abstract, no characters.', NEUTRAL_STYLE),
     'Shown for face-down cards');
-  for (const c of COSMETICS.filter(c => !c.default)) {
+  // Card frames are drawn in CSS only (styles.css), so they have no image slot.
+  for (const c of COSMETICS.filter(c => !c.default && c.kind !== 'frame')) {
     const [kind, name] = c.id.split(':');
     const back = kind === 'back';
     const parts = {
@@ -375,7 +381,7 @@ export function allSlots() {
       style: COSMETIC_FINISH, subject: COSMETIC_ART[c.id], extra: back ? BACK_RULES : ARENA_RULES,
     };
     add(back ? 'back' : 'scene', `ui/${kind}-${name}`, 'Cosmetics', `${c.name} — ${back ? 'card back' : 'arena'}`, parts,
-      c.gems ? `${c.gems} Gems in the shop` : `Season tier ${c.season.tier} (${c.season.track})`);
+      c.founder ? 'Meta Founders only' : c.gems ? `${c.gems} Gems in the shop` : `Season tier ${c.season.tier} (${c.season.track})`);
   }
   // The key art style for the rest of the UI. None of these is wired into the game yet: each slot says where
   // it is meant to go. Transparent ones are fitted whole; attach ui/key-art.webp to every prompt.

@@ -6,6 +6,11 @@
 //   npm run moderate -- rename <name> <new>  rename an account (friends, history and sessions follow it)
 //   npm run moderate -- ban <name>           ban an account: signed out everywhere, can't sign in
 //   npm run moderate -- unban <name>
+//   npm run moderate -- founders             the Meta Founders, by number, and whether their Gems are paid
+//   npm run moderate -- founder <name>       make an account a Meta Founder (the next number)
+//   npm run moderate -- unfounder <name>     take it away (Gems already paid stay)
+//   npm run moderate -- founders --reset     unmake every founder: run once before launch, so test accounts
+//                                            don't use up the first 100 places
 //
 // While the server is running it asks the server (with the admin token, from this machine only), so the
 // change takes effect at once; otherwise it edits the database directly. Set DATA_DIR if the server uses
@@ -31,7 +36,7 @@ async function call(route, body, direct) {
 }
 
 function usage() {
-  console.error('Usage: npm run moderate -- reports [--all] | resolve <id> | rename <name> <new name> | ban <name> | unban <name>');
+  console.error('Usage: npm run moderate -- reports [--all] | resolve <id> | rename <name> <new name> | ban <name> | unban <name> | founders [--reset] | founder <name> | unfounder <name>');
   process.exit(1);
 }
 
@@ -65,6 +70,26 @@ switch (cmd) {
     const on = cmd === 'ban';
     const r = await call('ban', { name: a, on }, ({ accounts }) => accounts.setBanned(a, on));
     console.log(r.ok ? `${r.name} is ${r.banned ? 'banned' : 'no longer banned'}.` : r.reason);
+    if (!r.ok) process.exitCode = 1;
+    break;
+  }
+  case 'founders': {
+    if (argv.includes('--reset')) {
+      const r = await call('resetfounders', {}, ({ accounts }) => ({ ok: true, reset: accounts.resetFounders() }));
+      console.log(`Unmade ${r.reset} founder${r.reset === 1 ? '' : 's'}. The next sign-up is Meta Founder #1.`);
+      break;
+    }
+    const r = await call('founders', {}, ({ accounts }) => ({ ok: true, founders: accounts.founders() }));
+    if (!r.founders.length) { console.log('No Meta Founders yet.'); break; }
+    for (const f of r.founders) console.log(`#${String(f.n).padEnd(4)} ${f.name.padEnd(22)} ${f.created.slice(0, 10)}  Gems ${f.gems === 'paid' ? 'paid' : 'after 3 matches'}`);
+    break;
+  }
+  case 'founder':
+  case 'unfounder': {
+    if (!a) usage();
+    const on = cmd === 'founder';
+    const r = await call('founder', { name: a, on }, ({ accounts }) => accounts.setFounder(a, on));
+    console.log(!r.ok ? r.reason : on ? (r.changed ? `${r.name} is Meta Founder #${r.founder}.` : `${r.name} already is Meta Founder #${r.founder}.`) : `${r.name} is no longer a Meta Founder.`);
     if (!r.ok) process.exitCode = 1;
     break;
   }

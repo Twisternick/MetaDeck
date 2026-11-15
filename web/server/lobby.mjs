@@ -37,7 +37,7 @@ import crypto from 'node:crypto';
 import { createGame, applyAction, decisionPlayer } from '../src/engine/game.js';
 import { getDeck, deckErrors } from '../src/data/index.js';
 import { START_HP } from '../src/engine/constants.js';
-import { missingCards } from '../src/data/economy.js';
+import { missingCards, founderTitle, loadoutFor } from '../src/data/economy.js';
 import { logMatch } from './db.mjs';
 import { offensiveName } from './names.mjs';
 
@@ -66,6 +66,7 @@ export function createLobby({
   const queue = [];          // players waiting for a quick match
   const perIp = new Map();   // address -> open connections
   let closing = null;        // maintenance: { until, done, timer, deadline }
+  let shutDown = false;      // close() ran: sockets closing after it start no timers
   const matcher = setInterval(() => guarded(matchQueue)(), 2000);
   matcher.unref?.();
   // Where a signed-in player is, for their friends list: 'match', 'lobby', or null when not connected.
@@ -122,7 +123,7 @@ export function createLobby({
       clearTimeout(helloTimer);
       const left = (perIp.get(ip) ?? 1) - 1;
       if (left > 0) perIp.set(ip, left); else perIp.delete(ip);
-      if (player && player.ws === ws) disconnected(player);
+      if (player && player.ws === ws && !shutDown) disconnected(player);
     });
   }
 
@@ -431,7 +432,7 @@ export function createLobby({
     return {
       t: 'start', seat: seatNo, code: room.code, visibility: room.visibility, ranked: !!room.ranked,
       state: view(room.game, seatNo), clock: clockFor(room),
-      opponent: room.seats[1 - seatNo] ? { name: room.seats[1 - seatNo].name, deckId: room.seats[1 - seatNo].deck.archetype } : null,
+      opponent: room.seats[1 - seatNo] ? { name: room.seats[1 - seatNo].name, deckId: room.seats[1 - seatNo].deck.archetype, ...showOff(room.seats[1 - seatNo]) } : null,
     };
   }
 
@@ -587,12 +588,20 @@ export function createLobby({
 
   // ------------------------------------------------------------ helpers
 
+  // What an opponent sees of a signed-in player: their title (Meta Founder #n) and the card frame they
+  // use for the deck they brought.
+  function showOff(p) {
+    const profile = accounts && p.account ? accounts.profileFor(p.account) : null;
+    return profile ? { title: founderTitle(profile.founder), frame: loadoutFor(profile, p.deck?.archetype).frame } : {};
+  }
+
   const send = (player, msg) => { if (player?.ws?.open) player.ws.send(msg); };
   // Timers run outside any message handler; an exception there must not take the whole server down.
   const guarded = fn => () => { try { fn(); } catch (err) { console.error('lobby:', err); } };
   const opponentOf = (room, player) => room.seats.find(p => p !== player);
 
   function close() {
+    shutDown = true;
     clearTimeout(closing?.timer);
     clearInterval(matcher);
     for (const room of rooms.values()) clearTimeout(room.timer);

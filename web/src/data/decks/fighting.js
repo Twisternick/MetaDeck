@@ -43,7 +43,7 @@ export default {
     S('FIG_S07_GuardBreak', 'Guard Break', 2, [fx('Silence', 0, 'EnemyMonster')]),
     S('FIG_S12_Burst', 'Burst', 2, [fx('DealDamage', 2, 'EnemyMonster')], QUICK_NEW),
     S('FIG_S13_FrameTrap', 'Frame Trap', 2, [fx('DebuffAttack', 2, 'EnemyMonster'), fx('Suppress', 0, 'EnemyMonster')], QUICK_NEW),
-    S('FIG_S08_SuperMeterBurst', 'Super Meter Burst', 3, [fx('DealDamage', 3, 'EnemyMonster'), fx('DealDamage', 2, 'EnemyMonster', { cond: 'CardsPlayed2' })]),
+    S('FIG_S08_SuperMeterBurst', 'Super Meter Burst', 2, [fx('DealDamage', 1, 'AllEnemyMonsters'), fx('DealDamage', 2, 'AllEnemyMonsters', { cond: 'CardsPlayed2' })]),
     S('FIG_S09_RageActivation', 'Rage Activation', 3, [fx('GrantKeyword', 0, 'AllFriendlyMonsters', { keyword: 'Combo' }), fx('BuffAttackThisTurn', 1, 'AllFriendlyMonsters')]),
     S('FIG_S10_SuddenDeath', 'Sudden Death', 4, [fx('DealDamage', 2, 'FriendlyPlayer'), fx('DealDamage', 5, 'EnemyPlayer')]),
     S('FIG_S11_SuperArt', 'Super Art', 4, [fx('DealDamage', 5, 'EnemyMonster'), fx('Draw', 1, 'None', { cond: 'CardsPlayed2' })], NEW),

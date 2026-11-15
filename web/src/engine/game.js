@@ -60,10 +60,37 @@ export const defOf = card => CARDS[card.id];
 const P = (state, pid) => state.players[pid];
 const opp = pid => 1 - pid;
 
+// The AI clones the state for every action it considers, so this is the simulator's hot path. It copies
+// the known shape directly, which is far faster than a JSON round trip. Scalar fields are carried over by
+// the spreads; a new nested field (an array or object on the state, a player, a card or a monster) must be
+// copied here too, or clones would share it. test/engine.test.mjs checks that nothing is shared.
 export function cloneState(state) {
-  const copy = JSON.parse(JSON.stringify({ ...state, log: [], events: [] }));
-  copy.rng = (copy.rng ^ 0x5bd1e995) | 0; // simulations must not "see" the real future draws
-  return copy;
+  return {
+    ...state,
+    rng: (state.rng ^ 0x5bd1e995) | 0, // simulations must not "see" the real future draws
+    players: state.players.map(clonePlayer),
+    pending: state.pending && { ...state.pending },
+    log: [],
+    events: [],
+  };
+}
+
+const cloneCard = c => ({ ...c });
+const cloneMonster = m => m && ({
+  ...m,
+  mods: m.mods.map(x => ({ ...x })),
+  kw: m.kw.slice(),
+  tempKw: m.tempKw.slice(),
+});
+
+function clonePlayer(p) {
+  return {
+    ...p,
+    deck: p.deck.map(cloneCard),
+    hand: p.hand.map(cloneCard),
+    grave: p.grave.map(cloneCard),
+    board: p.board.map(cloneMonster),
+  };
 }
 
 // ---------------------------------------------------------------- queries
@@ -493,7 +520,7 @@ function afterAttack(state, att, killed) {
     log(state, `${defOf(att).displayName} devours its prey (+1/+1).`);
   }
   if (hasKeyword(att, 'Overtake')) { keywordEvent(state, 'Overtake', att, '+1 Nitro'); gainNitro(state, att.owner, 1); }
-  if (hasKeyword(att, 'XP') && !att.leveled) { keywordEvent(state, 'XP', att, '+1 XP'); gainXP(state, att, 1); }
+  if (hasKeyword(att, 'XP')) { keywordEvent(state, 'XP', att, '+1 XP'); gainXP(state, att, 1); }
 }
 
 function doEndTurn(state) {
@@ -547,12 +574,12 @@ function summon(state, pid, card, { played = false } = {}) {
   const m = {
     uid: card.uid, id: card.id, owner: pid,
     damage: 0, mods: [], kw: [...def.keywords], tempKw: [],
-    silenced: false, xp: 0, leveled: false,
+    silenced: false, xp: 0,
     summonedTurn: state.turn, playedTurn: played ? state.turn : -1,
     attacks: 0, suppressedUntil: 0, isToken: !!def.isToken,
   };
   p.board[slot] = m;
-  state.events.push({ type: 'summon', uid: m.uid });
+  state.events.push({ type: 'summon', uid: m.uid, deckId: p.deckId });
   return m;
 }
 
@@ -739,6 +766,10 @@ function effectTargets(state, source, e, chosen) {
     case 'AllOtherFriendlyMonsters': return friendly().filter(x => x.uid !== source.uid);
     case 'AllEnemyMonsters': return enemies();
     case 'AllMonsters': return [...friendly(), ...enemies()];
+    case 'AllDamagedMonsters': return [...friendly(), ...enemies()].filter(isDamaged);
+    case 'SmallEnemyAttackers': return enemies().filter(m => getAttack(state, m) <= 2);
+    case 'LowCostNonDistricts': return [...friendly(), ...enemies()].filter(m => defOf(m).cost <= 2 && !hasKeyword(m, 'District'));
+    case 'HighAttackMonsters': return [...friendly(), ...enemies()].filter(m => getAttack(state, m) >= 4);
     default: { // chosen targeting
       if (chosen === null || chosen === undefined) return [];
       const tpid = refToPid(chosen);
@@ -865,7 +896,6 @@ function silence(state, m) {
   m.tempKw = [];
   m.mods = [];
   m.xp = 0;
-  m.leveled = false;
   m.silenced = true;
   m.damage = Math.min(m.damage, getMaxHealth(m) - 1);
   state.events.push({ type: 'silence', uid: m.uid });
@@ -886,11 +916,12 @@ function gainNitro(state, pid, n) {
 }
 
 function gainXP(state, m, n) {
+  const previousLevels = Math.floor(m.xp / LEVEL_UP_XP);
   m.xp += n;
-  if (m.xp >= LEVEL_UP_XP && !m.leveled) {
-    m.leveled = true;
+  const newLevels = Math.floor(m.xp / LEVEL_UP_XP);
+  for (let level = previousLevels; level < newLevels; level++) {
     m.mods.push({ atk: LEVEL_UP_BONUS, hp: LEVEL_UP_BONUS });
-    keywordEvent(state, 'XP', m, `Level Up! +${LEVEL_UP_BONUS}/+${LEVEL_UP_BONUS}`);
+    keywordEvent(state, 'Level Up', m, `+${LEVEL_UP_BONUS}/+${LEVEL_UP_BONUS}`);
     state.events.push({ type: 'levelup', uid: m.uid });
     log(state, `${defOf(m).displayName} Levels Up! (+${LEVEL_UP_BONUS}/+${LEVEL_UP_BONUS})`);
   }

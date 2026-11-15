@@ -104,7 +104,8 @@ export function handleAccountApi(req, res, route, ctx) {
           : await accounts.signIn(name, password, ip);
         if (!r.ok) return send(res, route === 'signin' ? 401 : 400, r);
         if (route === 'signup') ctx.track?.('signup', {}, req, accounts.accountFor(r.token)?.key ?? null);
-        send(res, 200, { ok: true, ...accounts.me(r.token), recoveryCode: r.recoveryCode, testPurchases: ctx.testPurchases(req) },
+        const rank = ctx.social ? ctx.social.rankOf(accounts.userForToken(r.token)) : null;
+        send(res, 200, { ok: true, ...accounts.me(r.token), rank, country: ctx.country?.(req) ?? null, recoveryCode: r.recoveryCode, testPurchases: ctx.testPurchases(req) },
           { 'Set-Cookie': cookie(r.token, ctx.secure(req)) });
       });
     case 'signout':

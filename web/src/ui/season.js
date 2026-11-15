@@ -1,7 +1,7 @@
 // Season & quests: today's quests, the daily Gold counters, archetype levels (which unlock the other
 // starter decks) and the season track with its free and premium rewards.
 
-import { h } from './dom.js';
+import { h, rectOf } from './dom.js';
 import { removeFx, sparkle, confetti, motionOK, deckEmblem, currency } from './fx.js';
 import { profile, act, walletBar } from './profile.js';
 import { toast } from './packs.js';
@@ -67,7 +67,7 @@ export function season(root, { onBack, nav }) {
     for (let t = 1; t <= tier; t++) for (const track of ['free', 'premium']) if (canClaim(p, track, t)) claimable.push([track, t]);
 
     const claim = async (track, t, el) => {
-      const rect = el?.getBoundingClientRect();
+      const rect = (el ? rectOf(el) : undefined);
       const res = await act('claimSeason', { track, tier: t });
       if (!res.ok) { toast(res.reason, 'bad'); return render(); }
       const got = res.reward;

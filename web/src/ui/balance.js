@@ -4,7 +4,7 @@
 // played, then the full balance tables, and can hand the results to Claude (saved to web/reports/ by the
 // local server, and copied to the clipboard).
 
-import { h, storage } from './dom.js';
+import { h, storage, rectOf } from './dom.js';
 import { removeFx, deckEmblem } from './fx.js';
 import { DECKS, CARDS, STYLES, starterDecks, deckList } from '../data/index.js';
 import { LEAD_TURNS, LEAD_MIN, newLeadTally, tallyLead } from '../engine/snowball.js';
@@ -427,7 +427,7 @@ export function balanceLab(root, { onBack }) {
   function paintBoard() {
     const rate = Object.fromEntries(ids.map(id => [id, crossRate(stats, id)]));
     const order = [...ids].sort((x, y) => (rate[y] ?? -1) - (rate[x] ?? -1));
-    const before = new Map(order.map(id => [id, rows[id].el.getBoundingClientRect().top]));
+    const before = new Map(order.map(id => [id, rectOf(rows[id].el).top]));
     for (const id of order) {
       const r = rows[id];
       r.fill.style.width = `${(rate[id] ?? 0) * 100}%`;
@@ -437,7 +437,7 @@ export function balanceLab(root, { onBack }) {
     // FLIP: slide rows to their new place in the ranking.
     for (const id of order) {
       const el = rows[id].el;
-      const dy = before.get(id) - el.getBoundingClientRect().top;
+      const dy = before.get(id) - rectOf(el).top;
       if (!dy) continue;
       el.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: 450, easing: 'cubic-bezier(.16,1,.3,1)' });
     }

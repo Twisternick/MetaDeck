@@ -45,7 +45,7 @@ export default {
     S('RAC_S13_OilSlick', 'Oil Slick', 1, [fx('Suppress', 0, 'EnemyMonster'), fx('DealDamage', 2, 'EnemyMonster', { nitroCost: 1 })], QUICK_NEW),
     S('RAC_S08_CleanLap', 'Clean Lap', 3, [fx('Destroy', 0, 'EnemyMonster', { cond: 'TargetMustBeDamaged' })]),
     S('RAC_S14_LapRecord', 'Lap Record', 3, [fx('Draw', 2), fx('Draw', 1, 'None', { nitroCost: 2 })], NEW),
-    S('RAC_S15_SpinOut', 'Spin Out', 3, [fx('DealDamage', 3, 'EnemyMonster'), fx('DealDamage', 2, 'EnemyMonster', { nitroCost: 2 })], NEW),
+    S('RAC_S15_SpinOut', 'Spin Out', 3, [fx('DealDamage', 3, 'EnemyMonster'), fx('DealDamage', 2, 'AllEnemyMonsters', { nitroCost: 2 })], NEW),
     S('RAC_S09_FullThrottle', 'Full Throttle', 4, [fx('BuffAttackThisTurn', 2, 'AllFriendlyMonsters')]),
     S('RAC_S10_PodiumFinish', 'Podium Finish', 5, [fx('DealDamage', 4, 'EnemyPlayer'), fx('DealDamage', 4, 'EnemyPlayer', { nitroCost: 2 })]),
   ],

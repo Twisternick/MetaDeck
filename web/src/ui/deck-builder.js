@@ -2,7 +2,8 @@
 // DECK_SIZE cards. Click a pool card to add it, right-click it (or click its row in the list) to take one out.
 // Decks can be saved unfinished; only complete, legal decks can be played.
 
-import { h } from './dom.js';
+import { keywordName } from '../engine/text.js';
+import { h, rectOf } from './dom.js';
 import { renderCard, renderPreview } from './card-view.js';
 import { motionOK, flyTo, sparkle, removeFx, deckEmblem } from './fx.js';
 import { getDeck, CARDS, DECK_SIZE, MAX_COPIES, countCards, deckErrors, starterDecks } from '../data/index.js';
@@ -46,9 +47,9 @@ export function deckBuilder(root, { archetype, deck = null, onBack, onPlay }) {
       row.classList.remove('bump'); void row.offsetWidth; row.classList.add('bump');
       row.scrollIntoView({ block: 'nearest', behavior: motionOK() ? 'smooth' : 'auto' });
       const card = fromEl?.querySelector('.card');
-      if (card && motionOK()) flyTo(card.cloneNode(true), card.getBoundingClientRect(), row.getBoundingClientRect(), { duration: 380 });
+      if (card && motionOK()) flyTo(card.cloneNode(true), rectOf(card), rectOf(row), { duration: 380 });
     }
-    if (st.cards.length === DECK_SIZE) sparkle(countEl.getBoundingClientRect(), arch.color, 18);
+    if (st.cards.length === DECK_SIZE) sparkle(rectOf(countEl), arch.color, 18);
   };
 
   const remove = id => {
@@ -116,7 +117,7 @@ export function deckBuilder(root, { archetype, deck = null, onBack, onPlay }) {
     const { q, type, cost } = st.filters;
     if (type !== 'All' && def.type !== type) return false;
     if (cost !== 'All' && (cost === '7+' ? def.cost < 7 : Math.max(1, def.cost) !== cost)) return false;
-    return !q || `${def.displayName} ${def.keywords.join(' ')}`.toLowerCase().includes(q.toLowerCase());
+    return !q || `${def.displayName} ${def.keywords.map(keywordName).join(' ')}`.toLowerCase().includes(q.toLowerCase());
   };
 
   const poolGrid = h('div', { class: 'card-grid pool-grid' });

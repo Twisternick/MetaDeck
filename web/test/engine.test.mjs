@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   createGame, applyAction, legalActions, attackTargets, placeMonster, giveCard, getAttack, getHealth,
   effectiveCost, findMonster, hasKeyword, decisionPlayer, attackBonuses, boostCost, canBoost, defOf,
+  cloneState,
 } from '../src/engine/game.js';
 import { chooseAction } from '../src/engine/ai.js';
 import { DECKS, CARDS, deckList, starterDecks, deckErrors, DECK_SIZE, MAX_COPIES } from '../src/data/index.js';
@@ -22,6 +23,47 @@ function setup(seed = 42) {
 
 const ready = m => { m.summonedTurn = 0; return m; };
 const ok = res => assert.ok(res.ok, res.reason);
+
+test('selective sweepers resolve against every matching monster and spare the others', () => {
+  const small = 'CCG_M03_MonsterCard'; // 2-cost 2/3
+  const large = 'RPG_M09_QuestingKnight'; // 3-cost 4/3
+  const district = 'CTY_M01_TownArchitect'; // 1-cost 1/3 District
+  // Friendly small, friendly large, enemy small, enemy large, enemy District.
+  for (const [spell, removed] of [
+    ['HOR_S15_FinalGirl', [0, 3]],
+    ['PLA_S06_WarpPipe', [2, 4]],
+    ['CTY_S12_EminentDomain', [0, 2]],
+    ['CCG_S12_BanHammer', [1, 3]],
+  ]) {
+    const s = setup();
+    const board = [small, large, small, large, district].map((id, i) => placeMonster(s, i < 2 ? 0 : 1, id));
+    board[0].damage = board[3].damage = 1;
+    ok(applyAction(s, { type: 'play', uid: giveCard(s, 0, spell).uid }));
+    board.forEach((m, i) => assert.equal(!!findMonster(s, m.uid), !removed.includes(i), spell));
+    if (spell === 'PLA_S06_WarpPipe') assert.deepEqual(s.players[1].hand.map(c => c.id), [small, district]);
+  }
+});
+
+// cloneState copies a fixed shape for speed, so a new nested field it misses would be shared with the real game.
+test('cloneState copies the whole state and shares no arrays or objects with it', () => {
+  const objects = (v, out = new Set()) => {
+    if (v !== null && typeof v === 'object') { out.add(v); for (const k in v) objects(v[k], out); }
+    return out;
+  };
+  const ids = DECKS.map(d => d.id);
+  for (let g = 0; g < 10; g++) {
+    const s = createGame({ decks: [deckList(ids[g]), deckList(ids[(g + 3) % 10])], seed: g, firstPlayer: g % 2 });
+    while (!s.over) {
+      s.log.length = 0;
+      s.events.length = 0;
+      const copy = cloneState(s);
+      assert.deepEqual({ ...copy, rng: s.rng }, s);
+      const real = objects(s);
+      for (const o of objects(copy)) assert.ok(!real.has(o), 'a clone shares a nested array or object with the real state');
+      ok(applyAction(s, chooseAction(s)));
+    }
+  }
+});
 
 test('every deck has exactly 40 unique, valid cards', () => {
   assert.equal(DECKS.length, 10);
@@ -210,15 +252,27 @@ test('legal actions offer a boosted and a plain play only when the Boost is affo
   assert.equal(canBoost(s, 0, card), true);
 });
 
-test('XP levels a monster up after three surviving attacks', () => {
+test('Battle Training grants another +2/+2 every three surviving attacks', () => {
   const s = setup();
-  const knight = ready(placeMonster(s, 0, 'RPG_M09_QuestingKnight')); // 4/3 XP
-  for (let i = 0; i < 3; i++) {
+  const knight = ready(placeMonster(s, 0, 'RPG_M09_QuestingKnight')); // 4/3 Battle Training
+  for (let i = 1; i <= 6; i++) {
     knight.attacks = 0;
     ok(applyAction(s, { type: 'attack', uid: knight.uid, target: 'P1' }));
+    assert.equal(knight.xp, i);
+    assert.equal(getAttack(s, knight), 4 + 2 * Math.floor(i / 3));
+    assert.equal(getHealth(knight), 3 + 2 * Math.floor(i / 3));
   }
-  assert.equal(knight.xp, 3);
-  assert.equal(getAttack(s, knight), 6);
+});
+
+test('XP spells carry excess progress into the next level on an untrained monster', () => {
+  const s = setup();
+  const monster = placeMonster(s, 0, 'CCG_M03_MonsterCard');
+  const baseAttack = getAttack(s, monster);
+  for (const bonus of [0, 2, 4]) {
+    const spell = giveCard(s, 0, 'RPG_S01_GainXP');
+    ok(applyAction(s, { type: 'play', uid: spell.uid, target: monster.uid }));
+    assert.equal(getAttack(s, monster), baseAttack + bonus);
+  }
 });
 
 test('Suppress stops attacks through the controller\'s next turn', () => {

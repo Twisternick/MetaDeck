@@ -36,6 +36,9 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 const portArg = process.env.PORT || process.argv[2];
 const port = portArg !== undefined && /^\d+$/.test(portArg) ? Number(portArg) : 5173; // 0 picks a free port (the tests)
 const trustProxy = process.env.TRUST_PROXY === '1';
+// The site's public address (e.g. https://play.example.com), when set: link previews need absolute URLs,
+// so index.html's share image gets it prefixed and an og:url is added.
+const publicUrl = (process.env.PUBLIC_URL ?? '').replace(/\/+$/, '');
 const types = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.ttf': 'font/ttf', '.svg': 'image/svg+xml',
@@ -43,8 +46,11 @@ const types = {
   '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg',
 };
 // The only paths the game loads, plus the privacy and terms pages. Everything else in web/ (the server,
-// tools, tests, reports) stays private.
-const PUBLIC = [/^\/index\.html$/, /^\/checkout\.html$/, /^\/styles\.css$/, /^\/src\//, /^\/assets\//, /^\/legal\/[a-z-]+\.(html|css)$/];
+// tools, tests, reports) stays private. In assets/audio only the game's own sound slots are served
+// (click.mp3, play-RPG.mp3, …): the sound libraries they were cut from may sit in subfolders there, and
+// their licences forbid handing out the original files.
+const PUBLIC = [/^\/index\.html$/, /^\/checkout\.html$/, /^\/styles\.css$/, /^\/src\//, /^\/assets\/(?!audio\/)/,
+  /^\/assets\/audio\/[A-Za-z0-9-]+\.(mp3|ogg)$/, /^\/legal\/[a-z-]+\.(html|css)$/];
 
 const dataDir = path.resolve(process.env.DATA_DIR || path.join(root, 'data'));
 fs.mkdirSync(dataDir, { recursive: true });
@@ -56,13 +62,20 @@ process.on('uncaughtException', err => {
   process.exit(1);
 });
 process.on('unhandledRejection', err => console.error('unhandled rejection:', err));
-// A live database in a synced folder risks corruption, and sends password hashes to the cloud.
-if (/onedrive|dropbox|google drive|icloud/i.test(dataDir)) {
+// A live database in a synced folder risks corruption, and sends password hashes to the cloud. Compared
+// with the folders Windows says OneDrive syncs (a path merely containing the word isn't one), plus the
+// usual Dropbox, Google Drive and iCloud folder names.
+const syncedRoots = [process.env.OneDrive, process.env.OneDriveConsumer, process.env.OneDriveCommercial]
+  .filter(Boolean).map(p => path.resolve(p).toLowerCase() + path.sep);
+const synced = syncedRoots.some(r => (dataDir.toLowerCase() + path.sep).startsWith(r))
+  || /[\\/](dropbox|google drive|icloud ?drive)[\\/]/i.test(dataDir + path.sep);
+if (synced) {
   console.warn(`Warning: the data folder ${dataDir} is inside a synced folder. Set DATA_DIR to a folder outside it (see HOSTING.md).`);
 }
 
 loadBlockedNames(path.join(dataDir, 'blocked-names.txt'));
-const accounts = accountsIn(dataDir);
+// FOUNDER_SLOTS: how many first sign-ups become Meta Founders (default 100; 0 turns it off).
+const accounts = accountsIn(dataDir, process.env.FOUNDER_SLOTS !== undefined ? { founderSlots: Math.max(0, Number(process.env.FOUNDER_SLOTS) || 0) } : {});
 const social = createSocial({ accounts });
 const payments = createPayments({ accounts, config: loadPaddleConfig(path.join(dataDir, 'paddle.json')) });
 if (payments.enabled) console.log(`Gem purchases are on (Paddle ${payments.publicConfig().sandbox ? 'sandbox' : 'live'}).`);
@@ -233,7 +246,16 @@ function serveStatic(req, res) {
       'Cache-Control': media ? 'public, max-age=86400, stale-while-revalidate=604800' : 'no-cache',
     };
     if (req.headers['if-none-match'] === etag) { res.writeHead(304, headers).end(); return; }
-    res.writeHead(200, { ...headers, 'Content-Type': types[path.extname(file)] ?? 'application/octet-stream', 'Content-Length': stat.size });
+    const type = types[path.extname(file)] ?? 'application/octet-stream';
+    if (urlPath === '/index.html' && publicUrl) {
+      const page = Buffer.from(fs.readFileSync(file, 'utf8')
+        .replaceAll('content="assets/', `content="${publicUrl}/assets/`)
+        .replace('<meta property="og:type"', `<meta property="og:url" content="${publicUrl}/">\n  <meta property="og:type"`));
+      res.writeHead(200, { ...headers, 'Content-Type': type, 'Content-Length': page.length });
+      res.end(req.method === 'HEAD' ? undefined : page);
+      return;
+    }
+    res.writeHead(200, { ...headers, 'Content-Type': type, 'Content-Length': stat.size });
     if (req.method === 'HEAD') { res.end(); return; }
     fs.createReadStream(file).on('error', () => res.destroy()).pipe(res);
   });
@@ -275,6 +297,7 @@ function health(res) {
 // Admin, from this machine with the admin token (tools/maintenance.mjs and tools/backup.mjs):
 //   POST /api/admin/maintenance { minutes, exit }   POST /api/admin/backup   POST /api/admin/ping
 //   POST /api/admin/reports { resolved }   resolve { id }   rename { from, to }   ban { name, on }
+//   POST /api/admin/founders   founder { name, on }   resetfounders
 function admin(req, res, route) {
   if (req.method !== 'POST') { res.writeHead(405, { Allow: 'POST' }).end(); return; }
   if (!isAdmin(req)) return json(res, 403, { ok: false, reason: 'Admin only, from this machine.' });
@@ -285,6 +308,9 @@ function admin(req, res, route) {
     if (route === 'resolve') return json(res, 200, { ok: social.resolveReport(body?.id) });
     if (route === 'rename') { const r = accounts.rename(body?.from, body?.to); return json(res, r.ok ? 200 : 400, r); }
     if (route === 'ban') { const r = accounts.setBanned(body?.name, body?.on !== false); return json(res, r.ok ? 200 : 400, r); }
+    if (route === 'founders') return json(res, 200, { ok: true, founders: accounts.founders() });
+    if (route === 'founder') { const r = accounts.setFounder(body?.name, body?.on !== false); return json(res, r.ok ? 200 : 400, r); }
+    if (route === 'resetfounders') return json(res, 200, { ok: true, reset: accounts.resetFounders() });
     if (route === 'backup') {
       if (!backupDir) return json(res, 400, { ok: false, reason: 'Set BACKUP_DIR to turn on backups.' });
       const file = runBackup(true);
@@ -319,6 +345,8 @@ const server = http.createServer((req, res) => {
         return health(res);
       case '/api/version':
         return json(res, 200, { version });
+      case '/api/founders':
+        return json(res, 200, accounts.founderSpots());
       case '/api/shop/config':
         return json(res, 200, { ...payments.publicConfig(), country: country(req) });
       case '/api/shop/checkout':

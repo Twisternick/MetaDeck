@@ -1,2 +1,9 @@
 /data/
 /tools/windows/server-env.cmd
+
+# Sound libraries the game sounds were cut from (large, and not ours to redistribute). Only the
+# named slot files (assets/audio/<slot>.mp3), README.md and CREDITS.md belong in the repo.
+/assets/audio/*/
+/assets/audio/*.pdf
+/assets/audio/*.xlsx
+/assets/audio/Readme.txt

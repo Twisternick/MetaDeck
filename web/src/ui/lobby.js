@@ -112,7 +112,7 @@ export function lobby(root, { deck, onBack, matchExtras = () => ({}), challenge 
     net.inMatch = true;
     buffer = [];
     const online = {
-      seat: msg.seat, state: msg.state, clock: msg.clock, send: net.send,
+      seat: msg.seat, state: msg.state, clock: msg.clock, send: net.send, opponent: msg.opponent,
       subscribe: fn => {
         const queued = buffer ?? [];
         buffer = null;

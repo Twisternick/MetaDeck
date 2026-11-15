@@ -24,6 +24,7 @@ Then open http://localhost:5173. You need Node 20 or newer, and only for the tin
 - **Emotes and reports**: online matches have six preset emotes (no free chat) and a mute button; after a match you can report the opponent (and block them). Account names are checked against a word list at sign-up. `npm run reports` lists reports; `npm run moderate -- resolve <id> | rename <name> <new> | ban <name> | unban <name>` deals with them.
 - **Deck codes**: **Copy code** in the deck builder gives a short code for the list (like `MD1-RPG-ClkGVRhJhkRWZQE`); **Import code** in the menu's deck lists opens one in the builder.
 - **Buying Gems**: with `DATA_DIR/paddle.json` set up (HOSTING.md → Payments), signed-in players 18 and older can buy Gem bundles through Paddle, the merchant of record. Gems are credited only from Paddle's signed webhook; refunds and chargebacks take them back. Account → Purchases lists them. Without the file, the bundles say they're coming soon.
+- **Meta Founders**: the first 100 accounts are numbered founders. They get the title "Meta Founder #n" (shown with their name in matches, on the leaderboard, to friends and on their profile), three founder-only cosmetics (the Founder's Seal card back, the Founders' Hall arena and the Founder Gold card frame, which opponents see too), and 7,000 Gems once they've finished 3 matches. The rules are `FOUNDER` in `src/data/economy.js`; `FOUNDER_SLOTS` changes the count and `npm run moderate -- founders` lists, grants, revokes or resets them.
 - **Watch AI vs AI**: watch two AIs play each other.
 - **Card gallery**: browse all 400 cards. It shows each deck's mana curve and has a "new cards only" filter.
 - **How to play**: the rules and the keyword glossary.
@@ -64,6 +65,7 @@ When the enemy attacks and you have a playable **Quick** card plus unspent Bandw
 | `legal/` | The privacy policy and terms of service. |
 | `server/social.mjs`, `rating.mjs`, `names.mjs`, `src/data/ranked.js` | Friends, blocks, reports, ranked results, the leaderboard and match history; the Glicko-2 rating; the name filter; and the visible rank ladder and seasons. |
 | `src/ui/players.js`, `rank-badge.js`, `report.js`, `src/data/deck-code.js` | The Profile screen (rank, history, leaderboard, friends), the report dialog, and deck codes. |
+| `src/ui/founder.js`, `test/founders.test.mjs` | The Meta Founder badge and welcome, and the founder tests (numbering, cosmetics, Gems after three matches, the admin tools, what opponents see). |
 | `tools/moderate.mjs`, `test/social.test.mjs` | Reports, renames and bans; and the tests for ranked play, friends, blocks, reports, challenges, emotes, moderation and deck codes. |
 | `server/payments.mjs`, `src/ui/payments.js`, `checkout.html`, `test/payments.test.mjs` | Gem purchases through Paddle: the checkout, the signed webhook, refunds and chargebacks; the purchase dialog and the checkout page (the only page that loads a third-party script); and their tests against a fake Paddle. |
 | `test/operations.test.mjs` | The health check, caching and ETags, the admin routes behind a tunnel, analytics, backups and maintenance mode. |

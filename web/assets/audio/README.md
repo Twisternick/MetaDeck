@@ -35,8 +35,9 @@ MP3 plays in every browser. Keep effects short (under a second where possible), 
 |---|---|---|
 | `draw` | You draw a card | Card slide |
 | `pickup` | You pick up a card from your hand | Card lift / paper |
-| `play` | A monster is played (fallback for the per-deck sounds below) | Card slap on a table |
-| `summon` | A monster lands on the board | Thud with a little sparkle |
+| `drop` | You return a dragged card to your hand | Soft paper settle |
+| `play` | A monster card leaves the hand | Card slap on a table |
+| `summon` | Fallback when a monster lands on the board | Short tabletop landing |
 | `spell` | A spell is cast | Magic whoosh |
 | `attack` | A monster attacks | Whoosh / swing |
 | `hit` | A monster takes damage (louder for big hits) | Punchy impact |
@@ -47,28 +48,29 @@ MP3 plays in every browser. Keep effects short (under a second where possible), 
 | `buff` / `debuff` | Stats go up / down, Silence, Suppress | Rising / falling blip |
 | `shield` | Powered Up blocks damage, Checkpoint saves a monster | Shield clang |
 | `keyword` | A keyword triggers | Small sparkle |
-| `fizzle` | A response fizzles | Puff |
+| `fizzle` | An attack fizzles before it resolves | Falling puff |
 | `your-turn` / `enemy-turn` | Turn banner | Bright gong / softer low tone |
-| `alert` | The enemy attacks and you can answer with a Quick card | Attention ping |
+| `alert` | You can answer an attack, or receive a lobby invite | Double attention ping |
 | `tick` | The last 10 seconds of your online turn | Clock tick |
 | `victory` / `defeat` | Game over | Fanfare (2–4 s) / sad sting |
+| `tie` | Match ends in a draw | Neutral open fifth |
 
-### One play sound per deck (optional, high payoff)
+### Monster summon sounds by deck
 
-Each one falls back to `play` when it's missing. These sell the "every deck is a genre" idea cheaply.
+Every monster entering the board uses its summoning player’s deck cue, including tokens and monsters brought back by an effect. Missing cues fall back to `summon`.
 
 | Slot | Idea |
 |---|---|
-| `play-FPS` | Gun cock / slide rack |
-| `play-Horror` | Creepy sting or creak |
-| `play-Platformer` | 8-bit jump or coin blip |
-| `play-RPG` | Sword unsheathe or menu chime |
-| `play-Racing` | Engine rev |
-| `play-Fighting` | Punch with a crowd "ooh" |
-| `play-Sports` | Whistle or crowd cheer |
-| `play-Strategy` | War drum or horn |
-| `play-CityBuilder` | Construction clank or cash register |
-| `play-CardGame` | Card riffle shuffle |
+| `summon-FPS` | Gun cock / slide rack |
+| `summon-Horror` | Creepy sting or creak |
+| `summon-Platformer` | 8-bit jump or coin blip |
+| `summon-RPG` | Sword unsheathe or menu chime |
+| `summon-Racing` | Engine rev |
+| `summon-Fighting` | Punch with a crowd "ooh" |
+| `summon-Sports` | Whistle or crowd cheer |
+| `summon-Strategy` | Marching drums |
+| `summon-CityBuilder` | Construction clank or cash register |
+| `summon-CardGame` | Card riffle shuffle |
 
 ### Packs
 

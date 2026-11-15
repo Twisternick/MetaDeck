@@ -47,6 +47,6 @@ export default {
     S('RPG_S08_ReviveAlly', 'Revive Ally', 4, [fx('Revive')]),
     S('RPG_S09_LootDrop', 'Loot Drop', 4, [fx('Draw', 3)]),
     S('RPG_S12_Fireball', 'Fireball', 4, [fx('DealDamage', 5, 'EnemyCharacter')], NEW),
-    S('RPG_S10_FinalBossRaid', 'Final Boss Raid', 5, [fx('DealDamage', 6, 'EnemyMonster'), fx('GainXP', 1, 'AllFriendlyMonsters')]),
+    S('RPG_S10_FinalBossRaid', 'Final Boss Raid', 6, [fx('DealDamage', 3, 'AllEnemyMonsters'), fx('GainXP', 1, 'AllFriendlyMonsters')]),
   ],
 };

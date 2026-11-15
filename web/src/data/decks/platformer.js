@@ -38,7 +38,7 @@ export default {
     S('PLA_S04_Checkpoint', 'Checkpoint', 2, [fx('GrantKeyword', 0, 'FriendlyMonster', { keyword: 'Checkpoint' })]),
     S('PLA_S07_Springboard', 'Springboard', 1, [fx('BuffAttackThisTurn', 2, 'FriendlyMonster'), fx('GrantKeywordThisTurn', 0, 'FriendlyMonster', { keyword: 'DoubleJump' })]),
     S('PLA_S03_PowerUpMushroom', 'Power-Up Mushroom', 3, [fx('Buff', 1, 'FriendlyMonster'), fx('GrantKeyword', 0, 'FriendlyMonster', { keyword: 'PoweredUp' })]),
-    S('PLA_S06_WarpPipe', 'Warp Pipe', 3, [fx('Bounce', 0, 'AnyMonster')]),
+    S('PLA_S06_WarpPipe', 'Warp Pipe', 4, [fx('Bounce', 0, 'SmallEnemyAttackers')]),
     S('PLA_S08_InvincibilityStar', 'Invincibility Star', 2, [fx('GrantKeyword', 0, 'FriendlyMonster', { keyword: 'PoweredUp' })], QUICK),
     S('PLA_S13_CoinTrail', 'Coin Trail', 2, [fx('Buff', 1, 'FriendlyMonster'), fx('Draw', 1)], NEW),
     S('PLA_S14_HeadStomp', 'Head Stomp', 2, [fx('DealDamage', 2, 'EnemyMonster')], NEW),

@@ -83,9 +83,10 @@ test('every deck has its own card back and arena', () => {
   for (const c of COSMETICS.filter(c => c.deck)) assert.ok(DECKS.some(d => d.id === c.deck), `${c.id}: ${c.deck} is a deck`);
 });
 
-test('every card back and arena for sale or on the season track has an art slot with its own prompt', () => {
+test('every card back and arena for sale, on the season track or for founders has an art slot with its own prompt', () => {
   const slots = allSlots();
-  for (const c of COSMETICS.filter(c => !c.default)) {
+  // Card frames are CSS only: no art.
+  for (const c of COSMETICS.filter(c => !c.default && c.kind !== 'frame')) {
     const [kind, name] = c.id.split(':');
     const s = slots.find(s => s.key === `ui/${kind}-${name}`);
     assert.ok(s, c.id);

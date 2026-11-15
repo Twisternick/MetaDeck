@@ -46,7 +46,7 @@ export default {
     S('STR_S06_MobilizeArmy', 'Mobilize Army', 3, [fx('SummonToken', 2, 'None', { token: 'token_soldier' })]),
     S('STR_S08_UpgradeTree', 'Upgrade Tree', 4, [fx('Buff', 1, 'AllFriendlyMonsters'), fx('Draw', 1)]),
     S('STR_S09_EconomicBoom', 'Economic Boom', 3, [fx('GainMaxBandwidth', 2)]),
-    S('STR_S13_Ambush', 'Ambush', 3, [fx('DealDamage', 3, 'EnemyMonster')], QUICK_NEW),
+    S('STR_S13_Ambush', 'Ambush', 4, [fx('DealDamage', 3, 'EnemyMonster'), fx('DealDamage', 1, 'AllEnemyMonsters', { cond: 'ControlsStructure' })], QUICK_NEW),
     S('STR_S14_FortressWalls', 'Fortress Walls', 3, [fx('SummonToken', 2, 'None', { token: 'token_barricade' }), fx('Draw', 1)], NEW),
     S('STR_S12_ScorchedEarth', 'Scorched Earth', 4, [fx('DealDamage', 2, 'AllEnemyMonsters')], NEW),
     S('STR_S15_GrandStrategy', 'Grand Strategy', 4, [fx('GainMaxBandwidth', 1), fx('Draw', 2)], NEW),

@@ -28,7 +28,8 @@ export function tutorial(root, { onExit }) {
       sfx('unlock', { volume: 0.5 });
     }
   };
-  const ready = s => started && (!STEPS[step]?.when || STEPS[step].when(s));
+  // A started step held back by `when` (the game hasn't reached it: the enemy is still moving).
+  const held = s => started && !!STEPS[step]?.when && !STEPS[step].when(s);
 
   const script = {
     setup(s) { s.players[AI].hp = ENEMY_HP; },
@@ -46,7 +47,7 @@ export function tutorial(root, { onExit }) {
       if (s.over) return;
       const st = STEPS[step];
       if (!st) return;
-      const waiting = !ready(s);
+      const waiting = held(s);
       if (!waiting) {
         for (const t of st.glow?.(s) ?? []) {
           const el = !t ? null
@@ -95,12 +96,17 @@ const seen = () => storage.get(PREFS, { tutorial: false, tips: [] });
 export const tutorialSeen = () => seen().tutorial;
 export const dismissTutorial = () => markSeen();
 function markSeen() { storage.set(PREFS, { ...seen(), tutorial: true }); }
-export function resetOnboarding() { storage.set(PREFS, { tutorial: false, tips: [] }); }
+export const tipsEnabled = () => seen().tipsEnabled !== false;
+export function setTipsEnabled(enabled) {
+  storage.set(PREFS, { ...seen(), tipsEnabled: enabled });
+  if (!enabled) document.querySelector('.tip-card')?.remove();
+}
+export function resetTips() { storage.set(PREFS, { ...seen(), tips: [], tipsEnabled: true }); }
 
 // One-time tips: shown the first time `key` comes up in this browser, then never again.
 export function tip(key, text) {
   const s = seen();
-  if (s.tips.includes(key)) return;
+  if (s.tipsEnabled === false || s.tips.includes(key)) return;
   storage.set(PREFS, { ...s, tips: [...s.tips, key] });
   document.querySelector('.tip-card')?.remove();
   const card = h('div', { class: 'tip-card', role: 'status' },

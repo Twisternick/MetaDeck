@@ -46,7 +46,7 @@ export default {
     S('HOR_S09_GraveCall', 'Grave Call', 3, [fx('Revive')]),
     S('HOR_S14_SummoningCircle', 'Summoning Circle', 2, [fx('SummonToken', 3, 'None', { token: 'token_ghoul' })], NEW),
     S('HOR_S12_LightsOut', 'Lights Out', 4, [fx('DealDamage', 1, 'AllEnemyMonsters'), fx('GrantKeyword', 0, 'AllFriendlyMonsters', { keyword: 'Fear' })], NEW),
-    S('HOR_S15_FinalGirl', 'Final Girl', 4, [fx('DealDamage', 3, 'EnemyMonster'), fx('Heal', 4, 'FriendlyPlayer')], NEW),
+    S('HOR_S15_FinalGirl', 'Final Girl', 5, [fx('Destroy', 0, 'AllDamagedMonsters'), fx('Heal', 4, 'FriendlyPlayer')], NEW),
     S('HOR_S10_NightFalls', 'Night Falls', 5, [fx('DealDamage', 2, 'AllEnemyMonsters'), fx('DealDamage', 3, 'EnemyPlayer')]),
   ],
 };

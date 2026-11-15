@@ -2,14 +2,14 @@
 // face-down cards deal out glowing in their rarity colour, and each flips when clicked (Legendaries
 // with confetti). Also the game-over rewards summary and a small reward toast.
 
-import { h, delay } from './dom.js';
+import { h, delay, rectOf } from './dom.js';
 import { renderCard, renderCardBack } from './card-view.js';
 import { motionOK, confetti, sparkle, screenShake, removeFx, deckEmblem, currency } from './fx.js';
 import { profile, act } from './profile.js';
 import { track } from './telemetry.js';
 import { rankBadge } from './rank-badge.js';
 import { sfx } from './audio.js';
-import { rewardLabel, RARITY, RARITY_ORDER, dustValue, archLevel, ARCH_LEVEL_XP, TIER_XP, seasonTier } from '../data/economy.js';
+import { rewardLabel, RARITY, RARITY_ORDER, dustValue, archLevel, ARCH_LEVEL_XP, TIER_XP, seasonTier, loadoutFor } from '../data/economy.js';
 import { CARDS, DECKS } from '../data/index.js';
 
 const RARITY_COLORS = { common: '#c9d1e8', rare: '#38bdf8', epic: '#c084fc', legendary: '#ffb020' };
@@ -52,8 +52,8 @@ export function openPacks(kind, onClose = () => {}) {
     const left = profile().packs[kind] ?? 0;
     if (left < 2) return [];
     return [
-      left > BULK ? h('button', { class: `btn ${cls}`, onclick: () => ripMany(BULK) }, `Open ${BULK}`) : null,
-      h('button', { class: `btn ${cls}`, onclick: () => ripMany(left) }, `Open all (${left})`),
+      left > BULK ? h('button', { class: `btn ${cls}`, 'data-own-click-sound': true, onclick: () => ripMany(BULK) }, `Open ${BULK}`) : null,
+      h('button', { class: `btn ${cls}`, 'data-own-click-sound': true, onclick: () => ripMany(left) }, `Open all (${left})`),
     ].filter(Boolean);
   }
 
@@ -62,7 +62,7 @@ export function openPacks(kind, onClose = () => {}) {
     const pack = packArt(kind, 'big idle');
     stage.replaceChildren(
       h('div', { class: 'pack-left' }, `${left} ${left === 1 ? 'pack' : 'packs'} to open`),
-      h('button', { class: 'pack-button', onclick: () => rip(pack), 'aria-label': `Open ${packName(kind)}` }, pack),
+      h('button', { class: 'pack-button', 'data-own-click-sound': true, onclick: () => rip(pack), 'aria-label': `Open ${packName(kind)}` }, pack),
       h('p', { class: 'pack-hint' }, 'Click the pack to open it'),
       h('div', { class: 'pack-actions' }, bulkButtons()));
   }
@@ -72,7 +72,7 @@ export function openPacks(kind, onClose = () => {}) {
     if (!motionOK()) return;
     await delay(650);
     screenShake(stage, 1.2);
-    sparkle(pack.getBoundingClientRect(), packDeck(kind)?.color ?? '#a78bfa', 30);
+    sparkle(rectOf(pack), packDeck(kind)?.color ?? '#a78bfa', 30);
   }
 
   async function rip(pack) {
@@ -107,10 +107,24 @@ export function openPacks(kind, onClose = () => {}) {
     summary(res.packs);
   }
 
+  function revealSound(rarity, shiny) {
+    sfx('flip');
+    if (rarity !== 'common') sfx(`reveal-${rarity}`, { delay: 80 });
+    if (shiny) sfx('shine', { delay: 180, volume: rarity === 'common' ? 1 : 0.55 });
+  }
+
+  function flipRemaining(slots, pulls) {
+    const pending = pulls.filter((_, i) => !slots[i].classList.contains('flipped'));
+    if (!pending.length) return;
+    const best = RARITY_ORDER.findLast(r => pending.some(c => c.rarity === r));
+    revealSound(best, pending.some(c => c.holo || c.premium));
+    slots.forEach(s => s.flip(false));
+  }
+
   function pullSlot(c, i, back, onFlip) {
     const def = CARDS[c.id];
     const el = h('div', {
-      class: `pull rarity-${c.rarity}${c.holo ? ' is-holo' : c.premium ? ' is-premium' : ''}`, role: 'button', tabindex: '0',
+      class: `pull rarity-${c.rarity}${c.holo ? ' is-holo' : c.premium ? ' is-premium' : ''}`, role: 'button', tabindex: '0', 'data-own-click-sound': true,
       style: { '--i': i, '--glow': rarityColor(c.rarity) }, 'aria-label': `Face-down ${RARITY[c.rarity].name} card`,
     },
       h('div', { class: 'pull-inner' },
@@ -119,14 +133,12 @@ export function openPacks(kind, onClose = () => {}) {
       h('div', { class: 'pull-tag' },
         c.count > 1 ? `×${c.count}${c.fresh ? ' · New!' : ''}`
           : c.dust ? (c.count ? `+${c.dust} Dust` : `Extra copy → ${c.dust} Dust`) : c.holo ? 'Hologram!' : c.fresh ? 'New!' : c.premium ? 'Premium!' : RARITY[c.rarity].name));
-    const flip = () => {
+    const flip = (audible = true) => {
       if (el.classList.contains('flipped')) return;
       el.classList.add('flipped');
-      sfx('flip');
-      if (c.holo || c.premium) sfx('shine', { delay: 120 });
-      if (c.rarity !== 'common') sfx(`reveal-${c.rarity}`, { delay: 80 });
+      if (audible) revealSound(c.rarity, c.holo || c.premium);
       el.setAttribute('aria-label', `${def.displayName}, ${RARITY[c.rarity].name}${c.holo ? ', hologram' : c.premium ? ', premium' : ''}`);
-      const r = el.getBoundingClientRect();
+      const r = rectOf(el);
       if (motionOK()) {
         if (c.holo) { confetti(['#5ef0ff', '#ff5ee8', '#ffffff', '#b8fff7'], 140); screenShake(stage, 2); }
         else if (c.rarity === 'legendary' || c.premium) { confetti([rarityColor(c.rarity), '#ffffff', '#ffe08a', '#f472b6'], 90); screenShake(stage, 1); }
@@ -134,17 +146,17 @@ export function openPacks(kind, onClose = () => {}) {
       }
       onFlip();
     };
-    el.addEventListener('click', flip);
+    el.addEventListener('click', () => flip());
     el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } });
     el.flip = flip;
     return el;
   }
 
   function reveal(pulls) {
-    const back = profile().cosmetics.back;
+    const back = loadoutFor(profile(), kind === 'any' ? null : kind).back; // a deck's pack shows that deck's back
     let flipped = 0;
     const doneBtn = h('button', { class: 'btn primary', hidden: true }, 'Done');
-    const allBtn = h('button', { class: 'btn ghost', onclick: () => slots.forEach(s => s.flip()) }, 'Reveal all');
+    const allBtn = h('button', { class: 'btn ghost', 'data-own-click-sound': true, onclick: () => flipRemaining(slots, pulls) }, 'Reveal all');
     const actions = h('div', { class: 'pack-actions' }, allBtn, doneBtn);
     const slots = pulls.map((c, i) => pullSlot(c, i, back, () => { if (++flipped === pulls.length) finish(); }));
     const finish = () => {
@@ -181,13 +193,17 @@ export function openPacks(kind, onClose = () => {}) {
     if (!highlights.length) highlights = groups;
     highlights = highlights.slice(0, HIGHLIGHTS);
 
-    const back = profile().cosmetics.back;
+    const back = loadoutFor(profile(), kind === 'any' ? null : kind).back; // a deck's pack shows that deck's back
     const slots = highlights.map((g, i) => pullSlot(g, i, back, () => {}));
     // Flip the highlights in order, best last, once they have dealt out.
     const order = [...slots].reverse();
     let cancelled = false;
     (async () => {
       await delay(motionOK() ? 600 + slots.length * 110 : 0);
+      if (!motionOK()) {
+        if (!cancelled && !leaving && slots[0]?.isConnected) flipRemaining(slots, highlights);
+        return;
+      }
       for (const s of order) {
         if (cancelled || leaving || !s.isConnected) return;
         s.flip();
@@ -218,7 +234,7 @@ export function openPacks(kind, onClose = () => {}) {
           h('summary', null, `Every card pulled (${groups.length} different)`),
           h('div', { class: 'sum-chips' }, groups.map(g => cardChip(g))))),
       h('div', { class: 'pack-actions' },
-        h('button', { class: 'btn ghost', onclick: () => { cancelled = true; slots.forEach(s => s.flip()); } }, 'Reveal all'),
+        h('button', { class: 'btn ghost', 'data-own-click-sound': true, onclick: () => { cancelled = true; flipRemaining(slots, highlights); } }, 'Reveal all'),
         bulkButtons(),
         h('button', { class: 'btn primary', onclick: () => { cancelled = true; left ? showPack() : close(); } }, left ? `Back to packs (${left} left)` : 'Done')));
   }
@@ -232,10 +248,8 @@ const cardChip = g => h('span', { class: `sum-chip${g.fresh ? ' fresh' : ''}`, s
 
 // Game-over rewards: the rank change after a ranked match, Gold, season XP, quests finished and
 // archetype level-ups. `ranked` is { change, before, after } from the server, or null.
-export function rewardsPanel(out, deckId, ranked = null) {
+export function rewardsPanel(out, deckId, ranked = null, soundDelay = 0) {
   const p = profile();
-  sfx(out?.levelUps?.length ? 'unlock' : 'reward', { delay: 300 });
-  if (out?.gold) sfx('coin', { delay: 700 });
   const deck = DECKS.find(d => d.id === deckId);
   const a = p.arch[deckId] ?? { xp: 0 };
   const lv = archLevel(a.xp);
@@ -246,12 +260,13 @@ export function rewardsPanel(out, deckId, ranked = null) {
     h('span', null, ranked.change > 0 ? `+${ranked.change} star${ranked.change > 1 ? 's' : ''}${ranked.change > 1 ? ' (win streak!)' : ''}`
       : ranked.change < 0 ? '−1 star' : ranked.after.stars === ranked.before.stars && ranked.after.games > ranked.before.games && ranked.after.wins === ranked.before.wins ? 'Tier protected: no star lost' : 'No change'),
     ranked.after.tier !== ranked.before.tier ? h('b', { class: 'rank-up' }, ranked.after.stars > ranked.before.stars ? `Promoted to ${ranked.after.tier}!` : '') : null) : null;
-  return h('div', { class: 'rewards' },
+  const panel = h('div', { class: 'rewards' },
     rankLine,
     h('div', { class: 'reward-row' },
       out.gold ? h('span', { class: 'reward-pill gold' }, currency('gold'), ` +${out.gold}`) : null,
       h('span', { class: 'reward-pill xp' }, `⭐ +${out.xp} season XP`),
-      out.firstWin ? h('span', { class: 'reward-pill hot' }, 'First win of the day!') : null),
+      out.firstWin ? h('span', { class: 'reward-pill hot' }, 'First win of the day!') : null,
+      out.founderGems ? h('span', { class: 'reward-pill hot' }, currency('gems'), ` +${out.founderGems.toLocaleString()} Meta Founder Gems!`) : null),
     out.quests.map(q => h('div', { class: 'reward-quest' }, h('b', null, '✔ Quest complete: '), q.text, ` · +${q.gold} Gold`)),
     h('div', { class: 'reward-bars' },
       h('div', { class: 'reward-bar', style: { '--deck': deck.color } },
@@ -262,10 +277,17 @@ export function rewardsPanel(out, deckId, ranked = null) {
         h('div', { class: 'meter' }, h('i', { style: { '--pct': `${(tierInto / TIER_XP) * 100}%` } })))),
     out.levelUps.map(l => h('div', { class: 'reward-level' },
       h('b', null, `Level ${l.level}!`), ' ', l.rewards.map(rewardLabel).join(' · '))));
+  setTimeout(() => {
+    if (!panel.isConnected) return;
+    sfx(out.levelUps.length ? 'unlock' : 'reward', { volume: 0.75 });
+    if (out.gold) sfx('coin', { delay: 400 });
+  }, soundDelay);
+  return panel;
 }
 
 // A brief toast in the corner, for claims and purchases.
 export function toast(text, cls = '') {
+  if (cls === 'bad') sfx('error');
   const el = h('div', { class: `eco-toast ${cls}`, role: 'status' }, text);
   document.body.append(el);
   setTimeout(() => el.classList.add('out'), 2200);

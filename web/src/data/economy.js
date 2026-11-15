@@ -59,7 +59,8 @@ export const seasonName = key => {
 // ---------------------------------------------------------------- cosmetics
 
 // `gems` is the shop price; `season` is where the track gives it ({ track, tier }). Defaults cost nothing.
-// `deck` marks a genre's own back and arena: every deck has exactly one of each.
+// `deck` marks a genre's own back and arena: every deck has exactly one of each. `founder` items are only
+// ever given to Meta Founders (FOUNDER below) and never sold. A frame dresses the player's own cards.
 export const COSMETICS = [
   { id: 'back:classic', kind: 'back', name: 'Classic', blurb: 'The standard MetaDeck back.', default: true },
   { id: 'back:neon-grid', kind: 'back', name: 'Neon Grid', blurb: 'A scrolling synth grid.', gems: 300 },
@@ -93,9 +94,42 @@ export const COSMETICS = [
   { id: 'arena:war-table', kind: 'arena', name: 'War Table', blurb: 'A campaign map under drifting fog of war.', gems: 600, deck: 'Strategy' },
   { id: 'arena:model-city', kind: 'arena', name: 'Model City', blurb: 'A tiny town lighting up at dusk.', gems: 600, deck: 'CityBuilder' },
   { id: 'arena:card-table', kind: 'arena', name: 'Card Table', blurb: 'Tournament felt, deck boxes and dice.', gems: 600, deck: 'CardGame' },
+  { id: 'frame:standard', kind: 'frame', name: 'Standard Frame', blurb: 'Your cards in their deck’s colours.', default: true },
+  // Meta Founders only.
+  { id: 'back:founder', kind: 'back', name: 'Founder’s Seal', blurb: 'A gold founding crest. Only the first players ever have this.', founder: true },
+  { id: 'arena:founders-hall', kind: 'arena', name: 'Founders’ Hall', blurb: 'A gilded hall lit for the first players.', founder: true },
+  { id: 'frame:founder', kind: 'frame', name: 'Founder Gold', blurb: 'A gleaming gold frame on every card you play, for everyone to see.', founder: true },
 ];
 export const cosmetic = id => COSMETICS.find(c => c.id === id);
 export const ownsCosmetic = (p, id) => !!cosmetic(id)?.default || p.cosmetics.owned.includes(id);
+
+// ---------------------------------------------------------------- Meta Founders
+// The first FOUNDER.slots accounts are Meta Founders, numbered in sign-up order (the server assigns the
+// number: server/accounts.mjs). They get the title "Meta Founder #n", the founder-only back, arena and card
+// frame straight away, and FOUNDER.gems Gems once they've finished FOUNDER.gemsAfterGames matches (so a
+// throwaway account can't just collect them).
+export const FOUNDER = { slots: 100, gems: 7000, gemsAfterGames: 3, title: 'Meta Founder' };
+export const FOUNDER_COSMETICS = COSMETICS.filter(c => c.founder).map(c => c.id);
+export const founderTitle = n => (Number.isInteger(n) && n > 0 ? `${FOUNDER.title} #${n}` : null);
+
+// Make a profile founder number `n`. Returns false if it already is one.
+export function makeFounder(p, n) {
+  if (p.founder) return false;
+  p.founder = n;
+  p.founderGems = 'pending';
+  for (const id of FOUNDER_COSMETICS) if (!p.cosmetics.owned.includes(id)) p.cosmetics.owned.push(id);
+  return true;
+}
+// Take founder status away (an account that shouldn't have it). Gems already paid stay.
+export function unmakeFounder(p) {
+  if (!p.founder) return false;
+  p.founder = null;
+  if (p.founderGems === 'pending') p.founderGems = null;
+  p.cosmetics.owned = p.cosmetics.owned.filter(id => !FOUNDER_COSMETICS.includes(id));
+  for (const c of COSMETICS) if (c.default && !ownsCosmetic(p, p.cosmetics[c.kind])) p.cosmetics[c.kind] = c.id;
+  tidyLoadouts(p);
+  return true;
+}
 
 // ---------------------------------------------------------------- profile
 
@@ -115,11 +149,13 @@ export function newProfile(now = new Date()) {
     quests: [], questDay: null, rerollDay: null,
     daily: { day: null, firstWin: false, winGold: 0 },
     season: { id: seasonKey(now), xp: 0, premium: false, claimed: { free: [], premium: [] } },
-    cosmetics: { owned: [], back: 'back:classic', arena: 'arena:standard', premiumArt: true },
+    cosmetics: { owned: [], back: 'back:classic', arena: 'arena:standard', frame: 'frame:standard', perDeck: {}, premiumArt: true },
     stats: { games: 0, wins: 0 },
     tutorial: false, // finished the tutorial (and got its pack)
     purchases: [],
     gemDebt: 0, // Gems a refund took back after they were spent (blocks Gem spending until repaid)
+    founder: null,     // Meta Founder number (1..FOUNDER.slots), or null
+    founderGems: null, // 'pending' until the founder Gems are paid, then 'paid'
     createdAt: now.toISOString(),
   };
   refreshDaily(p, now, () => 0.5, 3);
@@ -134,6 +170,8 @@ export function normalizeProfile(raw, now = new Date(), rng = Math.random) {
   p.gold = num(p.gold); p.gems = num(p.gems); p.dust = num(p.dust); p.pity = num(p.pity);
   p.tutorial = raw.tutorial === true;
   p.gemDebt = num(raw.gemDebt);
+  p.founder = Number.isInteger(raw.founder) && raw.founder > 0 ? raw.founder : null;
+  p.founderGems = raw.founderGems === 'pending' || raw.founderGems === 'paid' ? raw.founderGems : null;
   const cards = {};
   for (const [id, c] of Object.entries(raw.cards ?? {})) {
     if (!CARDS[id]?.deckId) continue;
@@ -150,6 +188,8 @@ export function normalizeProfile(raw, now = new Date(), rng = Math.random) {
   p.cosmetics.owned = (p.cosmetics.owned ?? []).filter(id => cosmetic(id));
   if (!ownsCosmetic(p, p.cosmetics.back)) p.cosmetics.back = 'back:classic';
   if (!ownsCosmetic(p, p.cosmetics.arena)) p.cosmetics.arena = 'arena:standard';
+  if (!ownsCosmetic(p, p.cosmetics.frame)) p.cosmetics.frame = 'frame:standard';
+  tidyLoadouts(p);
   if (p.season?.id !== seasonKey(now)) p.season = { id: seasonKey(now), xp: 0, premium: false, claimed: { free: [], premium: [] } };
   refreshDaily(p, now, rng);
   return p;
@@ -322,11 +362,49 @@ export function buyCosmetic(p, id) {
   return { ok: true, price: c.gems };
 }
 
-export function equipCosmetic(p, id) {
+// ---------------------------------------------------------------- loadouts
+// What a player plays with: a card back, an arena and a card frame. `p.cosmetics.back/arena/frame` are the
+// defaults; `p.cosmetics.perDeck[deckId]` can override any of them for one archetype (Racing on the
+// Chequered Flag back and Night Circuit arena, say). A kind a deck doesn't override uses the default.
+export const LOADOUT_KINDS = ['back', 'arena', 'frame'];
+
+// The back, arena and frame for playing `deckId` (or the defaults, without one).
+export function loadoutFor(p, deckId = null) {
+  const own = (deckId && p.cosmetics.perDeck?.[deckId]) || {};
+  return Object.fromEntries(LOADOUT_KINDS.map(k => [k, own[k] && ownsCosmetic(p, own[k]) ? own[k] : p.cosmetics[k]]));
+}
+
+// Equip a cosmetic as the default, or (with `deckId`) only for that archetype.
+export function equipCosmetic(p, id, deckId = null) {
   const c = cosmetic(id);
   if (!c || !ownsCosmetic(p, id)) return false;
-  p.cosmetics[c.kind] = id;
+  if (deckId) {
+    if (!DECKS.some(d => d.id === deckId) || !LOADOUT_KINDS.includes(c.kind)) return false;
+    ((p.cosmetics.perDeck ??= {})[deckId] ??= {})[c.kind] = id;
+  } else {
+    p.cosmetics[c.kind] = id;
+  }
   return true;
+}
+
+// Make an archetype use the default `kind` again.
+export function clearDeckCosmetic(p, kind, deckId) {
+  const own = p.cosmetics.perDeck?.[deckId];
+  if (!own?.[kind]) return false;
+  delete own[kind];
+  if (!Object.keys(own).length) delete p.cosmetics.perDeck[deckId];
+  return true;
+}
+
+// Drop overrides for unknown decks, kinds or cosmetics the player no longer owns.
+function tidyLoadouts(p) {
+  const out = {};
+  for (const [deckId, own] of Object.entries(p.cosmetics.perDeck ?? {})) {
+    if (!DECKS.some(d => d.id === deckId) || !own || typeof own !== 'object') continue;
+    const keep = Object.fromEntries(LOADOUT_KINDS.filter(k => typeof own[k] === 'string' && cosmetic(own[k])?.kind === k && ownsCosmetic(p, own[k])).map(k => [k, own[k]]));
+    if (Object.keys(keep).length) out[deckId] = keep;
+  }
+  p.cosmetics.perDeck = out;
 }
 
 export function buySeasonPass(p) {
@@ -549,6 +627,13 @@ export function recordMatch(p, { deckId, won, damage = 0, online = false }, now 
   p.season.xp += out.xp;
 
   // Archetype XP and level-up rewards.
+  // A founder's Gems, once they've played enough to show the account is real.
+  if (p.founder && p.founderGems === 'pending' && p.stats.games >= FOUNDER.gemsAfterGames) {
+    addGems(p, FOUNDER.gems);
+    p.founderGems = 'paid';
+    out.founderGems = FOUNDER.gems;
+  }
+
   const a = (p.arch[deckId] ??= { xp: 0, games: 0, wins: 0 });
   const before = archLevel(a.xp);
   out.archXp = won ? 3 : 1;
@@ -612,7 +697,10 @@ export const OPS = {
   },
   buyPack: (p, a, ctx) => buyPack(p, str(a.kind), a.currency === 'gems' ? 'gems' : 'gold', a.count === PACK_BUNDLE.packs ? PACK_BUNDLE.packs : 1, ctx.country),
   buyCosmetic: (p, a) => buyCosmetic(p, str(a.id)),
-  equip: (p, a) => (equipCosmetic(p, str(a.id)) ? { ok: true } : fail('You don’t own that.')),
+  // { id, deck? }: as the default, or only for one archetype.
+  equip: (p, a) => (equipCosmetic(p, str(a.id), a.deck ? str(a.deck) : null) ? { ok: true } : fail('You don’t own that.')),
+  // { kind, deck }: that archetype goes back to the default.
+  unequip: (p, a) => (clearDeckCosmetic(p, str(a.kind), str(a.deck)) ? { ok: true } : fail('Nothing to reset there.')),
   premiumArt: (p, a) => { p.cosmetics.premiumArt = a.on === true; return { ok: true }; },
   buySeasonPass: p => buySeasonPass(p),
   craft: (p, a) => craft(p, str(a.id), a.premium === true),

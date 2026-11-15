@@ -199,6 +199,9 @@ test('quick find between two accounts is ranked: stars, rating, history and lead
   const board = (await api(a, 'leaderboard')).body.players;
   assert.ok(board.findIndex(p => p.name === a.name) < board.findIndex(p => p.name === b.name));
   assert.equal((await api(a, 'me')).body.rank.label, 'Bronze 5');
+  const idle = await player('Idle');
+  await api(idle, 'me'); // seen their rank, never played ranked
+  assert.ok(!(await api(a, 'leaderboard')).body.players.some(p => p.name === idle.name), 'no ranked games, not on the board');
   ca.close(); cb.close();
 });
 

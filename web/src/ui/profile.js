@@ -5,6 +5,7 @@
 // The rules live in data/economy.js; this file also draws the shared wallet bar.
 
 import { h, storage } from './dom.js';
+import { countUp } from './fx.js';
 import { normalizeProfile, runOp, unopenedPacks, seasonTier } from '../data/economy.js';
 
 const KEY = 'metadeck.profile';
@@ -203,6 +204,8 @@ export const testPurchasesAllowed = () => {
 };
 
 const fmt = n => n.toLocaleString();
+// The amounts each wallet last showed, so a wallet drawn after a change rolls from the old amount to the new.
+const shownAmounts = {};
 
 // Gold · Gems · Dust, the account, plus quick links. `nav` is { shop, collection, season, account } callbacks.
 export function walletBar(opts = {}) {
@@ -210,8 +213,14 @@ export function walletBar(opts = {}) {
   const packs = unopenedPacks(p);
   const quests = p.quests.length;
   const nav = opts.nav ?? {};
-  const coin = (cls, icon, value, label) => h('span', { class: `coin ${cls}`, 'data-tip': label, 'data-tip-title': `${icon} ${label.split(':')[0]}` },
-    h('i', { 'aria-hidden': 'true' }, icon), h('b', null, fmt(value)));
+  const coin = (cls, icon, value, label) => {
+    const amount = h('b', null, fmt(value));
+    const was = shownAmounts[cls];
+    shownAmounts[cls] = value;
+    if (was !== undefined && was !== value) countUp(amount, value, { from: was, duration: 1100, delay: 150 });
+    return h('span', { class: `coin ${cls}`, 'data-tip': label, 'data-tip-title': `${icon} ${label.split(':')[0]}` },
+      h('i', { 'aria-hidden': 'true' }, icon), amount);
+  };
   const el = h('div', { class: `wallet${opts.quiet ? '' : ' rise'}` },
     coin('gold', '🪙', p.gold, 'Gold: earned by winning, quests and the season track. Buys packs.'),
     coin('gems', '💎', p.gems, 'Gems: the premium currency. Buys packs, cosmetics and the premium season track.'),

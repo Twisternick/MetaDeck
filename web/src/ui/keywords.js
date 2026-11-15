@@ -27,7 +27,7 @@ export const KW_META = {
   DoubleJump: { icon: '🦘', kind: 'combat', hint: 'Ignores Guard' },
   PoweredUp: { icon: '✨', kind: 'defense', hint: 'Blocks the next damage once' },
   Checkpoint: { icon: '🚩', kind: 'defense', hint: 'Survives lethal damage once' },
-  XP: { icon: '⭐', kind: 'trigger', hint: 'Levels up after 3 attacks' },
+  XP: { icon: '🎓', kind: 'trigger', hint: '+1 XP per surviving attack' },
   Momentum: { icon: '🏃', kind: 'bonus', hint: '+1 ATK after your first attack' },
   Clutch: { icon: '💢', kind: 'bonus', hint: '+2 ATK while behind on HP' },
   Combo: { icon: '🔗', kind: 'bonus', hint: '+1 ATK per other card played (max 2)' },
@@ -46,6 +46,7 @@ export const KW_META = {
 };
 
 export const TERM_META = {
+  'Level Up': { icon: '⭐', kind: 'bonus' },
   Silence: { icon: '🔇', kind: 'combat' },
   Suppress: { icon: '📵', kind: 'combat' },
   Boost: { icon: '🔥', kind: 'economy' },
@@ -95,7 +96,7 @@ const KW_BY_NAME = Object.entries(KEYWORDS).map(([k, v]) => [v.name, k]).sort((a
 const TERM_NAMES = Object.keys(TERMS).sort((a, b) => b.length - a.length);
 const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const RICH_RE = new RegExp(
-  `^(${Object.keys(TRIGGER_TIPS).map(esc).join('|')}):|\\b(${[...KW_BY_NAME.map(x => x[0]), ...TERM_NAMES].map(esc).join('|')})\\b`,
+  `^(${Object.keys(TRIGGER_TIPS).map(esc).join('|')}):|\\b(${[...KW_BY_NAME.map(x => x[0]), ...TERM_NAMES, 'XP'].map(esc).join('|')})\\b`,
   'g',
 );
 
@@ -111,7 +112,7 @@ export function richText(line) {
     } else {
       const name = m[2];
       const kw = KW_BY_NAME.find(x => x[0] === name)?.[1];
-      const key = kw ?? name;
+      const key = name === 'XP' ? 'Level Up' : kw ?? name;
       out.push(h('span', { class: `term kind-${kwKind(key)}`, style: { '--kw': kwColor(key) }, 'data-kw': key, tabindex: '0' }, name));
     }
     last = m.index + m[0].length;

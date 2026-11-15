@@ -18,6 +18,10 @@ const TARGET_NOUN = {
   AllOtherFriendlyMonsters: 'your other monsters',
   AllEnemyMonsters: 'all enemy monsters',
   AllMonsters: 'all monsters',
+  AllDamagedMonsters: 'all damaged monsters',
+  SmallEnemyAttackers: 'all enemy monsters with 2 or less ATK',
+  LowCostNonDistricts: 'all monsters costing 2 or less that lack District',
+  HighAttackMonsters: 'all monsters with 4 or more ATK',
 };
 
 const TRIGGER_PREFIX = {
@@ -80,7 +84,7 @@ function sentence(e, t, prev) {
     case 'Destroy': return `destroy ${t}`;
     case 'Silence': return `Silence ${t}`;
     case 'Suppress': return `Suppress ${t}`;
-    case 'Bounce': return `return ${t} to its owner's hand`;
+    case 'Bounce': return e.targeting === 'SmallEnemyAttackers' ? `return ${t} to your opponent's hand` : `return ${t} to its owner's hand`;
     case 'GrantKeyword': return self ? `gain ${keywordName(e.keyword)}` : `give ${t} ${keywordName(e.keyword)}`;
     case 'GrantKeywordThisTurn': return self ? `gain ${keywordName(e.keyword)} this turn` : `give ${t} ${keywordName(e.keyword)} this turn`;
     case 'RemoveKeyword': return `${t} lose ${keywordName(e.keyword)}`;

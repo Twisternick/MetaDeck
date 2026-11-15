@@ -54,7 +54,7 @@ export const STEPS = [
     glow: s => [onBoard(s, ME, ROGUE), 'hero:1'],
   },
   {
-    text: `${name(ROGUE)} has <b>XP</b>: after each attack it survives it gets closer to leveling up. Hover any keyword to read it, or open <b>? Keywords</b>. Now end your turn.`,
+    text: `${name(ROGUE)} has <b>Battle Training</b>. Each attack it survives earns it 1 XP. Every 3 XP it earns gives it another +2/+2. Hover any keyword to read it, or open <b>? Keywords</b>. Now end your turn.`,
     allow: a => a.type === 'end',
     done: s => s.turn >= 4,
     glow: () => ['.end-turn'],

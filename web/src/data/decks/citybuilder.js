@@ -44,7 +44,7 @@ export default {
     S('CTY_S06_EmergencyServices', 'Emergency Services', 3, [fx('Heal', 4, 'FriendlyPlayer'), fx('SummonToken', 1, 'None', { token: 'token_citizen' })]),
     S('CTY_S07_UrbanExpansion', 'Urban Expansion', 3, [fx('GainMaxBandwidth', 1), fx('SummonToken', 1, 'None', { token: 'token_citizen' })]),
     S('CTY_S08_IndustrialBoom', 'Industrial Boom', 3, [fx('Draw', 2)]),
-    S('CTY_S12_EminentDomain', 'Eminent Domain', 3, [fx('Destroy', 0, 'EnemyMonster', { cond: 'TargetMustBeDamaged' }), fx('SummonToken', 1, 'None', { token: 'token_citizen' })], NEW),
+    S('CTY_S12_EminentDomain', 'Eminent Domain', 4, [fx('Destroy', 0, 'LowCostNonDistricts'), fx('GainMaxBandwidth', 1)], NEW),
     S('CTY_S15_CityCurfew', 'City Curfew', 4, [fx('Suppress', 0, 'AllEnemyMonsters')], NEW),
     S('CTY_S09_GoldenAge', 'Golden Age', 5, [fx('Buff', 2, 'AllFriendlyMonsters')]),
     S('CTY_S10_LandmarkConstruction', 'Landmark Construction', 6, [fx('SummonToken', 1, 'None', { token: 'token_landmark' })]),

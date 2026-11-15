@@ -13,7 +13,7 @@
 
 import { rate, START } from './rating.mjs';
 import { applyResult, rollSeason, rankOf } from '../src/data/ranked.js';
-import { grantReward } from '../src/data/economy.js';
+import { grantReward, founderTitle } from '../src/data/economy.js';
 
 const MAX_FRIENDS = 200;
 const REPORTS_PER_DAY = 10;
@@ -32,7 +32,8 @@ export function createSocial({ accounts }) {
       ON CONFLICT(user, friend) DO UPDATE SET status = excluded.status, at = excluded.at`),
     dropRel: db.prepare('DELETE FROM friends WHERE (user = ? AND friend = ?) OR (user = ? AND friend = ?)'),
     friendCount: db.prepare("SELECT COUNT(*) AS n FROM friends WHERE user = ? AND status = 'accepted'"),
-    mine: db.prepare(`SELECT f.friend AS k, u.name, f.status FROM friends f JOIN users u ON u.key = f.friend WHERE f.user = ? AND u.banned = 0`),
+    mine: db.prepare(`SELECT f.friend AS k, u.name, f.status, json_extract(u.profile, '$.founder') AS founder
+      FROM friends f JOIN users u ON u.key = f.friend WHERE f.user = ? AND u.banned = 0`),
     incoming: db.prepare(`SELECT f.user AS k, u.name FROM friends f JOIN users u ON u.key = f.user WHERE f.friend = ? AND f.status = 'pending' AND u.banned = 0`),
     blockedBy: db.prepare('SELECT 1 FROM blocks WHERE (user = ? AND blocked = ?) OR (user = ? AND blocked = ?) LIMIT 1'),
     block: db.prepare('INSERT OR IGNORE INTO blocks (user, blocked, at) VALUES (?, ?, ?)'),
@@ -53,7 +54,8 @@ export function createSocial({ accounts }) {
     byDeck: db.prepare(`SELECT deck, COUNT(*) AS games, SUM(won) AS wins FROM (
         SELECT deck0 AS deck, winner = 0 AS won FROM matches WHERE p0 = ?
         UNION ALL SELECT deck1 AS deck, winner = 1 AS won FROM matches WHERE p1 = ?) GROUP BY deck`),
-    board: db.prepare(`SELECT name, rank, rating FROM users WHERE banned = 0 AND rank IS NOT NULL AND json_extract(rank, '$.season') = ?
+    board: db.prepare(`SELECT name, rank, rating, json_extract(profile, '$.founder') AS founder FROM users WHERE banned = 0 AND rank IS NOT NULL AND json_extract(rank, '$.season') = ?
+        AND json_extract(rank, '$.games') > 0
       ORDER BY json_extract(rank, '$.stars') DESC, rating DESC LIMIT ?`),
   };
   const iso = (msAgo = 0) => new Date(now().getTime() - msAgo).toISOString();
@@ -88,7 +90,7 @@ export function createSocial({ accounts }) {
       const rows = q.mine.all(me.key);
       return {
         ok: true,
-        friends: rows.filter(r => r.status === 'accepted').map(r => ({ name: r.name, presence: presence(r.k) }))
+        friends: rows.filter(r => r.status === 'accepted').map(r => ({ name: r.name, title: founderTitle(r.founder), presence: presence(r.k) }))
           .sort((a, b) => (!!b.presence - !!a.presence) || a.name.localeCompare(b.name)),
         outgoing: rows.filter(r => r.status === 'pending').map(r => r.name),
         incoming: q.incoming.all(me.key).map(r => r.name),
@@ -203,7 +205,7 @@ export function createSocial({ accounts }) {
       const season = rollSeason(null, now()).rank.season;
       return q.board.all(season, limit).map((u, i) => {
         const r = JSON.parse(u.rank);
-        return { place: i + 1, name: u.name, ...rankOf(r.stars), stars: r.stars, games: r.games, wins: r.wins };
+        return { place: i + 1, name: u.name, title: founderTitle(u.founder), ...rankOf(r.stars), stars: r.stars, games: r.games, wins: r.wins };
       });
     },
 

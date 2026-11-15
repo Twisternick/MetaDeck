@@ -1,43 +1,53 @@
-// The Settings dialog: sound volumes, and replaying the tutorial or the first-time tips.
-
+// Shared settings for the menu and match HUD.
 import { h } from './dom.js';
 import { audioSettings, setAudio, sfx } from './audio.js';
-import { resetOnboarding } from './tutorial.js';
+import { resetTips, tipsEnabled, setTipsEnabled } from './tutorial.js';
 
-export function settingsDialog({ onTutorial }) {
-  const a = audioSettings();
-  const close = () => overlay.remove();
+export function settingsButton({ onTutorial } = {}) {
+  return h('button', { class: 'btn ghost small', 'aria-haspopup': 'dialog',
+    onclick: () => openSettings(onTutorial) }, 'Settings');
+}
+
+function openSettings(onTutorial) {
+  const audio = audioSettings();
+  const mute = h('input', { type: 'checkbox', checked: audio.muted,
+    onchange: () => setAudio({ muted: mute.checked }) });
   const slider = (key, label) => {
-    const out = h('output', null, `${Math.round(a[key] * 100)}%`);
-    const input = h('input', { type: 'range', min: '0', max: '100', step: '5', value: String(Math.round(a[key] * 100)), 'aria-label': label });
+    const value = Math.round(audio[key] * 100);
+    const out = h('output', null, value + '%');
+    const input = h('input', { type: 'range', min: 0, max: 100, step: 1, value,
+      'aria-label': label, 'aria-valuetext': value + '%' });
     input.addEventListener('input', () => {
-      setAudio({ [key]: Number(input.value) / 100 });
-      out.textContent = `${input.value}%`;
+      const changes = { [key]: Number(input.value) / 100 };
+      if (key === 'master') {
+        mute.checked = false;
+        changes.muted = false;
+      }
+      setAudio(changes);
+      out.textContent = input.value + '%';
+      input.setAttribute('aria-valuetext', out.textContent);
     });
-    input.addEventListener('change', () => sfx(key === 'music' ? 'coin' : 'click'));
+    if (key !== 'music') input.addEventListener('change', () => sfx('click'));
     return h('label', { class: 'setting-row' }, h('span', null, label), input, out);
   };
-  const mute = h('input', { type: 'checkbox', checked: a.muted ? '' : null });
-  mute.addEventListener('change', () => setAudio({ muted: mute.checked }));
-  const tipsBtn = h('button', { class: 'btn ghost small', onclick: () => { resetOnboarding(); tipsBtn.textContent = 'Tips will show again'; tipsBtn.disabled = true; } }, 'Show tips again');
-
-  const overlay = h('div', { class: 'overlay', onclick: e => { if (e.target === overlay) close(); } },
-    h('div', { class: 'dialog settings-dialog', role: 'dialog', 'aria-label': 'Settings' },
-      h('h2', null, 'Settings'),
-      h('section', null,
-        h('h3', null, 'Sound'),
-        slider('master', 'Master'),
-        slider('music', 'Music'),
-        slider('sfx', 'Effects'),
-        h('label', { class: 'setting-row check' }, mute, h('span', null, 'Mute everything'))),
-      h('section', null,
-        h('h3', null, 'Learning'),
-        h('div', { class: 'setting-actions' },
-          h('button', { class: 'btn ghost small', onclick: () => { close(); onTutorial(); } }, 'Play the tutorial'),
-          tipsBtn)),
-      h('div', { class: 'dialog-actions' }, h('button', { class: 'btn primary', onclick: close }, 'Done'))));
-  document.addEventListener('keydown', function esc(e) {
-    if (e.key === 'Escape') { close(); document.removeEventListener('keydown', esc); }
-  });
-  document.body.append(overlay);
+  const tips = h('input', { type: 'checkbox', checked: tipsEnabled(),
+    onchange: () => setTipsEnabled(tips.checked) });
+  const reset = h('button', { class: 'btn ghost small', onclick: () => {
+    resetTips();
+    tips.checked = true;
+    reset.textContent = 'Tips reset';
+  } }, 'Reset first-time tips');
+  const dialog = h('dialog', { class: 'dialog settings-dialog', 'aria-labelledby': 'settings-title',
+    onkeydown: e => e.stopPropagation(), onclose: () => dialog.remove() },
+    h('h2', { id: 'settings-title' }, 'Settings'),
+    h('section', null, h('h3', null, 'Sound'),
+      slider('master', 'Master volume'), slider('music', 'Music'), slider('sfx', 'Sound effects'),
+      h('label', { class: 'setting-row check' }, mute, 'Mute all sound')),
+    h('section', null, h('h3', null, 'Learning'),
+      h('label', { class: 'setting-row check' }, tips, 'Show first-time tips'),
+      h('div', { class: 'setting-actions' }, reset, onTutorial && h('button', { class: 'btn ghost small',
+        onclick: () => { dialog.close(); onTutorial(); } }, 'Play the tutorial'))),
+    h('div', { class: 'dialog-actions' }, h('button', { class: 'btn primary', onclick: () => dialog.close() }, 'Done')));
+  document.body.append(dialog);
+  dialog.showModal();
 }

@@ -77,6 +77,15 @@ test('the page loads nothing from third parties: fonts are served from here', as
   assert.equal((await request('/legal/../serve.mjs')).status, 404);
 });
 
+test('only the game’s own sound slots are served, never the sound libraries next to them', async () => {
+  const slot = fs.readdirSync(new URL('../assets/audio/', import.meta.url)).find(f => /^[a-z0-9-]+\.mp3$/.test(f));
+  if (slot) assert.equal((await request(`/assets/audio/${slot}`)).status, 200, slot);
+  for (const p of ['/assets/audio/Some%20Library/hit.wav', '/assets/audio/License%20-%20GDC%20Game%20Audio.pdf', '/assets/audio/Readme.txt', '/assets/audio/sub/click.mp3']) {
+    assert.equal((await request(p)).status, 404, p);
+  }
+  assert.equal((await request('/assets/fonts/rajdhani-700-latin.woff2')).status, 200, 'other assets are unaffected');
+});
+
 test('only the checkout page may load Paddle; payments are off without a configuration', async () => {
   const page = await request('/checkout.html');
   assert.equal(page.status, 200);
@@ -87,6 +96,14 @@ test('only the checkout page may load Paddle; payments are off without a configu
   assert.equal((await request('/api/shop/config')).json.enabled, false);
   assert.equal((await request('/api/paddle/webhook', { method: 'POST', body: {} })).status, 404);
   assert.equal((await request('/api/shop/checkout', { method: 'POST', body: { bundle: 'gems-100' } })).status, 503);
+});
+
+test('the founder spots left are public, and a sign-up takes one', async () => {
+  const before = (await request('/api/founders')).json;
+  assert.equal(before.slots, 100);
+  assert.equal(before.left, before.slots - before.taken);
+  await request('/api/account/signup', { method: 'POST', body: { name: 'Spot_Taker', password: 'longenough', birthYear: 1990 } });
+  assert.equal((await request('/api/founders')).json.left, before.left - 1);
 });
 
 test('health check and version', async () => {

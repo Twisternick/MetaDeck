@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { openDb, transaction } from './db.mjs';
-import { normalizeProfile, runOp } from '../src/data/economy.js';
+import { normalizeProfile, runOp, FOUNDER, makeFounder, unmakeFounder } from '../src/data/economy.js';
 import { CARDS, MAX_COPIES } from '../src/data/index.js';
 import { offensiveName } from './names.mjs';
 
@@ -71,7 +71,8 @@ export const accountsIn = (dataDir, opts = {}) =>
   createAccounts({ file: path.join(dataDir, 'metadeck.db'), legacy: path.join(dataDir, 'accounts.json'), ...opts });
 
 // `file` is the database (null keeps it in memory, for tests); `legacy` an accounts.json to import.
-export function createAccounts({ file = null, legacy = null, now = () => new Date(), rng = Math.random } = {}) {
+// `founderSlots`: how many of the first sign-ups become Meta Founders (FOUNDER in economy.js; 0 turns it off).
+export function createAccounts({ file = null, legacy = null, now = () => new Date(), rng = Math.random, founderSlots = FOUNDER.slots } = {}) {
   const db = openDb(file);
   const q = {
     user: db.prepare('SELECT * FROM users WHERE key = ?'),
@@ -95,6 +96,9 @@ export function createAccounts({ file = null, legacy = null, now = () => new Dat
     dropSessions: db.prepare('DELETE FROM sessions WHERE user = ? AND hash IS NOT ?'),
     devices: db.prepare('SELECT COUNT(*) AS n FROM sessions WHERE user = ? AND expires > ?'),
     count: db.prepare('SELECT COUNT(*) AS n FROM users'),
+    founders: db.prepare(`SELECT COUNT(*) AS n, MAX(json_extract(profile, '$.founder')) AS top FROM users WHERE json_extract(profile, '$.founder') IS NOT NULL`),
+    founderList: db.prepare(`SELECT key, name, created, json_extract(profile, '$.founder') AS n, json_extract(profile, '$.founderGems') AS gems
+      FROM users WHERE json_extract(profile, '$.founder') IS NOT NULL ORDER BY n`),
   };
   const fails = new Map();   // address -> { n, until }
   const signups = new Map(); // address -> { n, until }
@@ -200,6 +204,10 @@ export function createAccounts({ file = null, legacy = null, now = () => new Dat
       if (getUser(key(name))) return { ok: false, reason: 'That name is taken.' };
       bump(signups, ip, 3_600_000);
       const user = { key: key(name), name, ...pw, created: now().toISOString(), profile: normalizeProfile(null, now(), rng), birthYear };
+      // One of the first founderSlots accounts: the next founder number (checked and written with no await
+      // in between, so two sign-ups can't take the same number).
+      const f = q.founders.get();
+      if (f.n < founderSlots) makeFounder(user.profile, (f.top ?? 0) + 1);
       put(user);
       return { ok: true, token: newSession(key(name)), name, recoveryCode: issueCode(user) };
     },
@@ -435,6 +443,30 @@ export function createAccounts({ file = null, legacy = null, now = () => new Dat
       });
       cache.delete(oldKey);
       return { ok: true, from: user.name, to };
+    },
+
+    // How many founder places there are and how many are left (public: the title screen and menu advertise it).
+    founderSpots() {
+      const taken = q.founders.get().n;
+      return { slots: founderSlots, taken, left: Math.max(0, founderSlots - taken) };
+    },
+
+    // Admin (tools/moderate.mjs): the Meta Founders, and making or unmaking one by hand. A new founder gets
+    // the next number, even past founderSlots.
+    founders: () => q.founderList.all(),
+    setFounder(name, on = true) {
+      const user = typeof name === 'string' ? getUser(key(name)) : null;
+      if (!user) return { ok: false, reason: `No account named ${name}.` };
+      const p = profileOf(user);
+      const changed = on ? makeFounder(p, (q.founders.get().top ?? 0) + 1) : unmakeFounder(p);
+      put(user);
+      return { ok: true, name: user.name, founder: p.founder, changed };
+    },
+    // Unmake every founder (before launch, so test accounts don't use up the slots). Returns how many.
+    resetFounders() {
+      const list = q.founderList.all();
+      transaction(db, () => { for (const f of list) { const u = getUser(f.key); unmakeFounder(profileOf(u)); put(u); } });
+      return list.length;
     },
 
     names: () => db.prepare('SELECT name FROM users ORDER BY name').all().map(r => r.name),

@@ -1,7 +1,7 @@
 // Collection: every card with how many copies you own, crafting and disenchanting with Dust, your
 // unopened packs and your cosmetics (card backs, arenas, premium art).
 
-import { h, storage } from './dom.js';
+import { h, storage, rectOf } from './dom.js';
 import { renderCard, renderCardBack, glossaryFor, arenaFx } from './card-view.js';
 import { removeFx, sparkle, motionOK, deckEmblem, currency } from './fx.js';
 import { glossaryList } from './keywords.js';
@@ -9,7 +9,7 @@ import { profile, act, walletBar } from './profile.js';
 import { openPacks, packArt, packName, rarityColor, toast } from './packs.js';
 import {
   RARITY, RARITY_ORDER, rarityOf, owned, ownedTotal, spareCopies, craftCost, dustValue, upgradeCost,
-  COSMETICS, ownsCosmetic, CORE_COPIES, bestFinish,
+  COSMETICS, ownsCosmetic, CORE_COPIES, bestFinish, cosmetic,
 } from '../data/economy.js';
 import { DECKS, CARDS, MAX_COPIES } from '../data/index.js';
 import { tip } from './tutorial.js';
@@ -128,7 +128,7 @@ export function collection(root, { onBack, nav, tab = null, deckId = null }) {
           spare ? null : h('p', { class: 'muted small' }, 'Core set copies can’t be disenchanted, so your free starter deck always works.'),
           glossaryList(glossaryFor(def))),
         h('button', { class: 'btn ghost small craft-close', onclick: close }, 'Close'));
-      if (flash && motionOK()) requestAnimationFrame(() => sparkle(cardEl.getBoundingClientRect(), rarityColor(rarity), 22));
+      if (flash && motionOK()) requestAnimationFrame(() => sparkle(rectOf(cardEl), rarityColor(rarity), 22));
     };
     paint();
     document.addEventListener('keydown', onKey);
@@ -151,30 +151,59 @@ export function collection(root, { onBack, nav, tab = null, deckId = null }) {
   }
 
   // ---------- cosmetics
+  // `prefs.look` is whose look is being dressed: 'all' (the defaults) or one archetype, which can have
+  // its own back, arena and frame (anything it doesn't pick uses the default).
   function cosmeticsTab() {
     const p = profile();
-    const section = (kind, title) => h('section', null,
-      h('h2', null, title),
-      h('div', { class: 'cos-grid' }, COSMETICS.filter(c => c.kind === kind).map((c, i) => cosmeticTile(c, i))));
+    const scope = prefs.look && prefs.look !== 'all' ? DECKS.find(d => d.id === prefs.look) : null;
+    const own = scope ? p.cosmetics.perDeck?.[scope.id] ?? {} : {};
+    const scopeChip = (id, label, color, emblem) => h('button', {
+      class: `chip${(prefs.look ?? 'all') === id ? ' selected' : ''}${id !== 'all' && p.cosmetics.perDeck?.[id] ? ' has-look' : ''}`, style: { '--deck': color },
+      title: id !== 'all' && p.cosmetics.perDeck?.[id] ? 'Has its own picks' : null,
+      onclick: () => { prefs.look = id; render(); },
+    }, emblem, label);
+    const section = (kind, title) => {
+      // A deck's own themed items first when dressing that deck.
+      const items = COSMETICS.filter(c => c.kind === kind).sort((a, b) => (scope ? (b.deck === scope.id) - (a.deck === scope.id) : 0));
+      const status = scope ? h('div', { class: 'look-status' },
+        own[kind]
+          ? [h('span', null, `${scope.name} uses `, h('b', null, cosmetic(own[kind]).name)),
+            h('button', { class: 'btn ghost small', onclick: async () => { await act('unequip', { kind, deck: scope.id }); render(); } }, 'Use my default')]
+          : h('span', { class: 'muted' }, `${scope.name} uses your default: `, h('b', null, cosmetic(p.cosmetics[kind]).name))) : null;
+      return h('section', null, h('h2', null, title), status, h('div', { class: 'cos-grid' }, items.map((c, i) => cosmeticTile(c, i, scope))));
+    };
     return h('div', null,
       h('label', { class: 'toggle cos-toggle' },
         h('input', { type: 'checkbox', checked: p.cosmetics.premiumArt || null, onchange: e => act('premiumArt', { on: e.target.checked }) }),
         ' Show premium and hologram versions of cards I own'),
+      h('section', { class: 'look-scope' },
+        h('h2', null, 'Equip for'),
+        h('div', { class: 'chips' },
+          scopeChip('all', 'All decks (default)', '#ffc53d', h('span', { class: 'chip-emblem', 'aria-hidden': 'true' }, '✦')),
+          DECKS.map(d => scopeChip(d.id, d.name, d.color, deckEmblem(d, 'chip-emblem')))),
+        h('p', { class: 'muted' }, scope
+          ? `What you play with as ${scope.name}. Anything you don’t pick here uses your default.`
+          : 'Your default look, used by every deck that doesn’t have its own pick. Choose a deck above to give it its own.')),
       section('back', 'Card backs'),
-      section('arena', 'Arenas'));
+      section('arena', 'Arenas'),
+      section('frame', 'Card frames'));
   }
 
-  function cosmeticTile(c, i) {
+  function cosmeticTile(c, i, scope = null) {
     const p = profile();
     const have = ownsCosmetic(p, c.id);
-    const on = p.cosmetics[c.kind] === c.id;
-    const how = c.default ? 'Default' : c.gems ? [currency('gems'), ` ${c.gems} in the shop`] : `Season tier ${c.season.tier} (${c.season.track === 'premium' ? 'premium' : 'free'} track)`;
+    const on = scope ? p.cosmetics.perDeck?.[scope.id]?.[c.kind] === c.id : p.cosmetics[c.kind] === c.id;
+    const themed = c.deck ? DECKS.find(d => d.id === c.deck) : null;
+    const how = c.default ? 'Default' : c.founder ? 'Meta Founders only' : c.gems ? [currency('gems'), ` ${c.gems} in the shop`] : `Season tier ${c.season.tier} (${c.season.track === 'premium' ? 'premium' : 'free'} track)`;
     return h('div', { class: `cos-tile rise${on ? ' equipped' : ''}${have ? '' : ' locked'}`, style: { '--i': i } },
       cosmeticPreview(c),
-      h('div', { class: 'cos-name' }, c.name),
+      h('div', { class: 'cos-name' }, c.name, themed ? h('span', { class: 'cos-deck', style: { '--deck': themed.color } }, themed.name) : null),
       h('div', { class: 'cos-blurb muted' }, c.blurb),
       have
-        ? h('button', { class: `btn small ${on ? 'ghost' : 'primary'}`, disabled: on || null, onclick: async () => { await act('equip', { id: c.id }); render(); } }, on ? 'Equipped' : 'Equip')
+        ? h('button', {
+          class: `btn small ${on ? 'ghost' : 'primary'}`, disabled: on || null,
+          onclick: async () => { await act('equip', scope ? { id: c.id, deck: scope.id } : { id: c.id }); render(); },
+        }, on ? (scope ? `Equipped for ${scope.name}` : 'Equipped') : (scope ? `Equip for ${scope.name}` : 'Equip'))
         : h('span', { class: 'cos-how' }, '🔒 ', how));
   }
 
@@ -187,8 +216,12 @@ export function collection(root, { onBack, nav, tab = null, deckId = null }) {
   render();
 }
 
-// A small live preview of a cosmetic: a card back, or a slice of the arena.
+// A small live preview of a cosmetic: a card back, a card in the frame, or a slice of the arena.
 export function cosmeticPreview(c) {
+  if (c.kind === 'frame') {
+    const sample = CARDS.PLA_M08_AirborneAce; // a blue deck, so the gold frame stands out against the standard one
+    return h('div', { class: 'cos-preview frame' }, renderCard(sample, { classes: c.id === 'frame:standard' ? '' : `frame-${c.id.split(':')[1]}` }));
+  }
   return c.kind === 'back'
     ? h('div', { class: 'cos-preview back' }, renderCardBack('', c.id))
     : h('div', { class: 'cos-preview arena-swatch', 'data-arena': c.id.split(':')[1] }, arenaFx(c.id.split(':')[1]), h('div', { class: 'swatch-mat' }));

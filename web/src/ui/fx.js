@@ -2,7 +2,7 @@
 // impact bursts, dissolves, card flights, confetti, button ripples.
 // Everything here is DOM + CSS + the Web Animations API. No SVG.
 
-import { h } from './dom.js';
+import { h, rectOf, pt, viewW, viewH } from './dom.js';
 
 export const motionOK = () => !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -55,7 +55,7 @@ export function installTilt() {
   const apply = () => {
     frame = 0;
     if (!current || !last) return;
-    const r = current.getBoundingClientRect();
+    const r = rectOf(current);
     if (!r.width || !r.height) return;
     const px = Math.min(1, Math.max(0, (last.x - r.left) / r.width));
     const py = Math.min(1, Math.max(0, (last.y - r.top) / r.height));
@@ -77,7 +77,7 @@ export function installTilt() {
       if (el) el.classList.add('tilting');
     }
     if (!el) return;
-    last = { x: e.clientX, y: e.clientY };
+    last = { x: pt(e.clientX), y: pt(e.clientY) };
     if (!frame) frame = requestAnimationFrame(apply);
   }, { passive: true });
   document.addEventListener('pointerleave', () => { if (current) { reset(current); current = null; } });
@@ -109,13 +109,53 @@ export function installRipples() {
   document.addEventListener('pointerdown', e => {
     const btn = e.target instanceof Element ? e.target.closest('.btn') : null;
     if (!btn || btn.disabled || !motionOK()) return;
-    const r = btn.getBoundingClientRect();
+    const r = rectOf(btn);
     const size = Math.max(r.width, r.height) * 2.2;
     const ripple = h('span', { class: 'ripple' });
-    ripple.style.cssText = `left:${e.clientX - r.left}px;top:${e.clientY - r.top}px;width:${size}px;height:${size}px`;
+    ripple.style.cssText = `left:${pt(e.clientX) - r.left}px;top:${pt(e.clientY) - r.top}px;width:${size}px;height:${size}px`;
     btn.append(ripple);
     setTimeout(() => ripple.remove(), 700);
   }, { passive: true });
+}
+
+// ------------------------------------------------------------ number ticker
+// Rolls `el`'s number from `from` up (or down) to `to`, easing out, with a pop when it lands.
+export function countUp(el, to, { from = 0, duration = 900, delay = 0 } = {}) {
+  const show = n => { el.textContent = Math.round(n).toLocaleString(); };
+  if (!motionOK() || from === to) { show(to); return; }
+  show(from);
+  const t0 = performance.now() + delay;
+  const step = now => {
+    if (!el.isConnected && now > t0) return;
+    const k = Math.min(1, Math.max(0, (now - t0) / duration));
+    show(from + (to - from) * (1 - (1 - k) ** 4));
+    if (k < 1) requestAnimationFrame(step);
+    else el.animate([{ transform: 'scale(1.25)', filter: 'brightness(1.8)' }, { transform: 'none', filter: 'none' }], { duration: 380, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+  };
+  requestAnimationFrame(step);
+}
+
+// ------------------------------------------------------------ film grain
+// A tile of random noise drawn once on a canvas (a raster PNG, not SVG) and laid over the ambient
+// background, so its big gradients don't band and the screens get a printed, painted texture.
+let grainInstalled = false;
+export function installGrain() {
+  if (grainInstalled) return;
+  grainInstalled = true;
+  const size = 160;
+  const canvas = h('canvas', { width: size, height: size });
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const img = ctx.createImageData(size, size);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const v = Math.random() * 255;
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+    img.data[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  canvas.toBlob(blob => {
+    if (blob) document.documentElement.style.setProperty('--grain', `url(${URL.createObjectURL(blob)})`);
+  });
 }
 
 // ------------------------------------------------------------ art slots
@@ -260,8 +300,8 @@ export function damageSplat(rect, text, { gold = false, heal = false, delay = 0,
     h('i', { class: 'splat-rays' }), h('i', { class: 'splat-rim' }), h('i', { class: 'splat-core' }), h('b', null, text));
   splat.style.cssText = `--s:${size}px;--shape:${burstShape()};--delay:${delay}ms`;
   const place = r => {
-    splat.style.left = `${Math.max(half + 6, Math.min(window.innerWidth - half - 6, center(r).x))}px`;
-    splat.style.top = `${Math.max(size / 2 + 6, Math.min(window.innerHeight - size / 2 - 6, center(r).y))}px`;
+    splat.style.left = `${Math.max(half + 6, Math.min(viewW() - half - 6, center(r).x))}px`;
+    splat.style.top = `${Math.max(size / 2 + 6, Math.min(viewH() - size / 2 - 6, center(r).y))}px`;
   };
   place(rect);
   loadArt(splat, fxSplatUrls());
@@ -271,7 +311,7 @@ export function damageSplat(rect, text, { gold = false, heal = false, delay = 0,
     const track = () => {
       if (!splat.isConnected) return;
       const el = follow();
-      if (el?.isConnected) place(el.getBoundingClientRect());
+      if (el?.isConnected) place(rectOf(el));
       requestAnimationFrame(track);
     };
     requestAnimationFrame(track);
@@ -401,8 +441,8 @@ export function confetti(colors = ['#ffc53d', '#22d3ee', '#a78bfa', '#f472b6', '
     c.style.cssText = `left:${x}vw;background:${colors[i % colors.length]};width:${rand(6, 12)}px;height:${rand(10, 18)}px`;
     L.append(c);
     c.animate([
-      { transform: `translate(0, -5vh) rotate(0deg) rotateY(0)`, opacity: 1 },
-      { transform: `translate(${rand(-120, 120)}px, 110vh) rotate(${rand(360, 1080)}deg) rotateY(${rand(360, 1440)}deg)`, opacity: .9 },
+      { transform: `translate(0, ${-0.05 * viewH()}px) rotate(0deg) rotateY(0)`, opacity: 1 },
+      { transform: `translate(${rand(-120, 120)}px, ${1.1 * viewH()}px) rotate(${rand(360, 1080)}deg) rotateY(${rand(360, 1440)}deg)`, opacity: .9 },
     ], { duration: rand(2600, 4600), delay: rand(0, 900), easing: 'cubic-bezier(.2,.6,.3,1)', fill: 'forwards' }).onfinish = () => c.remove();
   }
 }
@@ -474,7 +514,7 @@ export function flyTo(cardEl, fromRect, toRect, { duration = 320, onDone } = {})
 // Deal a hand card in from a pile: animates from the pile's rect to where the card now sits.
 export function dealFrom(cardEl, pileRect, delay = 0) {
   if (!motionOK() || !pileRect) return;
-  const r = cardEl.getBoundingClientRect();
+  const r = rectOf(cardEl);
   const dx = pileRect.left + pileRect.width / 2 - (r.left + r.width / 2);
   const dy = pileRect.top + pileRect.height / 2 - (r.top + r.height / 2);
   const cs = getComputedStyle(cardEl);
@@ -524,11 +564,11 @@ export function installTooltips(describe) {
     if (handCard) timer = setTimeout(place, motionOK() ? 340 : 0); else place();
   };
   const position = anchor => {
-    const r = anchor.getBoundingClientRect();
+    const r = rectOf(anchor);
     const w = tip.offsetWidth;
     const hgt = tip.offsetHeight;
     let left = r.left + r.width / 2 - w / 2;
-    left = Math.max(8, Math.min(left, window.innerWidth - w - 8));
+    left = Math.max(8, Math.min(left, viewW() - w - 8));
     let top = r.top - hgt - 12;
     if (top < 8) { top = r.bottom + 12; tip.classList.add('below'); }
     tip.style.left = `${left}px`;
@@ -572,7 +612,7 @@ export function keywordCallout(rect, { icon, name, text, color = '#ffc53d', dela
   document.body.append(el);
   // Keep the pill on screen: it is centred on the element, so clamp that centre.
   const half = el.offsetWidth / 2;
-  const cx = Math.max(half + 8, Math.min(rect.left + rect.width / 2, window.innerWidth - half - 8));
+  const cx = Math.max(half + 8, Math.min(rect.left + rect.width / 2, viewW() - half - 8));
   el.style.left = `${cx}px`;
   setTimeout(() => el.remove(), (motionOK() ? 1700 : 1100) + delay);
 }

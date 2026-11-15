@@ -49,7 +49,7 @@ All ten decks finish between 47% and 54%, and the player going first wins 51% of
 - **Quick cards** (hand traps) can respond to an enemy **attack**, paid with Bandwidth you left unspent on your own turn. Each attack gets one response, and the Unity engine's chain-depth/priority loop is simplified away. If the response removes, Stealths, bounces or Suppresses either combatant, the attack fizzles. The old "Quick responses must cost 0–1" cap is gone, since Bandwidth already limits them.
 - **First Strike** always strikes first; it is no longer once per round. **Counter** is new: First Strike that only works when defending.
 - **Haunt** now deals 2 damage to a random enemy monster when it dies. The old curse ticked for 1 at end of turn.
-- **XP / Level Up** merged into one rule: a monster with XP gains 1 XP each time it attacks and survives, and any monster with 3 XP Levels Up for +2/+2. The separate `LevelUp` keyword is gone.
+- **Battle Training** grants 1 XP each time the monster attacks and survives. Any monster can gain XP from card effects and gets another +2/+2 for every 3 XP it earns. The separate `LevelUp` keyword is gone.
 - **Combo** gives +1 ATK per other card played this turn, capped at +2.
 - **Populate**, **Errata**, **Copy**, **Momentum**, **Clutch**, **Slipstream**, **Inspire** and **Tax** all have defined rules now.
 - **Boost N** (Racing): spend N Nitro for a bonus effect. It replaces `SpendNitroForBuff` and the one-off "if Nitro ≥ 2" conditions.
@@ -186,9 +186,9 @@ Heroes earn XP in combat and Level Up; gear and spells make them legends.
 | Potion Kit | 2 · Quick · Heal 3 → FriendlyMonster | 1 · Quick · Give a friendly monster +0/+2. |
 | Party Healer | 2 · 1/3 · Heal 2 → FriendlyPlayer | 2 · 1/3 · Play: Restore 3 HP to you. |
 | Shieldbearer | unchanged |  |
-| Ranger Tracker | 2 · 2/2 · XP | 2 · 2/3 · XP |
+| Ranger Tracker | 2 · 2/2 · XP | 2 · 2/3 · Battle Training |
 | Arcane Scholar | 2 · 2/2 · Draw 1 | 2 · 2/2 · Play: Give another friendly monster 1 XP. |
-| Squire | 2 · 2/3 | 2 · 2/2 · Guard, XP |
+| Squire | 2 · 2/3 | 2 · 2/2 · Guard, Battle Training |
 | **Mimic Chest** 🆕 | — | 2 · 2/3 · Devour |
 | Equip Sword | 2 · Equip · Buff 1 → FriendlyMonster | 2 · Equip a friendly monster with +2/+1. |
 | Mana Burst | 3 · GainMaxBandwidthNextTurn 1 → FriendlyPlayer | 2 · Gain an empty Bandwidth crystal. |
@@ -199,13 +199,13 @@ Heroes earn XP in combat and Level Up; gear and spells make them legends.
 | Side Quest | 2 · Draw 2 | 3 · Draw 2 cards. |
 | Talent Point | 3 · Buff 2 → FriendlyMonster | 3 · Give a friendly monster +2/+2. Give it 1 XP. |
 | **Enchant Armor** 🆕 | — | 3 · Equip a friendly monster with +0/+3 and Fortify. |
-| Dragon Slayer | 4 · 5/4 · LevelUp | 4 · 4/3 · XP · Play: Gain 1 XP. |
+| Dragon Slayer | 4 · 5/4 · LevelUp | 4 · 4/3 · Battle Training · Play: Gain 1 XP. |
 | Guardian Golem | unchanged |  |
-| Elite Ranger | 4 · 4/4 · XP | 4 · 4/4 · XP, First Strike |
+| Elite Ranger | 4 · 4/4 · XP | 4 · 4/4 · Battle Training, First Strike |
 | Revive Ally | 4 · ReviveFromGraveyard → CardInYourGraveyard | 4 · Revive your most recently destroyed monster. |
 | Loot Drop | 5 · Draw 3 | 4 · Draw 3 cards. |
 | **Fireball** 🆕 | — | 4 · Deal 5 damage to an enemy. |
-| Legendary Hero | 5 · 6/6 · LevelUp | 5 · 5/4 · XP · Play: Gain 2 XP. |
+| Legendary Hero | 5 · 6/6 · LevelUp | 5 · 5/4 · Battle Training · Play: Gain 2 XP. |
 | Final Boss Raid | 6 · DealDamage 6 → EnemyMonster | 5 · Deal 6 damage to an enemy monster. Give your monsters 1 XP. |
 | Raid Boss (was Final Boss) | 7 · 8/8 · Guard | 7 · 7/8 · Guard |
 | **Ancient Dragon** 🆕 | — | 8 · 7/7 · Play: Deal 2 damage to all enemy monsters. |
@@ -539,10 +539,10 @@ All ten decks finish between 47% and 54%, the same spread as the 30-card decks. 
 | Card | Cost | Stats | Text |
 |---|---|---|---|
 | **Novice Cleric** | 1 | 1/2 | Play: Restore 2 HP to you. |
-| **Shadow Thief** | 2 | 2/2 | Stealth, XP |
+| **Shadow Thief** | 2 | 2/2 | Stealth, Battle Training |
 | **Blacksmith** | 3 | 2/3 | Play: Equip another friendly monster with +1/+1 and First Strike. |
-| **Berserker** | 4 | 4/3 | Rush, XP |
-| **Paladin** | 4 | 3/5 | Guard, XP |
+| **Berserker** | 4 | 4/3 | Rush, Battle Training |
+| **Paladin** | 4 | 3/5 | Guard, Battle Training |
 | **Party Leader** | 5 | 4/5 | Play: Give your other monsters 1 XP. |
 | **High Priestess** | 5 | 3/6 | Turn end: Restore 2 HP to you. |
 | **Elixir** | 1 | Spell | Quick · Fully heal a friendly monster. Give it 1 XP. |

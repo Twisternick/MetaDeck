@@ -44,7 +44,7 @@ export default {
     S('FPS_S06_Headshot', 'Headshot', 2, [fx('Destroy', 0, 'EnemyMonster', { cond: 'TargetMustBeDamaged' })]),
     S('FPS_S09_UAVScan', 'UAV Scan', 2, [fx('RemoveKeyword', 0, 'AllEnemyMonsters', { keyword: 'Stealth' }), fx('Draw', 1)]),
     S('FPS_S11_LockOn', 'Lock On', 2, [fx('DealDamage', 1, 'EnemyMonster'), fx('Draw', 1)], NEW),
-    S('FPS_S14_Ricochet', 'Ricochet', 3, [fx('DealDamage', 2, 'EnemyMonster'), fx('DealDamage', 1, 'RandomEnemyMonster')], NEW),
+    S('FPS_S14_Ricochet', 'Ricochet', 3, [fx('DealDamage', 2, 'EnemyMonster'), fx('DealDamage', 1, 'AllEnemyMonsters')], NEW),
     S('FPS_S15_DroneStrike', 'Drone Strike', 3, [fx('SummonToken', 2, 'None', { token: 'token_drone' }), fx('DealDamage', 1, 'RandomEnemyMonster')], NEW),
     S('FPS_S10_RespawnTimer', 'Respawn Timer', 4, [fx('Revive')]),
     S('FPS_S12_Airstrike', 'Airstrike', 6, [fx('DealDamage', 3, 'AllEnemyMonsters')], NEW),

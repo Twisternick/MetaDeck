@@ -3,7 +3,7 @@
 // adults. Without them, a local or test host can credit a bundle as a clearly labelled test purchase
 // so the flow can be tried end to end; anywhere else the bundles say they're coming soon.
 
-import { h, storage } from './dom.js';
+import { h, storage, rectOf } from './dom.js';
 import { removeFx, sparkle, motionOK, deckEmblem, currency } from './fx.js';
 import { profile, act, walletBar, testPurchasesAllowed } from './profile.js';
 import { openPacks, packArt, packName, rarityColor, toast } from './packs.js';
@@ -45,7 +45,7 @@ export function shop(root, { onBack, nav }) {
     if (el) el.disabled = false;
     if (!res.ok) { toast(res.reason, 'bad'); return false; }
     toast(msg(res));
-    if (el && motionOK()) sparkle(el.getBoundingClientRect(), '#ffc53d', 18);
+    if (el && motionOK()) sparkle(rectOf(el), '#ffc53d', 18);
     render();
     return true;
   };

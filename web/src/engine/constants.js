@@ -26,7 +26,7 @@ export const KEYWORDS = {
   DoubleJump: { name: 'Double Jump', text: 'Can attack past Guard monsters.' },
   PoweredUp: { name: 'Powered Up', text: 'Prevents the next damage this would take, then is lost.' },
   Checkpoint: { name: 'Checkpoint', text: 'The first time this would die, it survives with 1 health instead.' },
-  XP: { name: 'XP', text: `After this attacks and survives, it gains 1 XP. At ${LEVEL_UP_XP} XP a monster Levels Up: +${LEVEL_UP_BONUS}/+${LEVEL_UP_BONUS}.` },
+  XP: { name: 'Battle Training', text: 'Each time this monster attacks and survives, it gains 1 XP.' },
   Momentum: { name: 'Momentum', text: "Has +1 ATK if you've already attacked this turn." },
   Clutch: { name: 'Clutch', text: "Has +2 ATK while your HP is lower than your opponent's." },
   Combo: { name: 'Combo', text: "Has +1 ATK for each other card you've played this turn (max +2)." },
@@ -46,6 +46,7 @@ export const KEYWORDS = {
 
 // Terms that appear in rules text and deserve a tooltip.
 export const TERMS = {
+  'Level Up': `Any monster can gain XP from card effects. For every ${LEVEL_UP_XP} XP it earns, it gains +${LEVEL_UP_BONUS}/+${LEVEL_UP_BONUS}.`,
   Silence: 'Removes all keywords, buffs and card text from a monster.',
   Suppress: "The monster can't attack on its controller's next turn.",
   Boost: 'Optional: when you play this, you may spend that much Nitro to get the extra effect. Needs enough Nitro.',

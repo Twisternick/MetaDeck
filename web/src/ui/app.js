@@ -14,19 +14,20 @@ import { difficultyFor } from '../engine/ai.js';
 import { decodeDeck } from '../data/deck-code.js';
 import { playerHub } from './players.js';
 import { rankOf } from '../data/ranked.js';
-import { seasonName, rewardLabel } from '../data/economy.js';
+import { seasonName, rewardLabel, founderTitle, loadoutFor } from '../data/economy.js';
 import { seasonSeen } from './profile.js';
 import { returnedFromCheckout, shopConfig } from './payments.js';
 import { installAudio, music } from './audio.js';
-import { settingsDialog } from './settings.js';
+import { settingsButton } from './settings.js';
 import { tutorial as startTutorial, tutorialSeen, dismissTutorial, tip } from './tutorial.js';
+import { founderPitch } from './founder.js';
 import { accountScreen } from './account.js';
 import { collection } from './collection.js';
 import { shop } from './shop.js';
 import { season } from './season.js';
 import { rewardsPanel, toast } from './packs.js';
 import { missingCards, missingDust, archInfo, archLevel, starterUnlockLevel, bestFinish } from '../data/economy.js';
-import { installTilt, installRipples, installTooltips, installCardFit, installSettle, artSlot, deckArtUrls, logoUrls, deckEmblem, removeFx, currency } from './fx.js';
+import { installTilt, installRipples, installTooltips, installCardFit, installSettle, installGrain, artSlot, deckArtUrls, logoUrls, deckEmblem, removeFx, currency, countUp, motionOK } from './fx.js';
 import { DECKS, CARDS, DECK_SIZE, getDeck } from '../data/index.js';
 import { KEYWORDS, TERMS, START_HP, BOARD_SLOTS, MAX_HAND, OPENING_HAND } from '../engine/constants.js';
 import { describeTip, glossaryList, kwName, KW_META, KIND_COLORS } from './keywords.js';
@@ -41,6 +42,7 @@ installRipples();
 installCardFit();
 installSettle(root);
 installTooltips(describeTip);
+installGrain();
 installTelemetry();
 installAudio();
 
@@ -74,14 +76,16 @@ function matchExtras(deckId, online = false, ticket = null) {
   if (online) track('match_start', { mode: 'online', deck: deckId });
   return {
     cosmetics: {
-      back: p.cosmetics.back, arena: p.cosmetics.arena,
+      ...loadoutFor(p, deckId), title: founderTitle(p.founder), // this deck's back, arena and frame
       finishes: new Map(p.cosmetics.premiumArt ? Object.keys(p.cards).map(id => [id, bestFinish(p, id)]).filter(([, f]) => f) : []),
     },
     // The game-over screen shows `holder`, filled in once the rewards are known.
     onResult: ({ won, damage, moves }) => {
       track('match_end', { mode: online ? 'online' : 'ai', deck: deckId, won });
       const holder = h('div', { class: 'rewards-holder' }, h('p', { class: 'muted rewards-wait' }, 'Adding up your rewards…'));
-      const show = (out, ranked = null) => holder.replaceChildren(rewardsPanel(out, deckId, ranked));
+      const resultSoundsUntil = performance.now() + 2400;
+      const show = (out, ranked = null) => holder.replaceChildren(
+        rewardsPanel(out, deckId, ranked, Math.max(0, resultSoundsUntil - performance.now())));
       const note = text => holder.replaceChildren(h('p', { class: 'muted' }, text));
       if (online && signedIn()) {
         const got = msg => { rewardWaiter = null; pendingRewards = null; reload().then(() => show(msg.out, msg.ranked)); };
@@ -257,82 +261,107 @@ function menu() {
         }, deck.starter ? 'Copy & edit' : 'Edit')));
   };
 
-  const vsSide = (deck, label, right, listName) => h('div', { class: `vs-side${right ? ' right' : ''}`, style: { '--deck': deck ? deck.color : '#888' } },
-    right ? null : artSlot('', deck ? deckArtUrls(deck.id) : [], deck ? deckEmblem(deck) : '🎲'),
-    h('div', null,
-      h('div', { class: 'vs-sub' }, label),
-      h('div', { class: 'vs-name' }, deck ? deck.name : 'Random deck'),
-      listName ? h('div', { class: 'vs-list' }, listName) : null),
-    right ? artSlot('', deck ? deckArtUrls(deck.id) : [], deck ? deckEmblem(deck) : '🎲') : null);
+  let browsing = false;
+  const picker = (label, value, options, change) => h('label', { class: 'match-picker' },
+    h('span', null, label),
+    h('select', { onchange: e => { change(e.target.value); savePrefs(); render(false); } },
+      options.map(([id, name]) => h('option', { value: id, selected: id === value }, name))));
 
   let listsShownFor = null; // deal the list tiles in again only when the archetype changes
   const render = (animate = true) => {
     const mine = DECKS.find(d => d.id === prefs.myDeck);
-    const opp = prefs.oppDeck === 'random' ? null : DECKS.find(d => d.id === prefs.oppDeck);
     const myList = resolveDeck(mine.id, prefs.lists[mine.id], usable);
     const dealLists = !animate && listsShownFor !== mine.id;
     listsShownFor = mine.id;
     root.replaceChildren(h('main', { class: 'menu' },
-      walletBar({ nav, quiet: !animate }),
-      h('header', { class: `menu-head${animate ? ' rise' : ''}` },
-        h('div', { class: 'logo-kicker' }, 'Every deck is a genre'),
-        h('div', { class: 'logo-wrap' }, logo()),
-        h('p', { class: 'tagline' }, 'A card battler where every deck is a video game genre.')),
-      h('section', null,
-        h('h2', null, 'Your deck'),
-        h('div', { class: 'deck-grid' }, DECKS.map((d, i) => deckTile(d, animate ? i + 1 : 0, prefs.myDeck === d.id, () => {
-          prefs.myDeck = d.id;
-          if (prefs.oppDeck === d.id) prefs.oppDeck = 'random';
-          savePrefs();
-          render(false);
-        })))),
-      h('section', { class: animate ? 'rise' : '', style: { '--i': 11 } },
-        h('h2', null, `${mine.name} deck list`),
-        h('div', { class: 'list-grid', style: { '--deck': mine.color } },
-          decksFor(mine.id).map((d, i) => listTile(d, dealLists ? i + 1 : 0, d.key === myList.key)),
-          h('button', { class: 'list-tile new', onclick: () => build() },
-            h('span', { class: 'list-plus', 'aria-hidden': 'true' }, '+'),
-            h('span', { class: 'list-name' }, 'New deck'),
-            h('span', { class: 'list-blurb' }, `Build your own from the ${mine.name} cards`)),
-          h('button', { class: 'list-tile new', onclick: importCode },
-            h('span', { class: 'list-plus', 'aria-hidden': 'true' }, '⇩'),
-            h('span', { class: 'list-name' }, 'Import code'),
-            h('span', { class: 'list-blurb' }, 'Paste a deck code someone shared')))),
-      h('section', { class: animate ? 'rise' : '', style: { '--i': 12 } },
-        h('h2', null, 'Opponent'),
-        h('div', { class: 'chips' },
-          h('button', { class: `chip random${prefs.oppDeck === 'random' ? ' selected' : ''}`, onclick: () => { prefs.oppDeck = 'random'; savePrefs(); render(false); } },
-            h('span', { class: 'chip-emblem', 'aria-hidden': 'true' }, '🎲'), 'Random'),
-          DECKS.filter(d => d.id !== prefs.myDeck).map(d => h('button', {
-            class: `chip${prefs.oppDeck === d.id ? ' selected' : ''}`, style: { '--deck': d.color },
-            onclick: () => { prefs.oppDeck = d.id; savePrefs(); render(false); },
-          }, emblem(d), d.name)))),
+      h('div', { class: 'menu-tools' }, settingsButton({ onTutorial: tutorial }), walletBar({ nav, quiet: !animate })),
+      h('header', { class: 'menu-head' }, logo()),
+      h('div', { class: 'match-launch' },
+        picker('Your deck', mine.id, DECKS.map(d => [d.id, d.name]), id => {
+          prefs.myDeck = id;
+          if (prefs.oppDeck === id) prefs.oppDeck = 'random';
+        }),
+        picker('Deck list', myList.key, decksFor(mine.id).filter(usable).map(d => [d.key, d.name]), key => { prefs.lists[mine.id] = key; }),
+        picker('AI opponent', prefs.oppDeck, [['random', 'Random deck'], ...DECKS.filter(d => d.id !== mine.id).map(d => [d.id, d.name])],
+          id => { prefs.oppDeck = id; }),
+        h('div', { class: 'launch-actions' },
+          h('button', { class: 'btn primary big', onclick: () => play(false) }, 'Play vs AI'),
+          h('button', { class: 'btn primary big online', onclick: online }, 'Play online'),
+          h('button', { class: 'btn ghost', onclick: () => play(true) }, 'Watch AI vs AI'))),
+      h('details', { class: 'deck-browser', open: browsing, ontoggle: e => {
+        if (e.currentTarget.isConnected) browsing = e.currentTarget.open;
+      } },
+        h('summary', null, 'Browse and build decks'),
+        h('section', null,
+          h('h2', null, 'Your deck'),
+          h('div', { class: 'deck-grid' }, DECKS.map((d, i) => deckTile(d, animate ? i + 1 : 0, prefs.myDeck === d.id, () => {
+            prefs.myDeck = d.id;
+            if (prefs.oppDeck === d.id) prefs.oppDeck = 'random';
+            savePrefs();
+            render(false);
+          })))),
+        h('section', null,
+          h('h2', null, mine.name + ' deck list'),
+          h('div', { class: 'list-grid', style: { '--deck': mine.color } },
+            decksFor(mine.id).map((d, i) => listTile(d, dealLists ? i + 1 : 0, d.key === myList.key)),
+            h('button', { class: 'list-tile new', onclick: () => build() },
+              h('span', { class: 'list-plus', 'aria-hidden': 'true' }, '+'),
+              h('span', { class: 'list-name' }, 'New deck'),
+              h('span', { class: 'list-blurb' }, `Build your own from the ${mine.name} cards`)),
+            h('button', { class: 'list-tile new', onclick: importCode },
+              h('span', { class: 'list-plus', 'aria-hidden': 'true' }, '⇩'),
+              h('span', { class: 'list-name' }, 'Import code'),
+              h('span', { class: 'list-blurb' }, 'Paste a deck code someone shared'))))),
       !profile().tutorial && !tutorialSeen() ? h('div', { class: `tutorial-offer${animate ? ' rise' : ''}`, style: { '--i': 12 } },
         h('div', null, h('b', null, 'New to MetaDeck?'), h('span', null, ' Learn the basics in about four minutes, and get a free pack.')),
         h('button', { class: 'btn primary', onclick: tutorial }, 'Play the tutorial'),
         h('button', { class: 'btn ghost small', 'aria-label': 'No thanks', onclick: () => { dismissTutorial(); render(false); } }, '✕')) : null,
-      h('div', { class: `vs-strip${animate ? ' rise' : ''}`, style: { '--i': 13 } },
-        vsSide(mine, 'You', false, myList.name),
-        h('div', { class: 'vs-badge' }, 'VS'),
-        vsSide(opp, 'Opponent', true)),
-      h('div', { class: `menu-actions${animate ? ' rise' : ''}`, style: { '--i': 14 } },
-        h('button', { class: 'btn primary big', onclick: () => play(false) }, 'Play vs AI'),
-        h('button', { class: 'btn primary big online', onclick: online }, 'Play online'),
-        h('button', { class: 'btn ghost', onclick: () => play(true) }, 'Watch AI vs AI'),
+      h('nav', { class: `menu-actions${animate ? ' rise' : ''}`, 'aria-label': 'Explore' },
         h('button', { class: 'btn ghost', onclick: () => collection(root, { onBack: menu, nav, tab: 'cards', deckId: prefs.myDeck }) }, 'Collection'),
         h('button', { class: 'btn ghost', onclick: nav.shop }, 'Shop'),
         h('button', { class: 'btn ghost', onclick: () => gallery(prefs.myDeck) }, 'Card gallery'),
         h('button', { class: 'btn ghost', onclick: () => players() }, signedIn()?.rank ? `Profile · ${signedIn().rank.label}` : 'Profile & friends'),
         h('button', { class: 'btn ghost', onclick: rules }, 'How to play'),
-        h('button', { class: 'btn ghost', onclick: () => settingsDialog({ onTutorial: tutorial }) }, 'Settings'),
         h('button', { class: 'btn ghost', onclick: () => balanceLab(root, { onBack: menu }) }, 'Balance lab')),
-      h('footer', { class: 'site-foot' },
-        h('a', { href: 'legal/privacy.html', target: '_blank', rel: 'noopener' }, 'Privacy'),
-        h('span', { 'aria-hidden': 'true' }, '·'),
-        h('a', { href: 'legal/terms.html', target: '_blank', rel: 'noopener' }, 'Terms')),
+      !signedIn() && spotsNow?.left > 0 ? h('div', { class: animate ? 'rise' : '', style: { '--i': 1 } },
+        founderPitch(spotsNow, { onClaim: signUpScreen })) : null,
+      siteFoot(),
     ));
   };
   render(true);
+  window.scrollTo(0, 0);
+}
+
+// The menu's footer: link columns over the oversized wordmark, which lights up under the pointer.
+function siteFoot() {
+  const link = (text, onclick) => h('li', null, h('button', { class: 'foot-link', onclick }, text));
+  const legal = (text, page) => h('li', null, h('a', { class: 'foot-link', href: `legal/${page}.html`, target: '_blank', rel: 'noopener' }, text));
+  const mark = h('div', { class: 'foot-mark', 'aria-hidden': 'true' }, 'MetaDeck');
+  mark.addEventListener('pointermove', e => {
+    const r = mark.getBoundingClientRect();
+    mark.style.setProperty('--mx', `${((e.clientX - r.left) / r.width) * 100}%`);
+  });
+  return h('footer', { class: 'site-foot' },
+    h('div', { class: 'foot-cols' },
+      h('div', { class: 'foot-about' },
+        h('b', null, 'MetaDeck'),
+        h('p', null, `A card battler where every deck is a video game genre. ${DECKS.length} decks, one arena.`)),
+      h('nav', { 'aria-label': 'Play' }, h('h3', null, 'Play'), h('ul', null,
+        link('Play the tutorial', tutorial),
+        link('How to play', rules),
+        link('Card gallery', () => gallery(prefs.myDeck)),
+        link('Balance lab', () => balanceLab(root, { onBack: menu })))),
+      h('nav', { 'aria-label': 'Your stuff' }, h('h3', null, 'Your stuff'), h('ul', null,
+        link('Collection', nav.collection),
+        link('Season pass', nav.season),
+        link('Shop', nav.shop),
+        link(signedIn() ? 'Account' : 'Sign in', nav.account))),
+      h('nav', { 'aria-label': 'Legal' }, h('h3', null, 'Legal'), h('ul', null,
+        legal('Privacy', 'privacy'),
+        legal('Terms', 'terms'),
+        legal('Refunds', 'refunds')))),
+    mark,
+    h('p', { class: 'foot-fine' }, `© ${new Date().getFullYear()} MetaDeck`));
 }
 
 // The tutorial match, then back to the menu.
@@ -460,36 +489,68 @@ function rules() {
 
 // Title screen: the key art full-bleed (its logo is the title), embers rising, and "press to start".
 // Resolves once the player clicks or presses a key, after the art has flared out.
+// Resolves to 'signup' when the player claimed a founder spot from it, else to nothing (go to the menu).
 function titleScreen() {
   return new Promise(resolve => {
     let done = false;
-    const start = () => {
+    const start = (intent = null) => {
       if (done) return;
       done = true;
       removeEventListener('keydown', onKey);
       screen.classList.add('leaving');
-      setTimeout(resolve, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 650);
+      setTimeout(() => resolve(intent), matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 650);
     };
     const onKey = e => { if (!e.repeat && !['Shift', 'Control', 'Alt', 'Meta', 'Tab'].includes(e.key)) start(); };
     addEventListener('keydown', onKey);
     const embers = Array.from({ length: 26 }, (_, i) => h('i', { style: {
       '--x': `${(i * 37) % 100}%`, '--s': `${2 + (i % 4)}px`, '--d': `${7 + (i * 13) % 9}s`, '--t': `${-(i * 0.7)}s`, '--dx': `${(i % 2 ? 1 : -1) * (12 + i % 30)}px`,
     } }));
+    // The tagline's last word flips through the genres, each in its deck's colour.
+    const genre = h('span', { class: 'title-genre', style: { '--deck': DECKS[0].color } }, h('b', null, DECKS[0].name));
+    let shown = 0;
+    const flip = motionOK() ? setInterval(() => {
+      if (done || !genre.isConnected) { clearInterval(flip); return; }
+      const deck = DECKS[shown = (shown + 1) % DECKS.length];
+      const word = h('b', null, deck.name);
+      genre.style.setProperty('--deck', deck.color);
+      genre.firstChild.classList.add('out');
+      genre.append(word);
+      setTimeout(() => genre.firstChild?.classList.contains('out') && genre.firstChild.remove(), 450);
+    }, 1800) : null;
+    const stats = [[DECKS.length, 'genre decks'], [Object.keys(CARDS).length, 'cards'], ['Ranked', 'online play'], ['Free', 'to play']];
     const screen = h('main', { class: 'title-screen', onclick: start },
       h('div', { class: 'title-art', 'aria-hidden': 'true' }, h('img', { src: 'assets/img/ui/key-art.webp', alt: '', decoding: 'async' })),
       h('div', { class: 'title-embers', 'aria-hidden': 'true' }, embers),
       h('h1', { class: 'sr-only' }, 'MetaDeck'),
       h('div', { class: 'title-foot' },
         h('button', { class: 'title-start' }, 'Press to start'),
-        h('p', { class: 'title-tag' }, 'A card battler where every deck is a video game genre.')));
+        h('p', { class: 'title-tag', 'aria-label': 'A card battler where every deck is a video game genre.' },
+          h('span', { 'aria-hidden': 'true' }, 'A card battler where every deck is a video game genre: ', genre)),
+        h('ul', { class: 'title-stats', 'aria-label': 'MetaDeck at a glance' }, stats.map(([n, label], i) =>
+          h('li', { style: { '--i': i } }, h('b', { 'data-count': typeof n === 'number' ? n : null }, String(n)), h('span', null, label))))));
     root.replaceChildren(screen);
+    for (const b of screen.querySelectorAll('[data-count]')) countUp(b, +b.dataset.count, { delay: 900 });
+    // Guests see the Meta Founder offer here too, once we know they're a guest and spots are left.
+    Promise.all([ready, founderSpots]).then(([, spots]) => {
+      if (done || signedIn() || !(spots?.left > 0)) return;
+      screen.querySelector('.title-foot').prepend(founderPitch(spots, { strip: true, onClaim: () => start('signup') }));
+    });
   });
+}
+
+// Straight to account creation (from a founder offer), back to the menu afterwards.
+function signUpScreen() {
+  accountScreen(root, { onBack: menu, nav, mode: 'signup' });
 }
 
 // Pick up a signed-in account first, then go to the menu. A reload during an online match goes
 // straight back to it (the server keeps it for a while).
 const ready = initAccount().catch(() => {});
+// Meta Founder places left ({ slots, taken, left }), for the offers to guests; null on a static host.
+const founderSpots = fetch('/api/founders', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).catch(() => null);
+let spotsNow = null;
+founderSpots.then(s => { spotsNow = s; });
 ready.then(() => { const notice = signedIn()?.rank?.notice; if (notice) seasonEnded(notice); });
 ready.then(() => { shopConfig(); returnedFromCheckout(); });
 if (net.inMatch) ready.finally(online);
-else Promise.all([ready, titleScreen()]).then(menu);
+else Promise.all([ready, titleScreen(), founderSpots]).then(([, intent]) => (intent === 'signup' ? signUpScreen() : menu()));
