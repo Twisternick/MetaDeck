@@ -339,6 +339,8 @@ function siteFoot() {
   // The server adds the operator's address from DATA_DIR/site.json; without one there's no Contact link.
   const contactEmail = document.querySelector('meta[name="contact"]')?.content;
   const legal = (text, page) => h('li', null, h('a', { class: 'foot-link', href: `legal/${page}.html`, target: '_blank', rel: 'noopener' }, text));
+  // The public guide pages (server/pages.mjs), in a new tab so a match or deck in progress stays put.
+  const guide = (text, page) => h('li', null, h('a', { class: 'foot-link', href: page, target: '_blank', rel: 'noopener' }, text));
   const mark = h('div', { class: 'foot-mark', 'aria-hidden': 'true' }, 'MetaDeck');
   mark.addEventListener('pointermove', e => {
     const r = mark.getBoundingClientRect();
@@ -355,6 +357,11 @@ function siteFoot() {
         link('How to play', rules),
         link('Card gallery', () => gallery(prefs.myDeck)),
         link('Balance lab', () => balanceLab(root, { onBack: menu })))),
+      h('nav', { 'aria-label': 'Guides' }, h('h3', null, 'Guides'), h('ul', null,
+        guide('Deck guides', 'decks'),
+        guide('Card list', 'cards'),
+        guide('Tier list', 'meta'),
+        guide('Rules and keywords', 'how-to-play'))),
       h('nav', { 'aria-label': 'Your stuff' }, h('h3', null, 'Your stuff'), h('ul', null,
         link('Collection', nav.collection),
         link('Season pass', nav.season),

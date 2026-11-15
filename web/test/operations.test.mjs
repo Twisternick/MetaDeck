@@ -66,6 +66,20 @@ test('search engines get readable text and a robots.txt; the sitemap waits for P
   assert.equal((await request('/sitemap.xml')).status, 404);
 });
 
+test('the content pages are served with the security headers and revalidate by ETag', async () => {
+  for (const p of ['/decks', '/decks/horror', '/decks/card-game', '/cards', '/how-to-play', '/meta']) {
+    const r = await request(p);
+    assert.equal(r.status, 200, p);
+    assert.match(r.headers['content-type'], /text\/html/);
+    assert.match(r.headers['content-security-policy'], /script-src 'self'/);
+    assert.doesNotMatch(r.text, /https?:\/\/(?!localhost)(?!www\.w3)/, `${p} loads nothing from third parties`);
+    assert.equal((await request(p, { headers: { 'if-none-match': r.headers.etag } })).status, 304, p);
+  }
+  assert.equal((await request('/decks/minecraft')).status, 404);
+  assert.equal((await request('/pages.css')).status, 200);
+  assert.equal((await request('/src/ui/card-search.js')).status, 200);
+});
+
 test('with PUBLIC_URL the page gets a canonical link and structured data, and the sitemap lists the pages', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'metadeck-seo-'));
   const proc = spawn(process.execPath, [fileURLToPath(new URL('../serve.mjs', import.meta.url)), '0'], {
@@ -85,6 +99,8 @@ test('with PUBLIC_URL the page gets a canonical link and structured data, and th
     const sitemap = await (await fetch(`${base}/sitemap.xml`)).text();
     assert.match(sitemap, /<loc>https:\/\/play\.example\.com\/<\/loc>/);
     assert.match(sitemap, /<loc>https:\/\/play\.example\.com\/legal\/privacy\.html<\/loc>/);
+    assert.match(sitemap, /<loc>https:\/\/play\.example\.com\/decks\/city-builder<\/loc>/);
+    assert.match(await (await fetch(`${base}/decks/horror`)).text(), /<link rel="canonical" href="https:\/\/play\.example\.com\/decks\/horror">/);
   } finally {
     proc.kill();
     await new Promise(r => proc.once('exit', r));

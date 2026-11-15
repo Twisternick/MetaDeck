@@ -33,6 +33,7 @@ import { createFeedback } from './server/feedback.mjs';
 import { createSite, loadSiteConfig } from './server/site.mjs';
 import { installLog } from './server/log.mjs';
 import { backup } from './server/db.mjs';
+import { createPages } from './server/pages.mjs';
 import { handleAccountApi, sessionToken } from './server/account-api.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -52,7 +53,7 @@ const types = {
 // tools, tests, reports) stays private. In assets/audio only the game's own sound slots are served
 // (click.mp3, play-RPG.mp3, …): the sound libraries they were cut from may sit in subfolders there, and
 // their licences forbid handing out the original files.
-const PUBLIC = [/^\/index\.html$/, /^\/checkout\.html$/, /^\/styles\.css$/, /^\/src\//, /^\/assets\/(?!audio\/)/,
+const PUBLIC = [/^\/index\.html$/, /^\/checkout\.html$/, /^\/styles\.css$/, /^\/pages\.css$/,/^\/src\//, /^\/assets\/(?!audio\/)/,
   /^\/assets\/audio\/[A-Za-z0-9-]+\.(mp3|ogg)$/, /^\/legal\/[a-z-]+\.(html|css)$/];
 
 const dataDir = path.resolve(process.env.DATA_DIR || path.join(root, 'data'));
@@ -216,6 +217,7 @@ const isJson = req => /^application\/json\b/i.test(req.headers['content-type'] ?
 // It writes a file, so it only accepts requests from this machine, addressed to localhost (which stops
 // DNS rebinding), from the game's own page, as JSON (which a cross-site form can't send).
 const reportFile = path.join(root, 'reports', 'meta-latest.md');
+const pages = createPages({ publicUrl, reportFile });
 function saveReport(req, res) {
   if (!fromThisMachine(req) || !sameOrigin(req) || !isJson(req)) { res.writeHead(403).end('Reports can only be saved from the machine running the server.'); return; }
   readBody(req, res, 1_000_000, body => {
@@ -231,7 +233,7 @@ function saveReport(req, res) {
 
 // For search engines. Crawlers may read everything the game serves except the API. The sitemap and
 // the game's structured data (schema.org) need absolute URLs, so they're only sent when PUBLIC_URL is set.
-const crawlerPages = ['/', '/legal/terms.html', '/legal/privacy.html', '/legal/refunds.html'];
+const crawlerPages = () => ['/', ...pages.paths(), '/legal/terms.html', '/legal/privacy.html', '/legal/refunds.html'];
 function serveCrawlerFile(req, res, urlPath) {
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405, { Allow: 'GET, HEAD' }).end(); return; }
   let body;
@@ -240,7 +242,7 @@ function serveCrawlerFile(req, res, urlPath) {
   } else {
     if (!publicUrl) { res.writeHead(404).end('Not found'); return; }
     body = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
-      + crawlerPages.map(p => `  <url><loc>${publicUrl}${p}</loc></url>\n`).join('') + '</urlset>\n';
+      + crawlerPages().map(p => `  <url><loc>${publicUrl}${p}</loc></url>\n`).join('') + '</urlset>\n';
   }
   const type = urlPath === '/robots.txt' ? 'text/plain; charset=utf-8' : 'application/xml; charset=utf-8';
   res.writeHead(200, { 'Content-Type': type, 'Content-Length': Buffer.byteLength(body), 'Cache-Control': 'public, max-age=3600', 'X-Content-Type-Options': 'nosniff' });
@@ -270,6 +272,15 @@ function serveStatic(req, res) {
   let urlPath;
   try { urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname); } catch { res.writeHead(400).end('Bad request'); return; }
   if (urlPath === '/robots.txt' || urlPath === '/sitemap.xml') { serveCrawlerFile(req, res, urlPath); return; }
+  // The content pages (decks, cards, meta, how to play) are built from the card data, not read from disk.
+  const page = pages.render(urlPath);
+  if (page) {
+    const headers = { ...securityHeaders(req), ETag: page.etag, 'Cache-Control': 'no-cache' };
+    if (req.headers['if-none-match'] === page.etag) { res.writeHead(304, headers).end(); return; }
+    res.writeHead(200, { ...headers, 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': Buffer.byteLength(page.html) });
+    res.end(req.method === 'HEAD' ? undefined : page.html);
+    return;
+  }
   if (urlPath === '/') urlPath = '/index.html';
   const file = path.resolve(root, '.' + urlPath);
   const ok = !urlPath.includes('\0') && !urlPath.split(/[\\/]/).some(part => part.startsWith('.'))

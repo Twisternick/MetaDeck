@@ -3748,7 +3748,7 @@ body:has(#app > .match) .bg-grain { opacity: .045; }
 
 /* footer: link columns over an oversized wordmark that lights up under the pointer */
 .site-foot { display: block; margin: 56px 0 0; padding: 30px 0 18px; border-top: 1px solid var(--stroke); font-size: 14px; color: var(--muted); }
-.foot-cols { display: grid; grid-template-columns: 1.6fr repeat(3, 1fr); gap: 28px; }
+.foot-cols { display: grid; grid-template-columns: 1.6fr repeat(4, 1fr); gap: 28px; }
 .foot-about b { font-family: var(--display); font-size: 22px; letter-spacing: 1px; color: var(--gold-ink); }
 .foot-about p { margin: 8px 0 0; max-width: 32ch; line-height: 1.5; }
 .site-foot h3 { margin: 0 0 10px; font-family: var(--tech); font-size: 13px; letter-spacing: 2px; text-transform: uppercase; color: var(--text); }
@@ -3774,7 +3774,7 @@ body:has(#app > .match) .bg-grain { opacity: .045; }
 }
 .foot-fine { margin: 6px 0 0; font-size: 12px; text-align: center; color: var(--dim); }
 @media (max-width: 720px) {
-  .foot-cols { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px 14px; }
+  .foot-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 14px; }
   .foot-about { grid-column: 1 / -1; }
 }
 
