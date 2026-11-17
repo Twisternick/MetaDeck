@@ -85,6 +85,10 @@ const MIGRATIONS = [
      user TEXT, user_name TEXT, resolved INTEGER NOT NULL DEFAULT 0
    );
    CREATE INDEX feedback_open ON feedback(resolved, at);`,
+  // 6: each side's play style (data/index.js deckStyle), for the live tier list (server/live-meta.mjs).
+  `ALTER TABLE matches ADD COLUMN style0 TEXT;
+   ALTER TABLE matches ADD COLUMN style1 TEXT;
+   CREATE INDEX matches_at ON matches(at);`,
 ];
 
 // Open (or create) the database and bring its schema up to date. `file` null or ':memory:' keeps it in memory.
@@ -124,11 +128,12 @@ export function transaction(db, fn) {
 
 // Record a finished match. `players` are account keys (null for a guest or the AI), `winner` 0, 1 or
 // null for a draw, `ending` how it ended: 'hero' (a hero fell), 'left', 'disconnected' or 'inactive'.
-// A ranked match also has `stars`: each seat's rank change. Returns the match's id.
-export function logMatch(db, { kind, players, decks, winner, turns, seconds = null, ending = 'hero', at = new Date(), rated = false, stars = [null, null] }) {
-  return Number(db.prepare(`INSERT INTO matches (at, kind, p0, p1, deck0, deck1, winner, turns, seconds, ending, rated, stars0, stars1)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(at.toISOString(), kind, players[0] ?? null, players[1] ?? null, decks[0], decks[1],
+// A ranked match also has `stars`: each seat's rank change. `styles` is each deck's play style (Aggro,
+// Control, ...). Returns the match's id.
+export function logMatch(db, { kind, players, decks, styles = [null, null], winner, turns, seconds = null, ending = 'hero', at = new Date(), rated = false, stars = [null, null] }) {
+  return Number(db.prepare(`INSERT INTO matches (at, kind, p0, p1, deck0, deck1, style0, style1, winner, turns, seconds, ending, rated, stars0, stars1)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(at.toISOString(), kind, players[0] ?? null, players[1] ?? null, decks[0], decks[1], styles[0] ?? null, styles[1] ?? null,
       winner === 0 || winner === 1 ? winner : null, turns, seconds, ending, rated ? 1 : 0, stars[0] ?? null, stars[1] ?? null).lastInsertRowid);
 }
 

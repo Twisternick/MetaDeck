@@ -85,7 +85,7 @@ export async function returnedFromCheckout() {
     await new Promise(r => setTimeout(r, 2500));
     await reload();
     if (!Number.isFinite(before) || profile().gems > before) {
-      toast('Your Gems have arrived. 💎');
+      toast('Your Gems have arrived.');
       return;
     }
   }

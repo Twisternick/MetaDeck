@@ -3,7 +3,9 @@
 // lives in engine/constants.js; this file only decides how it looks.
 
 import { h } from './dom.js';
-import { KEYWORDS, TERMS } from '../engine/constants.js';
+import { artIcon } from './fx.js';
+import { keywordIconKey, ruleIconKey, triggerIconKey } from './icon-keys.js';
+import { KEYWORDS, TERMS, RULES } from '../engine/constants.js';
 
 // kind: how the keyword behaves, which decides the chip colour family.
 //   combat  – changes how fights resolve (red/orange)
@@ -13,56 +15,56 @@ import { KEYWORDS, TERMS } from '../engine/constants.js';
 //   economy – resources: cards, Bandwidth, Nitro (cyan)
 //   passive – static restriction or tag (grey)
 export const KW_META = {
-  Rush: { icon: '⚡', kind: 'combat', hint: 'Attacks the turn it arrives' },
-  Guard: { icon: '🛡️', kind: 'defense', hint: 'Must be attacked first' },
-  FirstStrike: { icon: '⚔️', kind: 'combat', hint: 'Hits before the other monster' },
-  Counter: { icon: '↩️', kind: 'defense', hint: 'Hits first when attacked' },
-  Stealth: { icon: '👁️', kind: 'defense', hint: "Can't be hit until it attacks" },
-  Suppression: { icon: '📵', kind: 'combat', hint: "What it damages can't attack next turn" },
-  Headshot: { icon: '🎯', kind: 'combat', hint: 'Kills a damaged monster outright' },
-  Drone: { icon: '🛸', kind: 'passive', hint: 'Just a tag — no rules' },
-  Fear: { icon: '😱', kind: 'combat', hint: 'Target gets -1 ATK before the fight' },
-  Haunt: { icon: '👻', kind: 'trigger', hint: 'Death: 2 damage to a random enemy' },
-  Devour: { icon: '🦷', kind: 'trigger', hint: 'Grows +1/+1 after a kill' },
-  DoubleJump: { icon: '🦘', kind: 'combat', hint: 'Ignores Guard' },
-  PoweredUp: { icon: '✨', kind: 'defense', hint: 'Blocks the next damage once' },
-  Checkpoint: { icon: '🚩', kind: 'defense', hint: 'Survives lethal damage once' },
-  XP: { icon: '🎓', kind: 'trigger', hint: '+1 XP per surviving attack' },
-  Momentum: { icon: '🏃', kind: 'bonus', hint: '+1 ATK after your first attack' },
-  Clutch: { icon: '💢', kind: 'bonus', hint: '+2 ATK while behind on HP' },
-  Combo: { icon: '🔗', kind: 'bonus', hint: '+1 ATK per other card played (max 2)' },
-  Structure: { icon: '🏛️', kind: 'passive', hint: "Can't attack" },
-  Fortify: { icon: '🧱', kind: 'defense', hint: 'Takes 1 less from every hit' },
-  Generate: { icon: '🔋', kind: 'economy', hint: '+1 Bandwidth each turn' },
-  District: { icon: '🏙️', kind: 'passive', hint: 'Powers up District cards' },
-  Tax: { icon: '💰', kind: 'economy', hint: 'Enemy spells cost 1 more' },
-  Populate: { icon: '👥', kind: 'trigger', hint: 'Arrives with a 1/1 Citizen' },
-  Topdeck: { icon: '🃏', kind: 'trigger', hint: '+1/+1 per extra card drawn' },
-  JudgeCall: { icon: '⚖️', kind: 'trigger', hint: 'Silences a random enemy when played' },
-  Copy: { icon: '📑', kind: 'economy', hint: 'Shuffles a copy into the top of your deck' },
-  Overtake: { icon: '🏁', kind: 'economy', hint: '+1 Nitro after it attacks' },
-  Slipstream: { icon: '💨', kind: 'bonus', hint: '+1 ATK while you hold Nitro' },
-  Inspire: { icon: '📣', kind: 'bonus', hint: 'Your other monsters +1 ATK' },
+  Rush: { kind: 'combat', hint: 'Attacks the turn it arrives' },
+  Guard: { kind: 'defense', hint: 'Must be attacked first' },
+  FirstStrike: { kind: 'combat', hint: 'Hits before the other monster' },
+  Counter: { kind: 'defense', hint: 'Hits first when attacked' },
+  Stealth: { kind: 'defense', hint: "Can't be hit until it attacks" },
+  Suppression: { kind: 'combat', hint: "What it damages can't attack next turn" },
+  Headshot: { kind: 'combat', hint: 'Kills a damaged monster outright' },
+  Drone: { kind: 'passive', hint: 'Just a tag — no rules' },
+  Fear: { kind: 'combat', hint: 'Target gets -1 ATK before the fight' },
+  Haunt: { kind: 'trigger', hint: 'Death: 2 damage to a random enemy' },
+  Devour: { kind: 'trigger', hint: 'Grows +1/+1 after a kill' },
+  DoubleJump: { kind: 'combat', hint: 'Ignores Guard' },
+  PoweredUp: { kind: 'defense', hint: 'Blocks the next damage once' },
+  Checkpoint: { kind: 'defense', hint: 'Survives lethal damage once' },
+  XP: { kind: 'trigger', hint: '+1 XP per surviving attack' },
+  Momentum: { kind: 'bonus', hint: '+1 ATK after your first attack' },
+  Clutch: { kind: 'bonus', hint: '+2 ATK while behind on HP' },
+  Combo: { kind: 'bonus', hint: '+1 ATK per other card played (max 2)' },
+  Structure: { kind: 'passive', hint: "Can't attack" },
+  Fortify: { kind: 'defense', hint: 'Takes 1 less from every hit' },
+  Generate: { kind: 'economy', hint: '+1 Bandwidth each turn' },
+  District: { kind: 'passive', hint: 'Powers up District cards' },
+  Tax: { kind: 'economy', hint: 'Enemy spells cost 1 more' },
+  Populate: { kind: 'trigger', hint: 'Arrives with a 1/1 Citizen' },
+  Topdeck: { kind: 'trigger', hint: '+1/+1 per extra card drawn' },
+  JudgeCall: { kind: 'trigger', hint: 'Silences a random enemy when played' },
+  Copy: { kind: 'economy', hint: 'Shuffles a copy into the top of your deck' },
+  Overtake: { kind: 'economy', hint: '+1 Nitro after it attacks' },
+  Slipstream: { kind: 'bonus', hint: '+1 ATK while you hold Nitro' },
+  Inspire: { kind: 'bonus', hint: 'Your other monsters +1 ATK' },
 };
 
 export const TERM_META = {
-  'Level Up': { icon: '⭐', kind: 'bonus' },
-  Silence: { icon: '🔇', kind: 'combat' },
-  Suppress: { icon: '📵', kind: 'combat' },
-  Boost: { icon: '🔥', kind: 'economy' },
-  Nitro: { icon: '🏎️', kind: 'economy' },
-  Bandwidth: { icon: '💠', kind: 'economy' },
-  Quick: { icon: '⏱️', kind: 'trigger' },
-  Revive: { icon: '💫', kind: 'trigger' },
-  Errata: { icon: '📝', kind: 'combat' },
-  'Alt Art': { icon: '🎨', kind: 'economy' },
-  'House Rule': { icon: '📜', kind: 'passive' },
-  Objection: { icon: '✋', kind: 'trigger' },
-  Typo: { icon: '✏️', kind: 'economy' },
-  Exile: { icon: '🕳️', kind: 'combat' },
-  'Draft Night': { icon: '🎲', kind: 'economy' },
-  'Balance Patch': { icon: '🩹', kind: 'bonus' },
-  'Hand Size Errata': { icon: '🗂️', kind: 'bonus' },
+  'Level Up': { kind: 'bonus' },
+  Silence: { kind: 'combat' },
+  Suppress: { kind: 'combat' },
+  Boost: { kind: 'economy' },
+  Nitro: { kind: 'economy' },
+  Bandwidth: { kind: 'economy' },
+  Quick: { kind: 'trigger' },
+  Revive: { kind: 'trigger' },
+  Errata: { kind: 'combat' },
+  'Alt Art': { kind: 'economy' },
+  'House Rule': { kind: 'passive' },
+  Objection: { kind: 'trigger' },
+  Typo: { kind: 'economy' },
+  Exile: { kind: 'combat' },
+  'Draft Night': { kind: 'economy' },
+  'Balance Patch': { kind: 'bonus' },
+  'Hand Size Errata': { kind: 'bonus' },
 };
 
 export const KIND_COLORS = {
@@ -74,7 +76,10 @@ export const KIND_COLORS = {
   passive: '#9aa3c2',
 };
 
-export const kwIcon = k => KW_META[k]?.icon ?? TERM_META[k]?.icon ?? '◆';
+// The keyword's painted icon (ui/kw-<keyword>, made in the Art Studio), an element to place inline.
+export const kwIcon = k => artIcon(keywordIconKey(k), kwName(k), kwColor(k));
+// A House Rule's painted icon (ui/rule-<rule>).
+export const ruleIcon = id => artIcon(ruleIconKey(id), RULES[id].name, KIND_COLORS.passive);
 export const kwKind = k => KW_META[k]?.kind ?? TERM_META[k]?.kind ?? 'passive';
 export const kwColor = k => KIND_COLORS[kwKind(k)];
 export const kwName = k => KEYWORDS[k]?.name ?? k;
@@ -83,10 +88,10 @@ export const kwHint = k => KW_META[k]?.hint ?? '';
 
 // The trigger words that open a rules line ("Play:", "Death:", ...), with what they mean.
 export const TRIGGER_TIPS = {
-  'Play': ['▶', 'Happens when you play this card.'],
-  'Death': ['💀', 'Happens when this monster is destroyed.'],
-  'Turn start': ['🌅', 'Happens at the start of each of your turns while this is on the board.'],
-  'Turn end': ['🌙', 'Happens at the end of each of your turns while this is on the board.'],
+  'Play': 'Happens when you play this card.',
+  'Death': 'Happens when this monster is destroyed.',
+  'Turn start': 'Happens at the start of each of your turns while this is on the board.',
+  'Turn end': 'Happens at the end of each of your turns while this is on the board.',
 };
 
 // A small inline chip for a keyword: icon + name, coloured by kind, with a hover tooltip.
@@ -115,9 +120,8 @@ export function richText(line) {
   for (const m of line.matchAll(RICH_RE)) {
     if (m.index > last) out.push(line.slice(last, m.index));
     if (m[1]) {
-      const [icon, tip] = TRIGGER_TIPS[m[1]];
-      out.push(h('span', { class: 'trig', 'data-tip': tip, 'data-tip-title': m[1], tabindex: '0' },
-        h('i', { 'aria-hidden': 'true' }, icon), m[1]));
+      out.push(h('span', { class: 'trig', 'data-tip': TRIGGER_TIPS[m[1]], 'data-tip-title': m[1], tabindex: '0' },
+        h('i', { 'aria-hidden': 'true' }, artIcon(triggerIconKey(m[1]), m[1], '#c9cfe6')), m[1]));
     } else {
       const name = m[2];
       const kw = KW_BY_NAME.find(x => x[0] === name)?.[1];

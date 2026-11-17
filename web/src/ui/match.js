@@ -19,7 +19,7 @@ import { chooseAction } from '../engine/ai.js';
 import { getDeck, deckList, CARDS } from '../data/index.js';
 import { BOARD_SLOTS, START_HP, KEYWORDS, RULES, TERMS, LIMITED_BOARD } from '../engine/constants.js';
 import { rulesLines } from '../engine/text.js';
-import { kwName, kwIcon, kwColor, kwKind, kwText, kwHint, richText, glossaryList } from './keywords.js';
+import { kwName, kwIcon, ruleIcon, kwColor, kwKind, kwText, kwHint, richText, glossaryList } from './keywords.js';
 import { sfx, music, playEvents } from './audio.js';
 import { settingsButton } from './settings.js';
 import { reportDialog } from './report.js';
@@ -501,14 +501,14 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
   function explainBadTarget(ref) {
     const tgt = typeof ref === 'string' ? null : findMonster(state, ref);
     if (ui.mode !== 'attack') {
-      if (tgt && hasKeyword(tgt, 'Stealth') && tgt.owner !== HUMAN) return `${kwIcon('Stealth')} Stealth: enemy effects can't target it until it attacks.`;
+      if (tgt && hasKeyword(tgt, 'Stealth') && tgt.owner !== HUMAN) return `Stealth: enemy effects can't target it until it attacks.`;
       return 'Not a valid target for this card.';
     }
     const att = findMonster(state, ui.source);
     if (tgt && tgt.owner === HUMAN) return "That's your own monster.";
-    if (tgt && hasKeyword(tgt, 'Stealth')) return `${kwIcon('Stealth')} Stealth: it can't be attacked until it attacks.`;
+    if (tgt && hasKeyword(tgt, 'Stealth')) return `Stealth: it can't be attacked until it attacks.`;
     const guardUp = hasGuard(state, OPP);
-    if (guardUp && att && !hasKeyword(att, 'DoubleJump') && !(tgt && hasKeyword(tgt, 'Guard'))) return `${kwIcon('Guard')} Guard: you must attack a Guard monster first.`;
+    if (guardUp && att && !hasKeyword(att, 'DoubleJump') && !(tgt && hasKeyword(tgt, 'Guard'))) return `Guard: you must attack a Guard monster first.`;
     return "Can't attack that.";
   }
 
@@ -828,9 +828,9 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
       if (e.type === 'keyword') { callout(key, { keyword: e.keyword, text: e.text }); continue; }
       if (e.type === 'suppress') { callout(key, { keyword: 'Suppression', name: 'Suppressed', text: "Can't attack next turn" }); continue; }
       if (e.type === 'silence') { callout(key, { keyword: 'Silence', name: 'Silenced', text: 'Loses keywords and text' }); continue; }
-      if (e.type === 'rule' && e.id) { callout(key, { keyword: 'House Rule', icon: RULES[e.id].icon, name: RULES[e.id].name, text: e.keyword ? `${kwName(e.keyword)} switched off` : 'New House Rule' }); continue; }
+      if (e.type === 'rule' && e.id) { callout(key, { keyword: 'House Rule', icon: ruleIcon(e.id), name: RULES[e.id].name, text: e.keyword ? `${kwName(e.keyword)} switched off` : 'New House Rule' }); continue; }
       if (e.type === 'altart') { callout(key, { keyword: 'Alt Art', text: `${e.count} card${e.count === 1 ? '' : 's'} rewritten` }); continue; }
-      if (e.type === 'fizzle' && !e.keyword) callout(key, { keyword: 'Quick', icon: '💨', name: 'Fizzle', text: e.why, color: '#9aa3c2' });
+      if (e.type === 'fizzle' && !e.keyword) callout(key, { keyword: 'Quick', name: 'Fizzle', text: e.why, color: '#9aa3c2' });
       let text = null, cls = '';
       switch (e.type) {
         case 'damage': text = e.amount === 'HEADSHOT' ? 'HEADSHOT' : e.amount ? `-${e.amount}` : '0'; cls = e.amount === 'HEADSHOT' ? 'dmg big' : 'dmg'; break;
@@ -839,7 +839,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
         case 'buff': text = e.text ?? '▲'; cls = e.temp ? 'heal small' : 'heal'; break;
         case 'debuff': text = e.text; cls = 'dmg small'; break;
         case 'fizzle': text = 'Fizzled'; cls = 'info'; break;
-        case 'nitro': text = e.boost ? `🔥 Boost −${-e.amount}` : `Nitro ${e.amount > 0 ? '+' : ''}${e.amount}`; cls = 'nitro'; break;
+        case 'nitro': text = e.boost ? `Boost −${-e.amount}` : `Nitro ${e.amount > 0 ? '+' : ''}${e.amount}`; cls = 'nitro'; break;
         case 'bandwidth': text = `+${e.amount} Bandwidth`; cls = 'info'; break;
         case 'burn': text = 'Burned'; cls = 'info'; break;
         default: continue;
@@ -1087,7 +1087,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
         ui.emoteOpen ? h('div', { class: 'emote-picker', role: 'menu' },
           Object.entries(EMOTES).map(([id, text]) => h('button', { class: 'emote-choice', role: 'menuitem', onclick: () => { online.send({ t: 'emote', id }); ui.emoteOpen = false; render(); } }, text)),
           h('button', { class: 'emote-choice mute', role: 'menuitemcheckbox', 'aria-checked': String(ui.muted), onclick: () => { ui.muted = !ui.muted; ui.bubbles[OPP] = null; ui.emoteOpen = false; render(); } },
-            ui.muted ? '🔈 Unmute opponent' : '🔇 Mute opponent')) : null) : null,
+            ui.muted ? 'Unmute opponent' : 'Mute opponent')) : null) : null,
       online && ui.clock && !state.over ? h('span', {
         class: `turn-pill clock-pill${decisionPlayer(state) === HUMAN ? ' mine' : ''}`,
         title: ui.clock.response ? 'Time left to respond' : 'Time left this turn',
@@ -1183,7 +1183,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
         h('div', { class: 'hero-meta' },
           p.nitro || p.deckId === 'Racing' ? h('span', { class: 'nitro', title: 'Nitro' }, 'Nitro', h('b', null, p.nitro)) : null,
           p.fatigue ? h('span', { title: 'Fatigue' }, 'Fatigue', h('b', null, p.fatigue)) : null,
-          p.objection ? h('span', { class: 'objection', 'data-tip': `Rules Lawyer: ${TERMS.Objection}`, 'data-tip-title': `${kwIcon('Objection')} Objection` }, `${kwIcon('Objection')} Next spell blocked`) : null,
+          p.objection ? h('span', { class: 'objection', 'data-tip': `Rules Lawyer: ${TERMS.Objection}`, 'data-tip-title': 'Objection' }, kwIcon('Objection'), ' Next spell blocked') : null,
           p.hand.length && pid !== HUMAN ? h('span', { title: 'Cards in hand' }, 'Hand', h('b', null, p.hand.length)) : null),
       ),
     );
@@ -1266,7 +1266,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
       const m = p.board[i];
       if (!m) {
         slots.push(sealed
-          ? h('div', { class: 'slot empty sealed', 'data-tip': `Limited Format: boards hold ${LIMITED_BOARD} monsters while the House Rule lasts.`, 'data-tip-title': `${RULES.LimitedFormat.icon} Limited Format` })
+          ? h('div', { class: 'slot empty sealed', 'data-tip': `Limited Format: boards hold ${LIMITED_BOARD} monsters while the House Rule lasts.`, 'data-tip-title': 'Limited Format' })
           : h('div', { class: 'slot empty' }));
         continue;
       }
@@ -1302,7 +1302,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
       h('div', { class: `face-zone${open ? '' : ' blocked'}`, 'aria-hidden': 'true' }),
       h('div', { class: `face-label${open ? '' : ' blocked'}`, 'aria-hidden': 'true' },
         open ? ['⚔ Attack ', h('b', null, name), h('span', null, 'aim anywhere on their side')]
-          : [`${kwIcon('Guard')} `, h('b', null, name), h('span', null, 'is protected by Guard')]),
+          : [kwIcon('Guard'), ' ', h('b', null, name), h('span', null, 'is protected by Guard')]),
     ];
   }
 
@@ -1326,11 +1326,11 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
       const att = findMonster(state, ui.source);
       const guardUp = hasGuard(state, OPP);
       const notes = [];
-      if (att && guardUp && !hasKeyword(att, 'DoubleJump')) notes.push(`${kwIcon('Guard')} Guard is up: only Guard monsters can be attacked`);
-      if (att && guardUp && hasKeyword(att, 'DoubleJump')) notes.push(`${kwIcon('DoubleJump')} Double Jump: ignores Guard`);
-      if (att) for (const b of attackBonuses(state, att)) notes.push(`${kwIcon(b.keyword)} ${kwName(b.keyword)}: +${b.amount} ATK`);
-      if (att && hasKeyword(att, 'Headshot')) notes.push(`${kwIcon('Headshot')} Headshot: destroys a damaged monster outright`);
-      if (att && hasKeyword(att, 'FirstStrike')) notes.push(`${kwIcon('FirstStrike')} First Strike: hits first`);
+      if (att && guardUp && !hasKeyword(att, 'DoubleJump')) notes.push(`Guard is up: only Guard monsters can be attacked`);
+      if (att && guardUp && hasKeyword(att, 'DoubleJump')) notes.push(`Double Jump: ignores Guard`);
+      if (att) for (const b of attackBonuses(state, att)) notes.push(`${kwName(b.keyword)}: +${b.amount} ATK`);
+      if (att && hasKeyword(att, 'Headshot')) notes.push(`Headshot: destroys a damaged monster outright`);
+      if (att && hasKeyword(att, 'FirstStrike')) notes.push(`First Strike: hits first`);
       message = [h('b', null, 'Choose what to attack'), notes.length ? h('span', { class: 'mid-sub' }, notes.join(' · ')) : null];
       cls = 'mine';
     }
@@ -1349,15 +1349,15 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     if (!r) return null;
     const def = RULES[r.id];
     const left = ruleTurnsLeft(state);
-    const keyword = r.keyword ? `${kwIcon(r.keyword)} ${kwName(r.keyword)}` : null;
+    const keyword = r.keyword ? [kwIcon(r.keyword), ` ${kwName(r.keyword)}`] : null;
     const fresh = ui.ruleSeen !== `${r.id}:${r.until}`;
     ui.ruleSeen = `${r.id}:${r.until}`;
     return h('div', {
       class: `rule-banner${fresh ? ' enter' : ''}${left === 0 ? ' last' : ''}`,
       'data-tip': `${def.text}${keyword ? ` Switched off: ${kwName(r.keyword)}.` : ''} ${TERMS['House Rule']}`,
-      'data-tip-title': `${kwIcon('House Rule')} House Rule · played by ${state.players[r.owner].name}`,
+      'data-tip-title': `House Rule · played by ${state.players[r.owner].name}`,
     },
-      h('i', { 'aria-hidden': 'true' }, def.icon),
+      h('i', { 'aria-hidden': 'true' }, ruleIcon(r.id)),
       h('span', { class: 'rule-text' },
         h('b', null, def.name),
         h('small', null, keyword ? [h('s', null, keyword), ' · '] : null, left === 0 ? 'last turn' : `${left} more turn${left === 1 ? '' : 's'}`)));
@@ -1396,7 +1396,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
           h('p', { class: 'boost-what' }, richText(`Spend ${cost} Nitro to also ${extra.charAt(0).toLowerCase()}${extra.slice(1)}`)),
           h('p', { class: 'muted' }, `You have ${nitro} Nitro · ${nitro - cost} left after`),
           h('div', { class: 'dialog-actions' },
-            h('button', { class: 'btn primary', onclick: () => answerBoost(true) }, `⚡ Boost (−${cost} Nitro)`),
+            h('button', { class: 'btn primary', onclick: () => answerBoost(true) }, kwIcon('Boost'), ` Boost (−${cost} Nitro)`),
             h('button', { class: 'btn ghost', onclick: () => answerBoost(false) }, 'Play without Boost')))));
   }
 

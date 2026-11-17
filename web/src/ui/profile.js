@@ -5,7 +5,7 @@
 // The rules live in data/economy.js; this file also draws the shared wallet bar.
 
 import { h, storage } from './dom.js';
-import { countUp } from './fx.js';
+import { countUp, uiIcon } from './fx.js';
 import { normalizeProfile, runOp, unopenedPacks, seasonTier } from '../data/economy.js';
 
 const KEY = 'metadeck.profile';
@@ -213,18 +213,19 @@ export function walletBar(opts = {}) {
   const packs = unopenedPacks(p);
   const quests = p.quests.length;
   const nav = opts.nav ?? {};
-  const coin = (cls, icon, value, label) => {
+  // The icon itself is the painted currency art, drawn by CSS (.coin.<cls> i).
+  const coin = (cls, value, label) => {
     const amount = h('b', null, fmt(value));
     const was = shownAmounts[cls];
     shownAmounts[cls] = value;
     if (was !== undefined && was !== value) countUp(amount, value, { from: was, duration: 1100, delay: 150 });
-    return h('span', { class: `coin ${cls}`, 'data-tip': label, 'data-tip-title': `${icon} ${label.split(':')[0]}` },
-      h('i', { 'aria-hidden': 'true' }, icon), amount);
+    return h('span', { class: `coin ${cls}`, 'data-tip': label, 'data-tip-title': label.split(':')[0] },
+      h('i', { 'aria-hidden': 'true' }), amount);
   };
   const el = h('div', { class: `wallet${opts.quiet ? '' : ' rise'}` },
-    coin('gold', '🪙', p.gold, 'Gold: earned by winning, quests and the season track. Buys packs.'),
-    coin('gems', '💎', p.gems, 'Gems: the premium currency. Buys packs, cosmetics and the premium season track.'),
-    coin('dust', '✨', p.dust, 'Dust: from duplicates and disenchanting. Crafts any card.'),
+    coin('gold', p.gold, 'Gold: earned by winning, quests and the season track. Buys packs.'),
+    coin('gems', p.gems, 'Gems: the premium currency. Buys packs, cosmetics and the premium season track.'),
+    coin('dust', p.dust, 'Dust: from duplicates and disenchanting. Crafts any card.'),
     h('span', { class: 'wallet-nav' },
       // badges sit beside the button, not inside it: .btn clips its children for the ripple
       nav.season ? h('span', { class: 'nav-slot' },
@@ -237,7 +238,7 @@ export function walletBar(opts = {}) {
       nav.account ? h('button', {
         class: `btn small account-btn${account ? ' ghost' : ' guest'}`, onclick: nav.account,
         title: account ? 'Your account' : 'Playing as a guest: progress stays in this browser',
-      }, account ? `👤 ${account.name}` : 'Sign in') : null));
+      }, account ? [uiIcon('account', 'Account'), ` ${account.name}`] : 'Sign in') : null));
   el._opts = opts;
   return el;
 }

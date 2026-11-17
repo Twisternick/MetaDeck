@@ -78,7 +78,8 @@ export function createAiMatches({ accounts, now = () => new Date() }) {
       const won = game.winner === 0;
       const damage = START_HP - Math.max(0, game.players[1].hp);
       logMatch(db, {
-        kind: 'ai', players: [account.key, null], decks: [deal.myDeck, deal.oppDeck], winner: game.winner,
+        kind: 'ai', players: [account.key, null], decks: [deal.myDeck, deal.oppDeck],
+        styles: game.players.map(p => p.style), winner: game.winner,
         turns: game.turn, seconds: Math.round((now().getTime() - deal.started) / 1000), at: now(),
       });
       const out = accounts.recordResult(account, { deckId: deal.myDeck, won, damage, online: false });

@@ -2,7 +2,7 @@
 // starter decks) and the season track with its free and premium rewards.
 
 import { h, rectOf } from './dom.js';
-import { removeFx, sparkle, confetti, motionOK, deckEmblem, currency } from './fx.js';
+import { removeFx, sparkle, confetti, motionOK, deckEmblem, currency, artIcon, uiIcon } from './fx.js';
 import { profile, act, walletBar } from './profile.js';
 import { toast } from './packs.js';
 import {
@@ -13,8 +13,9 @@ import {
 import { DECKS, starterDecks } from '../data/index.js';
 import { tip } from './tutorial.js';
 
-const REWARD_ICONS = { pack: '🎴', cosmetic: '🎨', premiumCard: '🌟', holoCard: '💠', cards: '📦' };
-const rewardIcon = type => (['gold', 'gems', 'dust'].includes(type) ? currency(type) : REWARD_ICONS[type]);
+// Painted icons per reward type (Art Studio slots: [key under ui/, name]); gold, gems and dust use the currency icons.
+const REWARD_ICONS = { pack: ['pack', 'Pack'], cosmetic: ['icon-cosmetic', 'Cosmetic'], premiumCard: ['icon-premium-card', 'Premium'], holoCard: ['icon-holo-card', 'Holo'], cards: ['icon-cards', 'Cards'] };
+const rewardIcon = type => (['gold', 'gems', 'dust'].includes(type) ? currency(type) : REWARD_ICONS[type] ? artIcon(...REWARD_ICONS[type]) : null);
 
 export function season(root, { onBack, nav }) {
   tip('season', "Every match earns season XP. Climb the 40 tiers and claim a reward at each one; daily quests give extra XP.");
@@ -71,7 +72,7 @@ export function season(root, { onBack, nav }) {
       const res = await act('claimSeason', { track, tier: t });
       if (!res.ok) { toast(res.reason, 'bad'); return render(); }
       const got = res.reward;
-      toast(`${REWARD_ICONS[got.type] ?? ''} ${rewardLabel(got)}`);
+      toast(rewardLabel(got));
       if (rect && motionOK()) sparkle(rect, track === 'premium' ? '#ffc53d' : '#22d3ee', 16);
       render();
     };
@@ -97,7 +98,7 @@ export function season(root, { onBack, nav }) {
       },
         h('span', { class: 'reward-icon', 'aria-hidden': 'true' }, rewardIcon(r.type)),
         h('span', { class: 'reward-label' }, r.type === 'cosmetic' ? cosmetic(r.id).name : rewardLabel(r)),
-        claimed ? h('span', { class: 'reward-state' }, '✔') : locked ? h('span', { class: 'reward-state' }, '🔒') : null);
+        claimed ? h('span', { class: 'reward-state' }, '✔') : locked ? h('span', { class: 'reward-state' }, uiIcon('lock', 'Locked')) : null);
     };
 
     return h('section', { class: 'track rise', style: { '--i': 1 } },

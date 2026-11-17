@@ -3,7 +3,6 @@ import { M, S, fx, QUICK, NEW, QUICK_NEW } from '../helpers.js';
 export default {
   id: 'Horror',
   name: 'Horror',
-  icon: '👻',
   color: '#7b3a8c',
   tagline: 'Fear weakens attackers, Haunt punishes removal, and the dead keep coming back.',
   cards: [

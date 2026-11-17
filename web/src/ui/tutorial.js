@@ -13,6 +13,7 @@ import { rewardLabel, TUTORIAL_REWARD } from '../data/economy.js';
 import { ME, AI, ENEMY_HP, MY_DECK, AI_DECK, STEPS, enemyMove } from './tutorial-script.js';
 import { track } from './telemetry.js';
 import { sfx } from './audio.js';
+import { uiIcon } from './fx.js';
 
 // Start the tutorial. onExit goes back to the menu.
 export function tutorial(root, { onExit }) {
@@ -80,7 +81,7 @@ export function tutorial(root, { onExit }) {
       act('finishTutorial').then(r => {
         holder.replaceChildren(
           h('p', { class: 'tutorial-done' }, 'Tutorial complete! You know the basics.'),
-          r.ok ? h('p', { class: 'reward-line' }, `🎁 ${rewardLabel(r.reward ?? TUTORIAL_REWARD)} — open it from Collection.`) : null,
+          r.ok ? h('p', { class: 'reward-line' }, uiIcon('gift', 'Gift'), ` ${rewardLabel(r.reward ?? TUTORIAL_REWARD)} — open it from Collection.`) : null,
           h('p', { class: 'muted' }, 'Your next few matches against the AI are on easy. Every deck has its own tricks: try them all.'));
       });
       return { render: () => holder };
@@ -110,7 +111,7 @@ export function tip(key, text) {
   storage.set(PREFS, { ...s, tips: [...s.tips, key] });
   document.querySelector('.tip-card')?.remove();
   const card = h('div', { class: 'tip-card', role: 'status' },
-    h('span', { class: 'tip-icon', 'aria-hidden': 'true' }, '💡'),
+    h('span', { class: 'tip-icon', 'aria-hidden': 'true' }, uiIcon('tip', 'Tip')),
     h('p', null, text),
     h('button', { class: 'btn ghost small', onclick: () => card.remove() }, 'Got it'));
   document.body.append(card);

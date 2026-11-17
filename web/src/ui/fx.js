@@ -3,6 +3,7 @@
 // Everything here is DOM + CSS + the Web Animations API. No SVG.
 
 import { h, rectOf, pt, viewW, viewH } from './dom.js';
+import { uiIconKey } from './icon-keys.js';
 
 export const motionOK = () => !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -178,14 +179,29 @@ export function artSlot(className, candidates, emblem, { label = false, alt = ''
   return box;
 }
 
-// A deck's emblem icon (ui/emblem-<deckId>), sized by the surrounding font size like the emoji it
-// replaces. The emoji stays underneath until the image loads, and for decks without one.
+// A deck's emblem icon (ui/emblem-<deckId>), sized by the surrounding font size like text. The deck's
+// monogram stays underneath until the image loads, and for decks without one.
 export function deckEmblem(deck, className = '') {
   const box = h('span', { class: `emblem ${className}`.trim(), 'aria-hidden': 'true', style: deck?.color ? { '--deck': deck.color } : null },
-    h('span', { class: 'emblem-glyph' }, deck?.icon ?? '🎴'));
+    h('span', { class: 'emblem-glyph' }, deck ? monogram(deck.name) : '?'));
   if (deck?.id) loadArt(box, emblemUrls(deck.id));
   return box;
 }
+
+// A painted UI icon (assets/img/ui/<key>, made in the Art Studio), sized by the surrounding font size like
+// text. Until its image exists it shows `glyph` (a monogram, by default) on a disc in `color`.
+export function artIcon(key, name, color = '#ffc53d', glyph = monogram(name)) {
+  const box = h('span', { class: 'emblem art-icon', 'aria-hidden': 'true', style: { '--deck': color } },
+    h('span', { class: 'emblem-glyph' }, glyph));
+  loadArt(box, imgUrls(`ui/${key}`));
+  return box;
+}
+
+// One of the general UI icons (ui/icon-<name>, listed in icon-keys.js).
+export const uiIcon = (name, label, color) => artIcon(uiIconKey(name), label, color);
+
+// "First Strike" -> "FS", "Rush" -> "R": the stand-in letters for an icon or emblem without art.
+export const monogram = name => String(name).split(/[\s-]+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
 
 // Appends an <img> that tries each candidate in turn and adds .has-img to `box` once one loads.
 function loadArt(box, candidates, alt = '') {
@@ -595,7 +611,7 @@ export function installTooltips(describe) {
 }
 
 // ------------------------------------------------------------ keyword callouts
-// A punchy pill ("⚔️ FIRST STRIKE · Strikes first") that pops out above an element and floats
+// A punchy pill (icon, "FIRST STRIKE · Strikes first") that pops out above an element and floats
 // away. `stack` offsets further callouts on the same element so they don't overlap.
 export function keywordCallout(rect, { icon, name, text, color = '#ffc53d', delay = 0, stack = 0 } = {}) {
   if (!rect) return;

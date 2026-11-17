@@ -5,7 +5,7 @@
 import { keywordName } from '../engine/text.js';
 import { h, rectOf } from './dom.js';
 import { renderCard, renderPreview } from './card-view.js';
-import { motionOK, flyTo, sparkle, removeFx, deckEmblem } from './fx.js';
+import { motionOK, flyTo, sparkle, removeFx, deckEmblem, uiIcon } from './fx.js';
 import { getDeck, CARDS, DECK_SIZE, MAX_COPIES, countCards, deckErrors, starterDecks } from '../data/index.js';
 import { saveCustomDeck, deleteCustomDeck } from './deck-store.js';
 import { profile } from './profile.js';
@@ -100,7 +100,7 @@ export function deckBuilder(root, { archetype, deck = null, onBack, onPlay }) {
       renderCard(def, { attrs: { style: `--deck:${arch.color}` }, premium: profile().cosmetics.premiumArt && bestFinish(profile(), def.cardId) }),
       h('div', { class: 'pool-copies', 'aria-hidden': 'true' }, Array.from({ length: MAX_COPIES }, (_, k) =>
         h('span', { class: `pip${k >= ownedTotal(profile(), def.cardId) ? ' unowned' : ''}` }))),
-      ownedTotal(profile(), def.cardId) ? null : h('div', { class: 'pool-lock' }, '🔒 Not owned'),
+      ownedTotal(profile(), def.cardId) ? null : h('div', { class: 'pool-lock' }, uiIcon('lock', 'Locked'), ' Not owned'),
       h('button', {
         class: 'pool-minus', title: 'Remove one', 'aria-label': `Remove ${def.displayName}`,
         onclick: e => { e.stopPropagation(); remove(def.cardId); },
@@ -229,7 +229,7 @@ export function deckBuilder(root, { archetype, deck = null, onBack, onPlay }) {
 
     const missing = missingCards(profile(), st.cards);
     const errors = n === DECK_SIZE ? deckErrors(archetype, st.cards) : [];
-    if (missing.length) errors.push(`You're missing ${missing.reduce((s, m) => s + m.need, 0)} of these cards (✨ ${missingDust(profile(), st.cards)} to craft). Craft them in the Collection.`);
+    if (missing.length) errors.push(`You're missing ${missing.reduce((s, m) => s + m.need, 0)} of these cards (${missingDust(profile(), st.cards)} Dust to craft). Craft them in the Collection.`);
     errorsEl.replaceChildren(...errors.map(e => h('div', null, e)));
     playBtn.disabled = n !== DECK_SIZE || errors.length > 0;
     playBtn.title = n !== DECK_SIZE ? `Add ${DECK_SIZE - n} more card${DECK_SIZE - n === 1 ? "" : "s"} to play` : errors[0] ?? "";

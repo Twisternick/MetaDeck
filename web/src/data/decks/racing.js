@@ -3,7 +3,6 @@ import { M, S, fx, QUICK, NEW, QUICK_NEW } from '../helpers.js';
 export default {
   id: 'Racing',
   name: 'Racing',
-  icon: '🏁',
   color: '#d4473a',
   tagline: 'Bank Nitro, then spend it on Boost effects and Slipstream-powered rushers.',
   cards: [

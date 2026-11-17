@@ -5,7 +5,7 @@
 import { h, delay, storage } from './dom.js';
 import { net } from './net.js';
 import { startMatch } from './match.js';
-import { artSlot, deckArtUrls, deckEmblem, removeFx, motionOK } from './fx.js';
+import { artSlot, deckArtUrls, deckEmblem, removeFx, motionOK, uiIcon } from './fx.js';
 import { getDeck } from '../data/index.js';
 import { tip } from './tutorial.js';
 import { signedIn } from './profile.js';
@@ -227,14 +227,14 @@ export function lobby(root, { deck, onBack, matchExtras = () => ({}), challenge 
 
       s.phase === 'queued' || s.phase === 'hosting' ? renderWaiting() : h('section', { class: 'modes' },
         modeTile({
-          i: 1, cls: 'quick', icon: '⚡', title: signedIn() ? 'Ranked' : 'Quick find',
+          i: 1, cls: 'quick', icon: uiIcon('quick-match', 'Quick match'), title: signedIn() ? 'Ranked' : 'Quick find',
           blurb: signedIn() ? 'Get paired with a player of similar skill. Win stars to climb from Bronze to Meta.' : 'Get paired with the next player who is searching. Sign in to play ranked.',
           body: h('div', { class: 'mode-stack' },
             signedIn()?.rank ? rankBadge(signedIn().rank) : null,
             h('button', { class: 'btn primary big', disabled: !ready || null, onclick: quickFind }, 'Find match')),
         }),
         modeTile({
-          i: 2, cls: 'private', icon: '🔒', title: 'Private match', blurb: 'Create a room with a code, or join a friend with theirs.',
+          i: 2, cls: 'private', icon: uiIcon('lock', 'Private'), title: 'Private match', blurb: 'Create a room with a code, or join a friend with theirs.',
           body: h('div', { class: 'mode-stack' },
             h('button', { class: 'btn', disabled: !ready || null, onclick: () => host('private') }, 'Create private room'),
             h('form', { class: 'code-join', onsubmit: e => { e.preventDefault(); join(s.joinCode); } },
@@ -245,7 +245,7 @@ export function lobby(root, { deck, onBack, matchExtras = () => ({}), challenge 
               h('button', { class: 'btn', type: 'submit', disabled: !ready || null }, 'Join'))),
         }),
         modeTile({
-          i: 3, cls: 'open', icon: '📡', title: 'Open room', blurb: 'Host a room everyone in the lobby can see, and wait for a challenger.',
+          i: 3, cls: 'open', icon: uiIcon('open-room', 'Open room'), title: 'Open room', blurb: 'Host a room everyone in the lobby can see, and wait for a challenger.',
           body: h('button', { class: 'btn', disabled: !ready || null, onclick: () => host('open') }, 'Host open room'),
         })),
 
@@ -295,7 +295,7 @@ export function lobby(root, { deck, onBack, matchExtras = () => ({}), challenge 
     const rooms = s.info?.rooms ?? [];
     if (!rooms.length) {
       return h('div', { class: 'rooms-empty' },
-        h('span', { class: 'rooms-empty-icon', 'aria-hidden': 'true' }, '📡'),
+        h('span', { class: 'rooms-empty-icon', 'aria-hidden': 'true' }, uiIcon('open-room', 'Open room')),
         s.phase === 'connecting' || s.phase === 'offline' ? 'Rooms appear here once connected.' : 'No open rooms right now. Host one and wait for a challenger.');
     }
     const ownCode = s.phase === 'hosting' ? s.hosting.code : null;

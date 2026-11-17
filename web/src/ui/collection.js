@@ -3,7 +3,7 @@
 
 import { h, storage, rectOf } from './dom.js';
 import { renderCard, renderCardBack, glossaryFor, arenaFx } from './card-view.js';
-import { removeFx, sparkle, motionOK, deckEmblem, currency } from './fx.js';
+import { removeFx, sparkle, motionOK, deckEmblem, currency, uiIcon } from './fx.js';
 import { glossaryList } from './keywords.js';
 import { profile, act, walletBar } from './profile.js';
 import { openPacks, packArt, packName, rarityColor, toast } from './packs.js';
@@ -204,7 +204,7 @@ export function collection(root, { onBack, nav, tab = null, deckId = null }) {
           class: `btn small ${on ? 'ghost' : 'primary'}`, disabled: on || null,
           onclick: async () => { await act('equip', scope ? { id: c.id, deck: scope.id } : { id: c.id }); render(); },
         }, on ? (scope ? `Equipped for ${scope.name}` : 'Equipped') : (scope ? `Equip for ${scope.name}` : 'Equip'))
-        : h('span', { class: 'cos-how' }, '🔒 ', how));
+        : h('span', { class: 'cos-how' }, uiIcon('lock', 'Locked'), ' ', how));
   }
 
   root.replaceChildren(h('main', { class: 'collection' },

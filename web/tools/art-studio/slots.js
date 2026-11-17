@@ -6,6 +6,8 @@ import { TOKENS } from '../../src/data/tokens.js';
 import { rulesText } from '../../src/engine/text.js';
 import { REDO, REDO_REASONS, REDO_THEMES } from './redo.js';
 import { COSMETICS } from '../../src/data/economy.js';
+import { KEYWORDS, TERMS, RULES } from '../../src/engine/constants.js';
+import { keywordIconKey, ruleIconKey, triggerIconKey, uiIconKey, TRIGGERS, UI_ICONS } from '../../src/ui/icon-keys.js';
 
 // Output size per slot kind. `ask` is the shape requested from the generator; the studio crops it to `w`×`h`.
 // `fit` kinds are cut-outs on a transparent background: the studio fits them whole instead of cropping.
@@ -453,8 +455,121 @@ export function allSlots() {
     + 'glossy and lit from the top left, seen straight on.',
   'Only the burst, on transparent. Leave the middle plain: a number is drawn over it. The game tints it green for heals and gold for headshots.',
   ['Effect — damage splat', 'Transparent PNG · damage and heal numbers']);
+
+  // Small inline icons for keywords, rules terms, House Rules, rules-line triggers and the rest of the UI.
+  // Until one exists the game shows a lettered disc in its place (fx.js artIcon).
+  const SMALL = 'One object, centered, bold simple silhouette that still reads at 16 pixels, with a little empty margin around it. No badge, plate or circle behind it unless described.';
+  const smallIcon = (key, subject, glow, label, where) =>
+    ui('icon', key, `Subject: a small game icon: ${subject}, with a soft ${glow} glow.`, SMALL, [label, `Transparent PNG · ${where}`]);
+  for (const k of Object.keys(KEYWORDS)) {
+    const [subject, kind] = KEYWORD_ICON[k];
+    smallIcon(keywordIconKey(k), subject, KIND_GLOW[kind], `Keyword — ${KEYWORDS[k].name}`, 'keyword chips, badges and tooltips');
+  }
+  for (const t of Object.keys(TERMS)) {
+    if (keywordIconKey(t) in KEYWORDS_BY_ICON) continue; // drawn once, for the keyword
+    const [subject, kind] = TERM_ICON[t];
+    smallIcon(keywordIconKey(t), subject, KIND_GLOW[kind], `Rules term — ${t}`, 'rules text, tooltips and the glossary');
+  }
+  for (const [id, rule] of Object.entries(RULES)) {
+    smallIcon(ruleIconKey(id), RULE_ICON[id], KIND_GLOW.passive, `House Rule — ${rule.name}`, 'the House Rule banner and callouts');
+  }
+  for (const t of TRIGGERS) {
+    smallIcon(triggerIconKey(t), TRIGGER_ICON[t], 'pale silver-blue', `Trigger — ${t}`, `"${t}:" at the start of a rules line`);
+  }
+  for (const name of UI_ICONS) {
+    const [subject, where] = UI_ICON[name];
+    smallIcon(uiIconKey(name), subject, 'warm gold', `Icon — ${name}`, where);
+  }
   return slots;
 }
+
+const KEYWORDS_BY_ICON = Object.fromEntries(Object.keys(KEYWORDS).map(k => [keywordIconKey(k), k]));
+
+// The glow colour for each keyword kind, matching the chip colours in src/ui/keywords.js.
+const KIND_GLOW = {
+  combat: 'red-orange', defense: 'sky-blue', trigger: 'violet', bonus: 'gold', economy: 'cyan', passive: 'silver-grey',
+};
+// [what to draw, keyword kind] per keyword id (src/engine/constants.js KEYWORDS).
+const KEYWORD_ICON = {
+  Rush: ['a jagged lightning bolt', 'combat'],
+  Guard: ['a sturdy kite shield with a gold rim', 'defense'],
+  FirstStrike: ['two crossed swords, the front one slightly ahead and gleaming', 'combat'],
+  Counter: ['a shield with a curved arrow bouncing back off its face', 'defense'],
+  Stealth: ['a half-closed eye inside a wisp of shadow', 'defense'],
+  Suppression: ['a gauntlet pressing down with a struck-through sword under it', 'combat'],
+  Headshot: ['a targeting crosshair with a small burst at its centre', 'combat'],
+  Drone: ['a small hovering quadcopter drone seen from the front', 'passive'],
+  Fear: ['a cracked skull mask with wide hollow eyes', 'combat'],
+  Haunt: ['a small wailing ghost wisp', 'trigger'],
+  Devour: ['an open fanged maw', 'trigger'],
+  DoubleJump: ['a winged boot mid-leap with two little motion arcs below it', 'combat'],
+  PoweredUp: ['a glowing mushroom-shaped power-up orb wrapped in a ring of light', 'defense'],
+  Checkpoint: ['a pennant flag planted on a small post, glowing at its tip', 'defense'],
+  XP: ['a gem-studded upward chevron like a level-up arrow', 'trigger'],
+  Momentum: ['a running boot trailing speed lines', 'bonus'],
+  Clutch: ['a clenched fist bursting out of a cracked heart', 'bonus'],
+  Combo: ['three linked chain rings', 'bonus'],
+  Structure: ['a small columned stone temple building', 'passive'],
+  Fortify: ['a stack of three thick stone bricks bound with a gold band', 'defense'],
+  Generate: ['a crystal battery cell charging with a spark', 'economy'],
+  District: ['a cluster of three small city towers on a hex tile', 'passive'],
+  Tax: ['a tied coin pouch with a gold coin spilling out', 'economy'],
+  Populate: ['two little hooded villager figures side by side', 'trigger'],
+  Topdeck: ['a playing card lifting off the top of a short card stack', 'trigger'],
+  JudgeCall: ['a gavel striking a small round block', 'trigger'],
+  Copy: ['two overlapping cards, the back one a faint duplicate', 'economy'],
+  Overtake: ['a chequered racing flag whipping forward', 'economy'],
+  Slipstream: ['three swept curved wind streaks', 'bonus'],
+  Inspire: ['a raised war horn with sound rings coming out of it', 'bonus'],
+};
+// [what to draw, kind] per rules term (src/engine/constants.js TERMS).
+const TERM_ICON = {
+  'Level Up': ['a gold star with an upward arrow', 'bonus'],
+  Silence: ['a closed mouth crossed by a thin silver bar', 'combat'],
+  Boost: ['a flame bursting out of an exhaust nozzle', 'economy'],
+  Nitro: ['a small nitro canister with a flame at its valve', 'economy'],
+  Bandwidth: ['a faceted electric-blue crystal with a gold setting', 'economy'],
+  Quick: ['a stopwatch with its hand mid-sweep', 'trigger'],
+  Revive: ['a rising phoenix feather wreathed in light', 'trigger'],
+  Errata: ['a quill pen crossing out a line on a scrap of parchment', 'combat'],
+  'Alt Art': ['a painter\'s palette with a brush across it', 'economy'],
+  'House Rule': ['a rolled scroll with a wax seal', 'passive'],
+  Objection: ['a raised open hand, palm forward', 'trigger'],
+  Typo: ['a pencil with its eraser end worn down', 'economy'],
+  Exile: ['a swirling dark void portal', 'combat'],
+};
+// What to draw per House Rule (src/engine/constants.js RULES).
+const RULE_ICON = {
+  LimitedFormat: 'a short measuring ruler with a gold end cap',
+  PauperFormat: 'a single worn copper coin',
+  ErrataWeek: 'a quill pen crossing out a line on a scrap of parchment',
+  DraftNight: 'a pair of dice mid-tumble',
+  BalancePatch: 'a set of balance scales with a small bandage on the beam',
+  HandSize: 'a fanned stack of folders with a card sticking out',
+};
+// What to draw per rules-line trigger (src/ui/icon-keys.js TRIGGERS).
+const TRIGGER_ICON = {
+  'Play': 'a card being laid down with a small flash under it',
+  'Death': 'a small skull',
+  'Turn start': 'a sun rising over a horizon line',
+  'Turn end': 'a crescent moon with a small star',
+};
+// [what to draw, where it shows] per general UI icon (src/ui/icon-keys.js UI_ICONS).
+const UI_ICON = {
+  lock: ['a heavy gold padlock, closed', 'locked decks, cards, cosmetics and rewards'],
+  key: ['an ornate gold key with a blue gem in its bow', 'account recovery code'],
+  account: ['a hooded adventurer bust in silhouette', 'account button and sign-up'],
+  trophy: ['a gold trophy cup with two handles', 'player hub and leaderboard'],
+  streak: ['a blazing flame', 'win streak'],
+  tip: ['a glowing lantern', 'tutorial tips'],
+  gift: ['a wrapped gift box with a gold ribbon bow', 'tutorial reward'],
+  'quick-match': ['two crossed swords over a lightning bolt', 'Quick find / Ranked match mode'],
+  'open-room': ['an open arched doorway with light pouring out', 'Open room mode and empty room list'],
+  cosmetic: ['a painter\'s palette with three colour swatches', 'cosmetic rewards'],
+  'premium-card': ['a playing card with a shining gold border and a star on its face', 'premium (gold) cards'],
+  'holo-card': ['a playing card with a rainbow holographic shimmer across its face', 'holo cards'],
+  cards: ['a small fanned stack of three cards', 'card bundle rewards'],
+};
 
 // Paths the studio server may write: assets/img/<cards|decks|heroes|ui>/<name>.webp
 export const SAVE_PATH = /^assets\/img\/(cards|decks|heroes|ui)\/[A-Za-z0-9_-]+\.webp$/;

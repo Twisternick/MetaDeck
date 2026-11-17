@@ -3,7 +3,6 @@ import { M, S, fx, QUICK, NEW } from '../helpers.js';
 export default {
   id: 'FPS',
   name: 'FPS',
-  icon: '🎯',
   color: '#7f9a3c',
   tagline: 'Stealthy openers, Suppression, and Headshot finishers on damaged targets.',
   cards: [

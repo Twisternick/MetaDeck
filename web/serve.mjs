@@ -34,6 +34,7 @@ import { createSite, loadSiteConfig } from './server/site.mjs';
 import { installLog } from './server/log.mjs';
 import { backup } from './server/db.mjs';
 import { createPages } from './server/pages.mjs';
+import { createLiveMeta } from './server/live-meta.mjs';
 import { handleAccountApi, sessionToken } from './server/account-api.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -88,6 +89,7 @@ if (site.missing.length) console.warn(`The legal pages still show placeholders f
 const aiMatches = createAiMatches({ accounts });
 const telemetry = createTelemetry({ db: accounts.db });
 const feedback = createFeedback({ db: accounts.db });
+const liveMeta = createLiveMeta({ db: accounts.db });
 const lobby = createLobby({ accounts, social });
 const adminToken = crypto.randomBytes(24).toString('base64url');
 fs.writeFileSync(path.join(dataDir, 'admin-token'), adminToken, { mode: 0o600 });
@@ -412,6 +414,10 @@ const server = http.createServer((req, res) => {
         return health(res);
       case '/api/version':
         return json(res, 200, { version });
+      case '/api/live-meta': {
+        const q = new URL(req.url, 'http://x').searchParams;
+        return json(res, 200, liveMeta.get({ days: q.get('days'), source: q.get('source') }));
+      }
       case '/api/founders':
         return json(res, 200, accounts.founderSpots());
       case '/api/shop/config':

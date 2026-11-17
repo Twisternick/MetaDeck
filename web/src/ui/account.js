@@ -4,7 +4,7 @@
 // Guests keep playing with a profile stored in this browser.
 
 import { h } from './dom.js';
-import { removeFx, confetti, motionOK } from './fx.js';
+import { removeFx, confetti, motionOK, uiIcon } from './fx.js';
 import {
   profile, signedIn, signIn, signUp, signOut, resetPassword, changePassword, newRecoveryCode, signOutOthers, deleteAccount, reload, walletBar,
   setBirthYear, downloadMyData,
@@ -206,7 +206,7 @@ export function accountScreen(root, { onBack, nav, mode = 'signin' }) {
     saved.addEventListener('change', () => { next.disabled = !saved.checked; });
     next.addEventListener('click', () => { URL.revokeObjectURL(file); reveal = null; render(); after?.(); });
     return h('section', { class: 'acct-card rise acct-reveal-card' },
-      h('div', { class: 'acct-badge', 'aria-hidden': 'true' }, '🔑'),
+      h('div', { class: 'acct-badge', 'aria-hidden': 'true' }, uiIcon('key', 'Key')),
       h('h2', { tabindex: '-1', 'data-autofocus': true }, title),
       h('p', { class: 'muted' }, intro),
       codeEl,
@@ -453,14 +453,14 @@ export function accountScreen(root, { onBack, nav, mode = 'signin' }) {
         },
       });
       form.append(
-        h('div', { class: 'acct-badge', 'aria-hidden': 'true' }, '🔑'),
+        h('div', { class: 'acct-badge', 'aria-hidden': 'true' }, uiIcon('key', 'Key')),
         h('h2', null, 'Forgot your password?'),
         h('p', { class: 'muted' }, 'Enter your name and your recovery code, then choose a new password. You’ll be signed out everywhere else.'),
         name.el, code.el, ...pair.els, err, submit,
         h('p', { class: 'acct-note' }, 'Lost your recovery code too? Ask whoever runs this server to set a new password for you.'),
         h('button', { type: 'button', class: 'linkish', onclick: () => go('signin') }, '← Back to sign in'));
     } else if (isUp && ageBlocked()) {
-      form.append(tabs, h('div', { class: 'acct-badge', 'aria-hidden': 'true' }, '🎮'), h('p', null, TOO_YOUNG),
+      form.append(tabs, h('div', { class: 'acct-badge', 'aria-hidden': 'true' }, uiIcon('account', 'Account')), h('p', null, TOO_YOUNG),
         h('button', { type: 'button', class: 'btn primary', onclick: onBack }, 'Keep playing'));
     } else if (isUp) {
       const pair = newPasswordPair(() => name.input.value.trim());

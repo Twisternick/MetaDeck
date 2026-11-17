@@ -3,7 +3,6 @@ import { M, S, fx, QUICK, NEW } from '../helpers.js';
 export default {
   id: 'CityBuilder',
   name: 'City Builder',
-  icon: '🏙️',
   color: '#3f8f8c',
   tagline: 'Populate the board with Citizens, Tax enemy spells, and reward Districts.',
   cards: [

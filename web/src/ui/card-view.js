@@ -26,7 +26,7 @@ function typeLine(def, deck) {
   return [
     h('span', { class: 'dot', 'aria-hidden': 'true' }),
     def.speedWindow === 'Quick'
-      ? h('span', { class: 'term quick-tag', style: { '--kw': kwColor('Quick') }, 'data-kw': 'Quick', tabindex: '0' }, `${kwIcon('Quick')} Quick`)
+      ? h('span', { class: 'term quick-tag', style: { '--kw': kwColor('Quick') }, 'data-kw': 'Quick', tabindex: '0' }, kwIcon('Quick'), ' Quick')
       : null,
     def.speedWindow === 'Quick' ? ' ' : null,
     `${kind} · ${deck.name}`,
@@ -49,7 +49,7 @@ export function renderCard(def, { cost = def.cost, printed = def.cost, atk = def
     style, onclick, 'data-tilt': '12', 'data-deck': themeFrame(/\bframe-founder\b/.test(classes) ? FOUNDER_FRAME : deck, rarity ?? 'common'), ...attrs,
   },
     h('div', { class: `card-cost${costClass}`, 'data-kw': costTip ? null : 'Bandwidth', 'data-tip': costTip,
-      'data-tip-title': cost > printed ? `${kwIcon('Tax')} Taxed` : altArt ? `${kwIcon('Alt Art')} Rewritten` : null }, cost),
+      'data-tip-title': cost > printed ? 'Taxed' : altArt ? 'Rewritten' : null }, cost),
     def.isNew ? h('div', { class: 'card-new' }, 'NEW') : null,
     artSlot('card-art', cardArtUrls(def, ownerDeckId), deckEmblem(deck), { label: large || classes.includes('large'), alt: '' }),
     h('div', { class: 'card-title' },
@@ -62,7 +62,7 @@ export function renderCard(def, { cost = def.cost, printed = def.cost, atk = def
     ),
     def.type === 'Monster'
       ? h('div', { class: 'card-stats' },
-          h('span', { class: `stat atk${altArt ? ' edited' : ''}`, 'data-tip': altTip ?? 'Attack: damage this deals when it fights.', 'data-tip-title': altArt ? `${kwIcon('Alt Art')} Rewritten` : 'Attack' }, atk),
+          h('span', { class: `stat atk${altArt ? ' edited' : ''}`, 'data-tip': altTip ?? 'Attack: damage this deals when it fights.', 'data-tip-title': altArt ? 'Rewritten' : 'Attack' }, atk),
           h('span', { class: 'stat hp', 'data-tip': 'Health: it is destroyed when this reaches 0.', 'data-tip-title': 'Health' }, def.baseHealth))
       : null,
     // The rarity frame (ui/frame-<rarity>) is drawn over the art; tokens get the common one.
@@ -252,15 +252,15 @@ export function renderMinion(state, m, { classes = '', onclick, onmouseenter, pr
       m.xp ? h('span', { class: 'xp', 'data-tip': TERMS['Level Up'], 'data-tip-title': 'Level Up' }, xpStatus(m)) : null,
     ) : null,
     h('div', { class: 'minion-name' }, def.displayName),
-    sleeping ? h('div', { class: 'minion-status', 'data-tip': 'Summoning sickness: monsters attack from the turn after they arrive, unless they have Rush.', 'data-tip-title': '💤 Resting' }, 'zzz') : null,
-    rushReady ? h('div', { class: 'minion-status good', 'data-kw': 'Rush' }, `${kwIcon('Rush')} Rush`) : null,
-    suppressed ? h('div', { class: 'minion-status bad', 'data-kw': 'Suppress' }, `${kwIcon('Suppression')} Suppressed`) : null,
-    m.silenced && !suppressed ? h('div', { class: 'minion-status bad', 'data-kw': 'Silence' }, `${kwIcon('Silence')} Silenced`) : null,
+    sleeping ? h('div', { class: 'minion-status', 'data-tip': 'Summoning sickness: monsters attack from the turn after they arrive, unless they have Rush.', 'data-tip-title': 'Resting' }, 'zzz') : null,
+    rushReady ? h('div', { class: 'minion-status good', 'data-kw': 'Rush' }, kwIcon('Rush'), ' Rush') : null,
+    suppressed ? h('div', { class: 'minion-status bad', 'data-kw': 'Suppress' }, kwIcon('Suppression'), ' Suppressed') : null,
+    m.silenced && !suppressed ? h('div', { class: 'minion-status bad', 'data-kw': 'Silence' }, kwIcon('Silence'), ' Silenced') : null,
     h('span', { class: `stat atk${atk > baseAttackOf(m) ? ' up' : atk < baseAttackOf(m) ? ' down' : ''}${errata ? ' edited' : ''}` }, atk),
-    bonusTotal ? h('span', { class: 'minion-bonus', 'data-tip': `${bonusTip} — this bonus is active right now.`, 'data-tip-title': '⚡ Attack bonus' }, `+${bonusTotal}`) : null,
+    bonusTotal ? h('span', { class: 'minion-bonus', 'data-tip': `${bonusTip} — this bonus is active right now.`, 'data-tip-title': 'Attack bonus' }, `+${bonusTotal}`) : null,
     h('span', { class: `stat hp${hp < maxHp ? ' down' : maxHp > baseHealthOf(m) ? ' up' : ''}${errata ? ' edited' : ''}` }, hp),
-    m.ruled ? h('div', { class: 'minion-ruled', 'data-tip': `Errata Week has switched off ${kwName(m.ruled)}. It comes back when the House Rule ends.`, 'data-tip-title': `${kwIcon('House Rule')} House Rule` },
-      h('s', null, `${kwIcon(m.ruled)} ${kwName(m.ruled)}`)) : null,
+    m.ruled ? h('div', { class: 'minion-ruled', 'data-tip': `Errata Week has switched off ${kwName(m.ruled)}. It comes back when the House Rule ends.`, 'data-tip-title': 'House Rule' },
+      h('s', null, kwIcon(m.ruled), ` ${kwName(m.ruled)}`)) : null,
     h('div', { class: 'minion-glow', 'aria-hidden': 'true' }),
     h('div', { class: 'minion-ring', 'aria-hidden': 'true' }),
   );
@@ -282,19 +282,19 @@ export function glossaryFor(def, instance) {
 // Live status lines for a monster on the board ("Momentum: +1 ATK right now", "Silenced", ...).
 export function statusLines(state, instance) {
   const status = [];
-  for (const b of attackBonuses(state, instance)) status.push(`${kwIcon(b.keyword)} ${kwName(b.keyword)}: +${b.amount} ATK right now`);
-  if (instance.xp) status.push(`${kwIcon('Level Up')} ${xpStatus(instance)} toward next level (${instance.xp} XP total)`);
-  if (instance.silenced) status.push(`${kwIcon('Silence')} Silenced: no keywords or card text`);
+  for (const b of attackBonuses(state, instance)) status.push(`${kwName(b.keyword)}: +${b.amount} ATK right now`);
+  if (instance.xp) status.push(`${xpStatus(instance)} toward next level (${instance.xp} XP total)`);
+  if (instance.silenced) status.push('Silenced: no keywords or card text');
   if (instance.baseAtk !== undefined) {
     const def = defOf(instance);
-    status.push(`${kwIcon('Errata')} Errata'd: printed ${def.baseAttack}/${def.baseHealth}, now reads ${instance.baseAtk}/${instance.baseHp}`);
+    status.push(`Errata'd: printed ${def.baseAttack}/${def.baseHealth}, now reads ${instance.baseAtk}/${instance.baseHp}`);
   }
-  if (instance.ruled) status.push(`${kwIcon('House Rule')} Errata Week: ${kwName(instance.ruled)} is switched off`);
-  if (state.turn <= instance.suppressedUntil) status.push(`${kwIcon('Suppression')} Suppressed — can't attack this turn`);
-  if (instance.tempKw.length) status.push(`This turn only: ${instance.tempKw.map(k => `${kwIcon(k)} ${kwName(k)}`).join(', ')}`);
+  if (instance.ruled) status.push(`Errata Week: ${kwName(instance.ruled)} is switched off`);
+  if (state.turn <= instance.suppressedUntil) status.push("Suppressed — can't attack this turn");
+  if (instance.tempKw.length) status.push(`This turn only: ${instance.tempKw.map(k => kwName(k)).join(', ')}`);
   const temp = instance.mods.filter(x => x.temp).reduce((s, x) => s + x.atk, 0);
   if (temp) status.push(`${temp > 0 ? '+' : ''}${temp} ATK this turn`);
-  if (instance.summonedTurn === state.turn && instance.owner === state.active && !hasKeyword(instance, 'Rush') && !hasKeyword(instance, 'Structure')) status.push('💤 Just summoned — attacks next turn');
+  if (instance.summonedTurn === state.turn && instance.owner === state.active && !hasKeyword(instance, 'Rush') && !hasKeyword(instance, 'Structure')) status.push('Just summoned — attacks next turn');
   return status;
 }
 

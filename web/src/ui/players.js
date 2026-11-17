@@ -3,7 +3,7 @@
 // comes from the server (server/social.mjs), so it needs an account; guests are asked to sign in.
 
 import { h } from './dom.js';
-import { removeFx, deckEmblem } from './fx.js';
+import { removeFx, deckEmblem, uiIcon } from './fx.js';
 import { getDeck, DECKS } from '../data/index.js';
 import { seasonName, seasonKey } from '../data/economy.js';
 import { rankBadge } from './rank-badge.js';
@@ -45,7 +45,7 @@ export function playerHub(root, { onBack, nav, tab = 'rank', onChallenge }) {
     }, label)));
     if (!signedIn()) {
       body.replaceChildren(h('section', { class: 'acct-card rise hub-guest' },
-        h('div', { class: 'acct-badge', 'aria-hidden': 'true' }, '🏆'),
+        h('div', { class: 'acct-badge', 'aria-hidden': 'true' }, uiIcon('trophy', 'Trophy')),
         h('h2', null, 'Ranked, history and friends need an account'),
         h('p', { class: 'muted' }, 'Sign in to play ranked, keep a history of your matches, climb the leaderboard and add friends. Guests can still play online, unranked.'),
         h('button', { class: 'btn primary', onclick: nav.account }, 'Sign in or create an account')));
@@ -69,7 +69,7 @@ export function playerHub(root, { onBack, nav, tab = 'rank', onChallenge }) {
       h('div', { class: 'hub-rank-info' },
         h('div', { class: 'vs-sub' }, `${seasonName(rank.season)} · ${daysLeft()} days left`),
         h('p', null, rank.games ? `${rank.wins} wins in ${rank.games} ranked games` : 'No ranked games yet this season. Quick find against another signed-in player is ranked.'),
-        rank.streak >= 2 ? h('p', { class: 'hub-streak' }, `🔥 ${rank.streak} wins in a row`) : null,
+        rank.streak >= 2 ? h('p', { class: 'hub-streak' }, uiIcon('streak', 'Streak'), ` ${rank.streak} wins in a row`) : null,
         h('p', { class: 'muted small' }, `Peak this season: ${rank.peakLabel}. A win is a star (a third win in a row is two); a loss takes one. You keep any tier you reach until the season ends.`)));
 
     const byDeck = new Map(decks.map(d => [d.deck, d]));

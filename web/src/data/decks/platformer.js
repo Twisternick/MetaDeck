@@ -3,7 +3,6 @@ import { M, S, fx, QUICK, NEW } from '../helpers.js';
 export default {
   id: 'Platformer',
   name: 'Platformer',
-  icon: '⭐',
   color: '#3d9bd6',
   tagline: 'Hop over Guards with Double Jump and shrug off hits with Power-Ups and Checkpoints.',
   cards: [

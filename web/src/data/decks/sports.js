@@ -3,7 +3,6 @@ import { M, S, fx, QUICK, NEW, QUICK_NEW } from '../helpers.js';
 export default {
   id: 'Sports',
   name: 'Sports',
-  icon: '🏆',
   color: '#2f9e5b',
   tagline: 'Go wide, keep Momentum rolling, and turn it around in the Clutch.',
   cards: [

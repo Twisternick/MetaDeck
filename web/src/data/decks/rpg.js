@@ -3,7 +3,6 @@ import { M, S, fx, QUICK, NEW, QUICK_NEW } from '../helpers.js';
 export default {
   id: 'RPG',
   name: 'RPG',
-  icon: '⚔️',
   color: '#c08a2e',
   tagline: 'Heroes earn XP in combat and Level Up; gear and spells make them legends.',
   cards: [

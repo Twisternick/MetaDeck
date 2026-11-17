@@ -5,6 +5,8 @@ import { COSMETICS } from '../src/data/economy.js';
 import { REDO, REDO_REASONS, REDO_THEMES } from '../tools/art-studio/redo.js';
 import { DECKS } from '../src/data/index.js';
 import { TOKENS } from '../src/data/tokens.js';
+import { KEYWORDS, TERMS, RULES } from '../src/engine/constants.js';
+import { keywordIconKey, ruleIconKey, triggerIconKey, uiIconKey, TRIGGERS, UI_ICONS } from '../src/ui/icon-keys.js';
 
 test('every card, token, deck and hero has one art slot with a usable prompt', () => {
   const slots = allSlots();
@@ -19,6 +21,16 @@ test('every card, token, deck and hero has one art slot with a usable prompt', (
     assert.match(`assets/img/${s.key}.webp`, SAVE_PATH, s.key);
     assert.doesNotMatch(s.prompt, /undefined|\[object|\[\w+\]/, s.key);
   }
+});
+
+test('every icon the UI asks for (keywords, terms, House Rules, triggers, UI icons) has an art slot', () => {
+  const keys = new Set(allSlots().map(s => s.key));
+  const wanted = [
+    ...Object.keys(KEYWORDS).map(keywordIconKey), ...Object.keys(TERMS).map(keywordIconKey),
+    ...['Draft Night', 'Balance Patch', 'Hand Size Errata'].map(keywordIconKey),
+    ...Object.keys(RULES).map(ruleIconKey), ...TRIGGERS.map(triggerIconKey), ...UI_ICONS.map(uiIconKey),
+  ];
+  for (const key of wanted) assert.ok(keys.has(`ui/${key}`), key);
 });
 
 test('every image flagged for redoing is a real slot with a known reason, and its prompt says what to fix', () => {

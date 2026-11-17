@@ -3,7 +3,6 @@ import { M, S, fx, QUICK, NEW, QUICK_NEW } from '../helpers.js';
 export default {
   id: 'Strategy',
   name: 'Strategy',
-  icon: '♟️',
   color: '#4364a8',
   tagline: 'Ramp your Bandwidth behind Fortified walls, then let Structures grind the enemy down.',
   cards: [

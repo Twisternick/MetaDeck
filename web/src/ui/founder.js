@@ -2,7 +2,7 @@
 // name, and the welcome they see when their account is made.
 
 import { h } from './dom.js';
-import { confetti, motionOK } from './fx.js';
+import { confetti, motionOK, currency, uiIcon } from './fx.js';
 import { sfx } from './audio.js';
 import { FOUNDER, founderTitle, cosmetic, FOUNDER_COSMETICS } from '../data/economy.js';
 
@@ -27,10 +27,10 @@ export function founderPitch(spots, { onClaim, strip = false }) {
       h('span', { class: 'founder-strip-cta' }, 'Claim yours →'));
   }
   const perks = [
-    ['💎', `${FOUNDER.gems.toLocaleString()} Gems`],
+    [currency('gems'), `${FOUNDER.gems.toLocaleString()} Gems`],
     ['✦', 'The Meta Founder title'],
-    ['🃏', 'A gold card frame'],
-    ['🛡', 'An exclusive card back & arena'],
+    [uiIcon('premium-card', 'Gold frame'), 'A gold card frame'],
+    [uiIcon('cosmetic', 'Cosmetic'), 'An exclusive card back & arena'],
   ];
   const claim = h('button', {
     class: 'btn primary founder-claim',

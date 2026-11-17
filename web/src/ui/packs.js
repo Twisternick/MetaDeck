@@ -4,7 +4,7 @@
 
 import { h, delay, rectOf } from './dom.js';
 import { renderCard, renderCardBack } from './card-view.js';
-import { motionOK, confetti, sparkle, screenShake, removeFx, deckEmblem, currency } from './fx.js';
+import { motionOK, confetti, sparkle, screenShake, removeFx, deckEmblem, currency, uiIcon } from './fx.js';
 import { profile, act } from './profile.js';
 import { track } from './telemetry.js';
 import { rankBadge } from './rank-badge.js';
@@ -12,6 +12,7 @@ import { sfx } from './audio.js';
 import { rewardLabel, RARITY, RARITY_ORDER, dustValue, archLevel, ARCH_LEVEL_XP, TIER_XP, seasonTier, loadoutFor } from '../data/economy.js';
 import { CARDS, DECKS } from '../data/index.js';
 
+// The same values as the --rarity-* colours in styles.css.
 const RARITY_COLORS = { common: '#c9d1e8', rare: '#38bdf8', epic: '#c084fc', legendary: '#ffb020' };
 export const rarityColor = r => RARITY_COLORS[r];
 
@@ -244,7 +245,7 @@ const BULK = 10;
 const HIGHLIGHTS = 10;
 const pullScore = g => RARITY_ORDER.indexOf(g.rarity) * 2 + (g.holo ? 9 : g.premium ? 3 : 0) + (g.fresh ? 1 : 0);
 const cardChip = g => h('span', { class: `sum-chip${g.fresh ? ' fresh' : ''}`, style: { '--glow': rarityColor(g.rarity) } },
-  g.holo ? '💠 ' : g.premium ? '🌟 ' : '', CARDS[g.id].displayName, g.count > 1 ? h('b', null, ` ×${g.count}`) : null);
+  g.holo ? [uiIcon('holo-card', 'Holo'), ' '] : g.premium ? [uiIcon('premium-card', 'Premium'), ' '] : '', CARDS[g.id].displayName, g.count > 1 ? h('b', null, ` ×${g.count}`) : null);
 
 // Game-over rewards: the rank change after a ranked match, Gold, season XP, quests finished and
 // archetype level-ups. `ranked` is { change, before, after } from the server, or null.

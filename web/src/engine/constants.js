@@ -71,12 +71,12 @@ export const TERMS = {
 
 // The House Rules a card can put in play, by id. The engine applies each one (game.js).
 export const RULES = {
-  LimitedFormat: { name: 'Limited Format', icon: '📏', text: `Boards hold only ${LIMITED_BOARD} monsters.` },
-  PauperFormat: { name: 'Pauper Format', icon: '🪙', text: `Cards costing ${PAUPER_MAX_COST + 1} or more can't be played.` },
-  ErrataWeek: { name: 'Errata Week', icon: '📝', text: 'The most common keyword on the enemy board stops working for every monster.' },
-  DraftNight: { name: 'Draft Night', icon: '🎲', text: 'Both players draw an extra card at the start of their turns.' },
-  BalancePatch: { name: 'Balance Patch', icon: '🩹', text: 'At the start of each turn, the strongest monster gets -1 Attack and the weakest gets +1 Attack.' },
-  HandSize: { name: 'Hand Size Errata', icon: '🗂️', text: `Hands hold up to ${RULE_HAND} cards. Monsters have +1 Attack while their owner holds more cards than the opponent.` },
+  LimitedFormat: { name: 'Limited Format', text: `Boards hold only ${LIMITED_BOARD} monsters.` },
+  PauperFormat: { name: 'Pauper Format', text: `Cards costing ${PAUPER_MAX_COST + 1} or more can't be played.` },
+  ErrataWeek: { name: 'Errata Week', text: 'The most common keyword on the enemy board stops working for every monster.' },
+  DraftNight: { name: 'Draft Night', text: 'Both players draw an extra card at the start of their turns.' },
+  BalancePatch: { name: 'Balance Patch', text: 'At the start of each turn, the strongest monster gets -1 Attack and the weakest gets +1 Attack.' },
+  HandSize: { name: 'Hand Size Errata', text: `Hands hold up to ${RULE_HAND} cards. Monsters have +1 Attack while their owner holds more cards than the opponent.` },
 };
 // Keywords that only do something as the monster is played; Errata Week never picks these.
 export const ON_PLAY_KEYWORDS = new Set(['Populate', 'JudgeCall', 'Copy']);

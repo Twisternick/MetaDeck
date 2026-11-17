@@ -3,7 +3,6 @@ import { M, S, fx, QUICK, NEW, QUICK_NEW } from '../helpers.js';
 export default {
   id: 'Fighting',
   name: 'Fighting',
-  icon: '🥊',
   color: '#e0782a',
   tagline: 'Chain cheap cards into big Combo turns; Counter fighters punish attackers.',
   cards: [

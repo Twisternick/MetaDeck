@@ -473,7 +473,7 @@ export function createLobby({
     const ranked = room.ranked ? social.recordRanked(room.seats[0].account, room.seats[1].account, winner) : null;
     logMatch(accounts.db, {
       kind: 'online', players: room.seats.map(p => p.account?.key ?? null), decks: game.players.map(p => p.deckId),
-      winner, turns: game.turn, seconds: Math.round((Date.now() - room.startedAt) / 1000), ending: game.ending ?? 'hero',
+      styles: game.players.map(p => p.style), winner, turns: game.turn, seconds: Math.round((Date.now() - room.startedAt) / 1000), ending: game.ending ?? 'hero',
       rated: !!ranked, stars: ranked ? ranked.map(r => r.change) : [null, null],
     });
     room.seats.forEach((p, i) => {

@@ -51,6 +51,11 @@
   --atk: #ffb020;
   --hp: #ff3b5c;
   --nitro: #ff7a1a;
+  /* rarity colours (card gems, pack pulls in packs.js, and the content pages in pages.css) */
+  --rarity-common: #c9d1e8;
+  --rarity-rare: #38bdf8;
+  --rarity-epic: #c084fc;
+  --rarity-legendary: #ffb020;
 
   --card-ink: #f3f5ff;
   --card-paper: #11152b;
@@ -1190,6 +1195,14 @@ body:has(.arena[data-arena]:not([data-arena="standard"]), .match-found, .pack-ov
   .card, .minion, .deck-tile, .mat, .hand.theirs { transform: none !important; }
 }
 
+/* On touch screens :hover sticks after a tap, which would leave a menu tile or button raised until the
+   next tap elsewhere. Their glow and border still change; only the lift is dropped. Game pieces (hand,
+   board, heroes) are left alone: their raised state follows selection. */
+@media (hover: none) {
+  .btn:hover:not([disabled]):not(:active), .chip:hover, .list-tile:hover, .pool-tile:hover, .deck-row:hover, .room-tile:hover,
+  .cos-tile:hover, .gem-tile:hover, .reward-cell.ready:hover, .founder-strip:hover:not(:focus-visible), .pack-button:hover, .foot-link:hover:not(:focus-visible) { transform: none; }
+}
+
 /* pointer interaction helpers */
 .hand.mine .card, .board.mine .minion { touch-action: none; }
 /* held for the long-press zoom: no browser callout, selection or pan */
@@ -1804,7 +1817,7 @@ body:has(.arena[data-arena]:not([data-arena="standard"]), .match-found, .pack-ov
   box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
 }
 .coin i { font-style: normal; font-size: 15px; filter: drop-shadow(0 0 6px var(--c)); }
-.coin b { min-width: 2ch; text-align: right; color: var(--c); }
+.coin b { min-width: 2ch; text-align: right; color: var(--c); font-variant-numeric: tabular-nums; }
 .coin.gold { --c: #ffd25e; } .coin.gems { --c: #7ee3ff; } .coin.dust { --c: #e2b8ff; }
 .wallet-nav { display: inline-flex; gap: 8px; margin-left: 6px; }
 .nav-slot { position: relative; display: inline-flex; }
@@ -1823,10 +1836,10 @@ body:has(.arena[data-arena]:not([data-arena="standard"]), .match-found, .pack-ov
   border-radius: .18em; border: .1em solid rgba(255,255,255,.8); background: var(--gem); box-shadow: 0 0 .6em var(--gem), 0 .1em .25em rgba(0,0,0,.6);
 }
 .card.spell > .card-gem { bottom: .45em; }
-.card.rarity-common { --gem: #c9d1e8; }
-.card.rarity-rare { --gem: #38bdf8; }
-.card.rarity-epic { --gem: #c084fc; }
-.card.rarity-legendary { --gem: #ffb020; }
+.card.rarity-common { --gem: var(--rarity-common); }
+.card.rarity-rare { --gem: var(--rarity-rare); }
+.card.rarity-epic { --gem: var(--rarity-epic); }
+.card.rarity-legendary { --gem: var(--rarity-legendary); }
 .card.rarity-legendary > .card-gem { animation: gemPulse 2.4s ease-in-out infinite; }
 @keyframes gemPulse { 50% { box-shadow: 0 0 1.2em var(--gem), 0 0 .3em #fff, 0 .1em .25em rgba(0,0,0,.6); } }
 
@@ -2627,7 +2640,7 @@ body:has(.arena[data-arena]:not([data-arena="standard"]), .match-found, .pack-ov
 
 /* recovery code, shown once */
 .acct-reveal-card { display: grid; gap: 14px; }
-.acct-reveal-card a.btn { text-decoration: none; }
+.acct-reveal-card a.btn, .menu-actions a.btn { text-decoration: none; }
 .acct-reveal-card h2 { margin: 4px 0 0; }
 .acct-reveal-card p { margin: 0; }
 .acct-code {
@@ -2880,6 +2893,15 @@ body:has(#app > .menu, #app > .match, #app > .collection, #app > .builder, #app 
 .emblem.has-img > img { opacity: 1; }
 .emblem.has-img .emblem-glyph { visibility: hidden; }
 .art-emblem .emblem { width: 1.15em; height: 1.15em; vertical-align: 0; }
+/* Until a deck emblem or painted icon (ui/kw-*, ui/rule-*, ui/trig-*, ui/icon-*, from the Art Studio)
+   has its image, its monogram sits on a small enamel disc in its colour (--deck). */
+.emblem .emblem-glyph {
+  display: grid; place-items: center; width: 100%; height: 100%; border-radius: 50%;
+  font: 700 .58em/1 var(--tech); letter-spacing: -.02em; font-style: normal; color: #fff; text-shadow: 0 .05em .1em rgba(0,0,0,.6);
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--deck, #ffc53d) 75%, #fff), color-mix(in srgb, var(--deck, #ffc53d) 55%, #05060f));
+  box-shadow: inset 0 0 0 .06em rgba(255,255,255,.35), inset 0 -.08em .12em rgba(0,0,0,.35), 0 0 .3em color-mix(in srgb, var(--deck, #ffc53d) 55%, transparent);
+}
+.art-icon { width: 1.25em; height: 1.25em; }
 
 /* Bandwidth pips are the crystal icon: lit when full, a dim ghost when spent, violet when temporary */
 .pip { clip-path: none; background: url(assets/img/ui/icon-bandwidth.webp) center / contain no-repeat; filter: grayscale(1) brightness(.45); opacity: .55; }

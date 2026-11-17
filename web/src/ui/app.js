@@ -28,7 +28,7 @@ import { shop } from './shop.js';
 import { season } from './season.js';
 import { rewardsPanel, toast } from './packs.js';
 import { missingCards, missingDust, archInfo, archLevel, starterUnlockLevel, bestFinish } from '../data/economy.js';
-import { installTilt, installRipples, installTooltips, installCardFit, installSettle, installGrain, artSlot, deckArtUrls, logoUrls, deckEmblem, removeFx, currency, countUp, motionOK } from './fx.js';
+import { installTilt, installRipples, installTooltips, installCardFit, installSettle, installGrain, artSlot, deckArtUrls, logoUrls, deckEmblem, removeFx, currency, countUp, motionOK, uiIcon } from './fx.js';
 import { DECKS, CARDS, DECK_SIZE, getDeck } from '../data/index.js';
 import { KEYWORDS, TERMS, START_HP, BOARD_SLOTS, MAX_HAND, OPENING_HAND } from '../engine/constants.js';
 import { describeTip, glossaryList, kwName, KW_META, KIND_COLORS } from './keywords.js';
@@ -239,7 +239,7 @@ function menu() {
       render(false);
     };
     const kind = locked
-      ? (deck.starter ? `🔒 Level ${starterUnlockLevel(starterIndex)}` : `Missing ${missing.reduce((s, m) => s + m.need, 0)} cards`)
+      ? (deck.starter ? [uiIcon('lock', 'Locked'), ` Level ${starterUnlockLevel(starterIndex)}`] : `Missing ${missing.reduce((s, m) => s + m.need, 0)} cards`)
       : deck.starter ? (starterIndex === 0 ? 'Starter · Free' : 'Starter') : playable ? 'Custom' : `Draft · ${deck.cards.length}/${DECK_SIZE}`;
     return h('div', {
       class: `list-tile${selected ? ' selected' : ''}${playable ? '' : ' draft'}${locked ? ' locked' : ''}${i ? ' rise' : ''}`, style: { '--i': i },
@@ -323,7 +323,9 @@ function menu() {
         h('button', { class: 'btn ghost', onclick: () => gallery(prefs.myDeck) }, 'Card gallery'),
         h('button', { class: 'btn ghost', onclick: () => players() }, signedIn()?.rank ? `Profile · ${signedIn().rank.label}` : 'Profile & friends'),
         h('button', { class: 'btn ghost', onclick: rules }, 'How to play'),
-        h('button', { class: 'btn ghost', onclick: () => balanceLab(root, { onBack: menu }) }, 'Balance lab')),
+        h('button', { class: 'btn ghost', onclick: () => balanceLab(root, { onBack: menu }) }, 'Balance lab'),
+        // The tier list from real players' games (server/live-meta.mjs), in a new tab like the guides.
+        h('a', { class: 'btn ghost', href: 'meta/live', target: '_blank', rel: 'noopener' }, 'Live meta')),
       !signedIn() && spotsNow?.left > 0 ? h('div', { class: animate ? 'rise' : '', style: { '--i': 1 } },
         founderPitch(spotsNow, { onClaim: signUpScreen })) : null,
       siteFoot(),
@@ -360,7 +362,8 @@ function siteFoot() {
       h('nav', { 'aria-label': 'Guides' }, h('h3', null, 'Guides'), h('ul', null,
         guide('Deck guides', 'decks'),
         guide('Card list', 'cards'),
-        guide('Tier list', 'meta'),
+        guide('Live tier list', 'meta/live'),
+        guide('Balance lab tier list', 'meta'),
         guide('Rules and keywords', 'how-to-play'))),
       h('nav', { 'aria-label': 'Your stuff' }, h('h3', null, 'Your stuff'), h('ul', null,
         link('Collection', nav.collection),

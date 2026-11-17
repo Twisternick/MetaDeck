@@ -3,7 +3,6 @@ import { M, S, fx, QUICK, NEW, QUICK_NEW } from '../helpers.js';
 export default {
   id: 'CardGame',
   name: 'Card Game',
-  icon: '🃏',
   color: '#8c56c4',
   tagline: 'A card game about card games: rewrite cards with Errata, change the rules with House Rules, and draw piles of cards.',
   cards: [
