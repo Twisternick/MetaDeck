@@ -1,5 +1,5 @@
-// The Art Studio slot (assets/img/ui/<key>.webp) behind each painted icon the UI shows. Plain data, so
-// the Art Studio (tools/art-studio/slots.js) and the tests can import it without a page.
+// The art slot (assets/img/ui/<key>.webp) behind each painted icon the UI shows. Plain data, so
+// the art tool (tools/art/slots.js) and the tests can import it without a page.
 
 const kebab = s => s.replace(/([a-z])([A-Z])/g, '$1-$2').replace(/\s+/g, '-').toLowerCase();
 

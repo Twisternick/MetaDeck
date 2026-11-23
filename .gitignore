@@ -76,3 +76,6 @@ crashlytics-build.properties
 
 # Balance lab reports (web/serve.mjs writes these)
 /web/reports/
+
+# Raw images and Codex logs from the art tool (web/tools/art.mjs)
+/web/tools/art/_incoming/

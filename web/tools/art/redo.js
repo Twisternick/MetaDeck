@@ -1,5 +1,5 @@
-// Art flagged for redoing by the art audit of 2026-11-14. The Art Studio badges these slots and lists them
-// under "Flagged". A flag clears by itself once a new image is saved over the flagged one: `bytes` is the
+// Art flagged for redoing by the art audit of 2026-11-14. `node tools/art.mjs list flagged` lists these
+// with the reason. A flag clears by itself once a new image is saved over the flagged one: `bytes` is the
 // flagged file's size, so the flag stays up only while that same file (or no file) is in place.
 // REDO flags single images; REDO_THEMES (at the end) flags every image drawn in a deck's art style.
 

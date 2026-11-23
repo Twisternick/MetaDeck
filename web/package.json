@@ -7,7 +7,7 @@
   "engines": { "node": ">=22.13" },
   "scripts": {
     "start": "node serve.mjs",
-    "art": "node tools/art-studio.mjs",
+    "art": "node tools/art.mjs",
     "test": "node --test test/*.test.mjs",
     "simulate": "node tools/simulate.mjs --games 100 --cards",
     "grant": "node tools/grant.mjs",

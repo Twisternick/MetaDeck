@@ -1,5 +1,5 @@
-// Every artwork slot in the game and the image-generator prompt for it. Shared by the Art Studio page
-// (tools/art-studio/) and the tests, so it only imports plain data modules.
+// Every artwork slot in the game and the image-generator prompt for it. Shared by the art tool
+// (tools/art.mjs) and the tests, so it only imports plain data modules.
 
 import { DECKS } from '../../src/data/index.js';
 import { TOKENS } from '../../src/data/tokens.js';
@@ -9,8 +9,8 @@ import { COSMETICS } from '../../src/data/economy.js';
 import { KEYWORDS, TERMS, RULES } from '../../src/engine/constants.js';
 import { keywordIconKey, ruleIconKey, triggerIconKey, uiIconKey, TRIGGERS, UI_ICONS } from '../../src/ui/icon-keys.js';
 
-// Output size per slot kind. `ask` is the shape requested from the generator; the studio crops it to `w`×`h`.
-// `fit` kinds are cut-outs on a transparent background: the studio fits them whole instead of cropping.
+// Output size per slot kind. `ask` is the shape requested from the generator; the art tool crops it to `w`×`h`.
+// `fit` kinds are cut-outs on a transparent background: the art tool fits them whole instead of cropping.
 const CLEAR = 'with a fully transparent background, exported as a PNG';
 export const KINDS = {
   card: { w: 768, h: 480, ask: 'a wide landscape image (3:2)' },
@@ -290,7 +290,7 @@ function prompt(kind, subject, style, extra = '') {
   return { prompt: text, style, subject, extra };
 }
 
-// Card slots go four to an image: a 2×2 grid of 3:2 panels, which the studio splits back into cards.
+// Card slots go four to an image: a 2×2 grid of 3:2 panels, which the art tool splits back into cards.
 // Each panel of a 1536×1024 image is 768×512, enough for a 768×480 card.
 export const BATCH = { cols: 2, rows: 2, positions: ['Top-left', 'Top-right', 'Bottom-left', 'Bottom-right'] };
 
@@ -339,7 +339,7 @@ const redoNote = (key, style) => redoFlags(key, style)
 const join = (...parts) => parts.filter(Boolean).join(' ');
 
 // { key, kind, group, name, sub, w, h, prompt, style, subject, extra, redo } for every slot. `key` is the path
-// under assets/img without extension; the studio saves `<key>.webp`. `redo` lists the slot's redo.js flags.
+// under assets/img without extension; the art tool saves `<key>.webp`. `redo` lists the slot's redo.js flags.
 export function allSlots() {
   const slots = [];
   const add = (kind, key, group, name, parts, sub = '') =>
@@ -571,5 +571,5 @@ const UI_ICON = {
   cards: ['a small fanned stack of three cards', 'card bundle rewards'],
 };
 
-// Paths the studio server may write: assets/img/<cards|decks|heroes|ui>/<name>.webp
+// Paths the art tool may write: assets/img/<cards|decks|heroes|ui>/<name>.webp
 export const SAVE_PATH = /^assets\/img\/(cards|decks|heroes|ui)\/[A-Za-z0-9_-]+\.webp$/;

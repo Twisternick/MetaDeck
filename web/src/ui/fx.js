@@ -163,7 +163,7 @@ export function installGrain() {
 // An art slot shows the first image in `candidates` that loads; until then (or if none
 // exists) it shows an animated placeholder with the deck emblem. Missing images are
 // remembered so re-renders never re-request them, until the tab regains focus (art may
-// have been added in the Art Studio meanwhile).
+// have been added meanwhile).
 const artStatus = new Map(); // url -> 'ok' | 'missing'
 window.addEventListener('focus', () => {
   for (const [url, status] of artStatus) if (status === 'missing') artStatus.delete(url);
@@ -188,7 +188,7 @@ export function deckEmblem(deck, className = '') {
   return box;
 }
 
-// A painted UI icon (assets/img/ui/<key>, made in the Art Studio), sized by the surrounding font size like
+// A painted UI icon (assets/img/ui/<key>, made with tools/art.mjs), sized by the surrounding font size like
 // text. Until its image exists it shows `glyph` (a monogram, by default) on a disc in `color`.
 export function artIcon(key, name, color = '#ffc53d', glyph = monogram(name)) {
   const box = h('span', { class: 'emblem art-icon', 'aria-hidden': 'true', style: { '--deck': color } },
@@ -223,7 +223,7 @@ function loadArt(box, candidates, alt = '') {
   box.append(img);
 }
 
-// Each slot is tried as .webp (what the Art Studio saves), then .png.
+// Each slot is tried as .webp (what tools/art.mjs saves), then .png.
 const imgUrls = key => [`assets/img/${key}.webp`, `assets/img/${key}.png`];
 export const cardArtUrls = (def, ownerDeckId) =>
   [...imgUrls(`cards/${def.cardId}`), ...imgUrls(`decks/${def.deckId ?? ownerDeckId ?? 'token'}`)];

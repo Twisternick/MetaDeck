@@ -178,7 +178,7 @@ export function renderCardBack(classes = '', skin = 'back:classic') {
     name !== 'classic' ? backSkin(name) : null);
 }
 
-// A non-classic back: its painted image (ui/back-<name>, made in the Art Studio) over the CSS skin it
+// A non-classic back: its painted image (ui/back-<name>, made with tools/art.mjs) over the CSS skin it
 // falls back to, with a foil sheen sweeping across either one.
 export function backSkin(name) {
   return h('div', { class: 'back-skin', 'aria-hidden': 'true' },

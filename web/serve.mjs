@@ -268,7 +268,7 @@ const gameJsonLd = () => JSON.stringify({
 // Static files. Each has an ETag, so a browser revalidating gets a tiny 304 instead of the file.
 // Art, sound and fonts may be cached for a day (and used stale for a week while refreshing), so a
 // proxy like Cloudflare can serve them; the code is always revalidated so updates show up at once.
-// On localhost everything is revalidated, so new art from the Art Studio appears on the next load.
+// On localhost everything is revalidated, so new art from tools/art.mjs appears on the next load.
 function serveStatic(req, res) {
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405, { Allow: 'GET, HEAD' }).end(); return; }
   let urlPath;

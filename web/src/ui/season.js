@@ -13,7 +13,7 @@ import {
 import { DECKS, starterDecks } from '../data/index.js';
 import { tip } from './tutorial.js';
 
-// Painted icons per reward type (Art Studio slots: [key under ui/, name]); gold, gems and dust use the currency icons.
+// Painted icons per reward type (art slots: [key under ui/, name]); gold, gems and dust use the currency icons.
 const REWARD_ICONS = { pack: ['pack', 'Pack'], cosmetic: ['icon-cosmetic', 'Cosmetic'], premiumCard: ['icon-premium-card', 'Premium'], holoCard: ['icon-holo-card', 'Holo'], cards: ['icon-cards', 'Cards'] };
 const rewardIcon = type => (['gold', 'gems', 'dust'].includes(type) ? currency(type) : REWARD_ICONS[type] ? artIcon(...REWARD_ICONS[type]) : null);
 

@@ -2079,7 +2079,7 @@ body:has(.arena[data-arena]:not([data-arena="standard"]), .match-found, .pack-ov
 }
 
 /* ---------- arena skins ----------
-   An arena is a painted table (ui/arena-<name>, made in the Art Studio) over the CSS gradient it falls back
+   An arena is a painted table (ui/arena-<name>, made with tools/art.mjs) over the CSS gradient it falls back
    to (--arena-base), a rim colour for the mat (--rim) and ambient particles in .arena-fx (--fx). The same
    variables dress the swatches in the collection and the shop, so every preview matches the match. */
 [data-arena="standard"] { --arena-art: url(assets/img/ui/bg-board.webp); }
@@ -2893,7 +2893,7 @@ body:has(#app > .menu, #app > .match, #app > .collection, #app > .builder, #app 
 .emblem.has-img > img { opacity: 1; }
 .emblem.has-img .emblem-glyph { visibility: hidden; }
 .art-emblem .emblem { width: 1.15em; height: 1.15em; vertical-align: 0; }
-/* Until a deck emblem or painted icon (ui/kw-*, ui/rule-*, ui/trig-*, ui/icon-*, from the Art Studio)
+/* Until a deck emblem or painted icon (ui/kw-*, ui/rule-*, ui/trig-*, ui/icon-*, from tools/art.mjs)
    has its image, its monogram sits on a small enamel disc in its colour (--deck). */
 .emblem .emblem-glyph {
   display: grid; place-items: center; width: 100%; height: 100%; border-radius: 50%;

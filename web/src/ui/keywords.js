@@ -76,7 +76,7 @@ export const KIND_COLORS = {
   passive: '#9aa3c2',
 };
 
-// The keyword's painted icon (ui/kw-<keyword>, made in the Art Studio), an element to place inline.
+// The keyword's painted icon (ui/kw-<keyword>, made with tools/art.mjs), an element to place inline.
 export const kwIcon = k => artIcon(keywordIconKey(k), kwName(k), kwColor(k));
 // A House Rule's painted icon (ui/rule-<rule>).
 export const ruleIcon = id => artIcon(ruleIconKey(id), RULES[id].name, KIND_COLORS.passive);

@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { allSlots, batchPrompt, batchable, DECK_STYLE, SAVE_PATH, COSMETIC_ART } from '../tools/art-studio/slots.js';
+import { allSlots, batchPrompt, batchable, DECK_STYLE, SAVE_PATH, COSMETIC_ART } from '../tools/art/slots.js';
 import { COSMETICS } from '../src/data/economy.js';
-import { REDO, REDO_REASONS, REDO_THEMES } from '../tools/art-studio/redo.js';
+import { REDO, REDO_REASONS, REDO_THEMES } from '../tools/art/redo.js';
 import { DECKS } from '../src/data/index.js';
 import { TOKENS } from '../src/data/tokens.js';
 import { KEYWORDS, TERMS, RULES } from '../src/engine/constants.js';
@@ -56,7 +56,7 @@ test('a deck flagged for a theme rework flags every image drawn in its style', (
   }
 });
 
-test('the studio only writes .webp files inside the art folders', () => {
+test('the art tool only writes .webp files inside the art folders', () => {
   for (const bad of ['assets/img/cards/../../serve.mjs', 'assets/img/cards/x.png', 'src/ui/fx.webp', 'assets/img/cards/a/b.webp']) {
     assert.doesNotMatch(bad, SAVE_PATH, bad);
   }
@@ -72,7 +72,7 @@ test('a batch prompt names each card in its panel and pads missing panels', () =
   assert.ok(!batchable(cards[0], allSlots().find(s => s.key === 'heroes/Horror')));
 });
 
-test('the key art style slots ask for transparent cut-outs where the studio fits them whole', () => {
+test('the key art style slots ask for transparent cut-outs where the art tool fits them whole', () => {
   const ui = allSlots().filter(s => s.key.startsWith('ui/') && s.key !== 'ui/card-back' && s.group !== 'Cosmetics');
   assert.ok(ui.length >= 20, 'logo, frames, backgrounds, icons and effects');
   for (const s of ui) {
@@ -105,6 +105,6 @@ test('every card back and arena for sale, on the season track or for founders ha
     assert.equal(s.group, 'Cosmetics');
     assert.equal(s.kind, kind === 'back' ? 'back' : 'scene');
     assert.ok(COSMETIC_ART[c.id] && s.prompt.includes(COSMETIC_ART[c.id]), `${c.id} has a subject`);
-    assert.ok(SAVE_PATH.test(`assets/img/${s.key}.webp`), `${c.id}: the studio may save it`);
+    assert.ok(SAVE_PATH.test(`assets/img/${s.key}.webp`), `${c.id}: the art tool may save it`);
   }
 });
