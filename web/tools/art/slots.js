@@ -70,8 +70,13 @@ const FRAME_LAYOUT = 'Layout, top to bottom: a wide window for the illustration 
 export const DECK_STYLE = {
   FPS: 'Gritty cinematic concept art, near-photoreal, like a frame from a shooter\'s key art. Night, rain, smoke and muzzle haze, '
     + 'desaturated cold palette, hard rim light, olive-green #7f9a3c accents on gear and lights.',
-  Horror: 'A grainy found-footage still: harsh on-camera flash, VHS noise, scan lines and slight color bleed, crushed blacks. '
-    + 'The flash catches the subject so it stays clearly visible. Violet #7b3a8c glow in eyes, haze and light leaks.',
+  Horror: 'A grainy found-footage still from a cheap camcorder, near-photoreal: harsh on-camera flash, VHS noise, scan lines '
+    + 'and slight color bleed at the frame edges, crushed blacks. The flash catches the subject in natural, sickly, desaturated colors '
+    + '(grey, brown, rust, pale flesh) so it stays clearly visible, in a real, grimy place: sewers, basements, hospital corridors, '
+    + 'wet concrete, rusted barrels, peeling walls. Violet #7b3a8c is an accent only, in glowing eyes and a faint light leak: '
+    + 'never a purple wash, purple fog or purple sky over the scene. '
+    + 'Nothing that resembles a famous horror character: no pyramid or triangular metal helmet, no hockey mask, '
+    + 'no burned face with a striped sweater, no long-haired girl crawling out of a well.',
   Platformer: 'Crisp 16-bit pixel art on a clean, even pixel grid (every pixel the same size, no blur or smoothing), '
     + 'bright limited palette, bold readable silhouette, sky-blue #3d9bd6 accents, floating platforms, stars and springs. '
     + 'Nothing that resembles a famous platformer mascot or its items: no green warp pipes, turtle shells or spiked shells, '
@@ -82,18 +87,25 @@ export const DECK_STYLE = {
   Racing: 'Sleek daytime motorsport concept art: bright hard sunlight, hazy pale sky, heat shimmer off the asphalt, crisp reflections '
     + 'on glossy paint, motion blur on the track behind the subject. Liveries in white, silver and racing red #d4473a. '
     + 'Usually the vehicle or the moment on track is the subject, shown whole; when a person is shown, frame them with their car '
-    + 'or gear, not as a face close-up. No night scenes, neon glow, flames swirling around the frame, or orange-dominant color.',
+    + 'or gear, not as a face close-up. No night scenes, neon glow, flames swirling around the frame, or orange-dominant color. '
+    + 'Vary the vehicle and the camera from card to card (side-on, rear three-quarter, overhead, a close detail): '
+    + 'do not default to the white sports car seen head-on.',
   Fighting: 'Anime cel-shading: clean confident line art, flat cel shadows, vivid colors, dynamic foreshortened pose, '
-    + 'energy swirls and impact sparks in orange #e0782a. Every fighter is an original character with their own look: '
+    + 'energy swirls and impact sparks in orange #e0782a. Every scene is set in the same sunlit stone colosseum: '
+    + 'tiered stands packed with a cheering crowd, red-and-gold banners, bright blue sky and a sandy stone floor, clearly visible '
+    + 'behind the fighter. Never a plain fire vortex, dark void or abstract background. '
+    + 'Every fighter is an original character with their own look: '
     + 'varied outfits (track suits, street clothes, armor plates, capes, ring gear, uniforms), hairstyles and builds. '
     + 'Nothing that resembles a famous fighting-game character: no red headband with a torn white gi, no prayer beads, '
     + 'no glowing hand-held fireball, no red braids with a green leotard, no red headband with red gloves, '
-    + 'no hair buns with ribbons, spiked bracelets or a qipao.',
+    + 'no hair buns with ribbons, spiked bracelets or a qipao, no white gi with torn-off sleeves and a headband. '
+    + 'Women fighters wear their hair loose, cropped, braided or in a ponytail, never in buns.',
   Sports: 'Photo-real sports action shot, like a trading-card photo: frozen motion, bright stadium floodlights, '
     + 'shallow depth of field with crowd bokeh, bright saturated colors, green #2f9e5b team accents. Celebratory, not gritty. '
     + 'Show the idea through what happens, not a face: full-body action, wide shots of the play, the ball or gear up close, '
     + 'the bench, the sideline or the scoreboard moment. Mix sports (soccer, American football, basketball, hockey, baseball) '
-    + 'and players of different ages and builds. No shouting face close-ups, and never the same pose twice.',
+    + 'and players of different ages and builds. No shouting face close-ups, and never the same pose twice. '
+    + 'Plain kits, shoes and gear with no brand logos, swooshes or stripes that read as a real brand.',
   Strategy: 'Bold vintage war-poster illustration: flat geometric shapes, a palette of navy, blue #4364a8, cream and a touch of red, '
     + 'printed paper grain and halftone, heroic low angle, banners and silhouetted armies. Plain sky blocks behind the subject: '
     + 'no sunburst rays and no real-world flags, insignia or political symbols.',
@@ -240,25 +252,69 @@ Object.assign(SUBJECT_NOTE, {
   CCG_M10_RareCard: 'Draw a single gleaming card displayed on a velvet pedestal under a spotlight, guarded by a small knight.',
   CCG_M11_ReprintBeast: 'Draw a wolf-like beast whose body is built from identical stacked cards, freshly rolling off a printing press.',
   CCG_M12_ComboPiece: 'Draw a clockwork golem made of interlocking puzzle-piece cards, one missing piece glowing in its chest.',
-  CCG_M19_BulkCommon: 'Draw a cheerful crowd of plain, scruffy card creatures spilling out of a cardboard bulk bin.',
   CCG_M20_Misprint: 'Draw a card creature whose printed image is smeared and doubled, ink colors misaligned like a bad print.',
   CCG_M23_GameStoreOwner: 'Draw a friendly shopkeeper behind a counter of display cases and booster boxes, young and aproned.',
   CCG_M24_MythicRare: 'Draw a radiant winged sphinx rising from a single card on a dark altar.',
-  CCG_S04_DiscardCard: 'Draw a hand of cards with one card torn away and fluttering into a dark pit.',
   CCG_S07_Errata: 'Draw a giant card flipping in mid-air while a quill crosses out its two stat numbers in red ink and writes them back the other way round.',
   CCG_M19_AlternatePrinting: 'Draw a printing press stamping out a card whose stat numbers come out mirrored, a slightly wrong twin of the card beside it.',
   CCG_S01_DraftNight: 'Draw a lively game-store table at night, players tearing open packs, cards fanning through the air under warm lamplight.',
   CCG_S02_HandSizeErrata: 'Draw a hand fanned out impossibly wide, twelve glowing cards, a ruler measuring it with the old limit crossed out.',
   CCG_S04_Typo: 'Draw a price tag on a card with the number crossed out and a bigger number scribbled in, a sheepish little gremlin holding the pen.',
   CCG_S10_Rotation: 'Draw a huge rotating vault door swallowing a pile of old cards into darkness, a calendar page flipping above it.',
-  CCG_S11_BalancePatch: 'Draw a giant set of scales tipping: a towering monster card shrinking on one side, a tiny card growing on the other, patch notes fluttering.',
+  CCG_S11_BalancePatch: 'Draw a giant set of scales tipping: a towering monster card shrinking on one side, a tiny card growing on the other, patch notes fluttering. Only cards on the scales: no slime, blob or mascot creature.',
   CCG_S03_AltArt: 'Draw a playing card on an easel with a paintbrush repainting it, the old cost gem and attack number visibly swapping places in the wet paint.',
   CCG_S05_LimitedFormat: 'Draw a game table being squeezed by two giant bookends, one card slot cracking and sealed off with tape.',
   CCG_S06_ErrataWeek: 'Draw a pinned noticeboard covered in errata notices, one big keyword crossed out in red marker with a STRUCK stamp.',
   CCG_S09_PauperFormat: 'Draw a humble wooden table where only small copper-trimmed cards are allowed, a velvet rope blocking a glittering expensive card.',
-  CCG_S10_Reprint: 'Draw a fallen card creature reforming as fresh copies stream out of a glowing printing press.',
   CCG_S13_StackResponse: 'Draw a tall tower of stacked cards, the top card flipping to block an incoming blast.',
   CCG_S15_BoardWipe: 'Draw a game table swept clean by a shockwave, cards and pieces blasting off the edges.',
+});
+
+// Cards whose earlier images copied a famous character or repeated another card in the deck (art audit of
+// 2026-11-23). Each gets a concrete, distinct scene so a redraw doesn't land on the same picture again.
+Object.assign(SUBJECT_NOTE, {
+  FPS_M12_RespawnSpecialist: 'Draw a soldier sliding down a fast-rope from a hovering helicopter, dropping straight back into the fight.',
+  HOR_M09_RelentlessPursuer: 'Draw a towering stitched figure in a rain-soaked trench coat and a cracked porcelain mask, dragging a chain down a long corridor.',
+  HOR_M22_AsylumWarden: 'Draw a hulking asylum orderly in a stained white uniform dragging a rattling ring of keys and a straitjacket down a ward corridor. No shield or door.',
+  HOR_M11_LastBulletGuard:'Draw a lone guard sitting slumped against a door, holding up a single bullet between two fingers, an empty revolver in the other hand. No shield.',
+  HOR_M24_Necromancer:'Draw a gaunt necromancer in a bone-trimmed robe raising both hands over an open grave as skeletons claw up out of the soil.',
+  PLA_M08_AirborneAce: 'Draw a girl in a flight cap and goggles gliding on a little propeller backpack high above the floating platforms.',
+  PLA_M22_HiddenBlockGuardian: 'Draw a small mischievous sprite peeking out of a cracked floating golden block, hugging the coin hidden inside. Not a golem.',
+  RPG_M03_PartyHealer: 'Draw a kindly grey-bearded dwarf herbalist bandaging a wounded companion\'s arm, a satchel of herbs at his side.',
+  RPG_M09_QuestingKnight: 'Draw a knight in full plate armor on a barded warhorse, lance raised, riding toward a distant castle.',
+  RPG_M19_NoviceCleric: 'Draw a young shaven-headed acolyte in plain grey robes carefully lighting a candle at a small roadside shrine.',
+  RPG_M20_ShadowThief: 'Draw a nimble bare-headed thief leaping between moonlit rooftops with a stolen jewel, a coil of rope over one shoulder.',
+  RAC_M12_BurnoutSpecialist: 'Draw a muscle car seen side-on, rear tyres spinning on the start line inside a huge cloud of white tyre smoke.',
+  RAC_M17_RivalRacer: 'Draw two drivers in rival liveries, helmets under their arms, squaring off beside their cars on the grid, seen at full length.',
+  RAC_S06_SharpTurn: 'Draw an overhead view of a car cutting a tight hairpin bend, the curve of the track and red-and-white kerbs filling the frame.',
+  RAC_S08_CleanLap: 'Draw a car seen from behind on an empty straight, perfectly on the racing line, heading for the start-finish gantry.',
+  FIG_M10_FinalRoundChampion: 'Draw an original heavyweight champion with a cropped haircut and a long ring robe, a title belt over one shoulder, fist raised.',
+  FIG_M11_DojoStudent: 'Draw a young student in a blue judo gi with a yellow belt, bowing respectfully, hands at the sides.',
+  FIG_M14_ProjectileZoner: 'Draw an original fighter in a long coat keeping distance by flinging spinning energy discs from both hands.',
+  FIG_M19_KickBoxer: 'Draw an original Muay Thai kickboxer with a shaved-side haircut, ring shorts and hand wraps, mid roundhouse kick.',
+  FIG_S12_Burst: 'Draw a short-haired fighter breaking free inside a spherical orange shockwave that throws the opponent back.',
+  FIG_M18_ButtonMasher: 'Draw a gleeful fighter in a tank top flailing a wild blur of a dozen fists at once, eyes squeezed shut, side-on view.',
+  FIG_M03_FramePerfectStriker: 'Draw a calm fighter in a sleeveless karate top landing one perfectly timed knee strike, frozen at the instant of impact, a ring of light at the contact point.',
+  FIG_S10_SuddenDeath:'Draw one original fighter in a sleeveless hoodie throwing an all-or-nothing haymaker, wincing as red recoil cracks run up their own arm, the crowd on its feet. One fighter only, no silhouettes.',
+  FIG_M16_TagPartner:'Draw two partner fighters slapping hands in a tag, one leaping into the fight as the other steps out: a tall woman in a track suit and a stocky man in a wrestling singlet.',
+  FIG_S14_Jab: 'Draw a bald boxer in a red tank top and gloves snapping out a lightning-fast straight jab, a ring of impact sparks at the glove.',
+  FIG_S15_Taunt: 'Draw a lanky fighter in a long scarf with short spiky hair, leaning back casually and beckoning the opponent with two fingers, a smug grin.',
+  SPO_M04_DefensiveWall: 'Draw an ice hockey goalie in full pads sprawled across the goal mouth, blocking a puck.',
+  SPO_M16_TeamMascot: 'Draw an original big fluffy green dragon mascot costume dancing on the sideline, waving a team towel. Not an eagle or any real team\'s mascot.',
+  SPO_M17_StarQuarterback: 'Draw a quarterback scrambling out of the pocket with the ball tucked, spinning away from a defender, wide shot.',
+  SPO_M24_Linebacker: 'Draw a linebacker in mid-air making a diving tackle on a ball carrier, seen from the side.',
+  SPO_S15_FullCourtPress: 'Draw a wide overhead shot of five defenders swarming one ball handler across the whole basketball court.',
+  STR_M06_SupplyOfficer: 'Draw a quartermaster on a loaded supply wagon handing ration crates down to a line of soldiers.',
+  STR_M13_CounterIntelChief: 'Draw a stern officer in a dark room pinning a captured enemy map to a board under a single hanging lamp.',
+  STR_M15_TotalWarEngine: 'Draw a colossal armored land ironclad on huge iron wheels, belching steam as it crushes a wooden palisade.',
+  STR_M23_LogisticsChief: 'Draw an officer at a busy dockside directing cranes that unload barrels and crates from a ship.',
+  CTY_M12_CityHallAdministrator: 'Draw a tall gentleman in a top hat cutting a ribbon on the steps of the city hall while townsfolk cheer.',
+  CTY_M20_UrbanPlanner: 'Draw a man on a tall library ladder pinning new roads onto a huge city map that covers a whole wall.',
+  CTY_M23_RevenueAgent: 'Draw a thin tax collector with a ledger knocking on a cottage door, a small strongbox under his arm.',
+  CTY_S05_TaxHike: 'Draw the rooftops of a tiny town with coins streaming up out of the chimneys into a giant floating coffer.',
+  CCG_M05_ReverseCard: 'Draw a giant card flipping end over end while the creature painted on it springs out the other way, curved arrows looping around it. No hooded figure.',
+  CCG_M14_SideboardSpecialist: 'Draw a dapper butler built from cards swapping cards in and out of a side-table drawer. No hood.',
+  CCG_M22_Netdecker: 'Draw a spindly robot built from cards copying a glowing deck list from a floating screen, cloned cards printing out of its chest. No hood.',
 });
 
 const scale = cost =>
@@ -397,7 +453,8 @@ export function allSlots() {
   }
   // The key art style for the rest of the UI. None of these is wired into the game yet: each slot says where
   // it is meant to go. Transparent ones are fitted whole; attach ui/key-art.webp to every prompt.
-  const ui = (kind, name, subject, extra, sub) => add(kind, `ui/${name}`, 'Extras', sub[0], uiPrompt(kind, subject, extra), sub[1]);
+  const ui = (kind, name, subject, extra, sub) =>
+    add(kind, `ui/${name}`, 'Extras', sub[0], uiPrompt(kind, subject, join(extra, redoNote(`ui/${name}`, KEY_ART_STYLE))), sub[1]);
   add('logo', 'ui/logo', 'Extras', 'Menu logo', LOGO_PROMPT, 'Transparent PNG · menu header');
 
   for (const [tier, look] of Object.entries(FRAME_TIER)) {
@@ -506,7 +563,7 @@ const KEYWORD_ICON = {
   PoweredUp: ['a glowing mushroom-shaped power-up orb wrapped in a ring of light', 'defense'],
   Checkpoint: ['a pennant flag planted on a small post, glowing at its tip', 'defense'],
   XP: ['a gem-studded upward chevron like a level-up arrow', 'trigger'],
-  Momentum: ['a running boot trailing speed lines', 'bonus'],
+  Momentum: ['a heavy rolling wheel gathering speed, three swooshing motion trails behind it, no boot or foot', 'bonus'],
   Clutch: ['a clenched fist bursting out of a cracked heart', 'bonus'],
   Combo: ['three linked chain rings', 'bonus'],
   Structure: ['a small columned stone temple building', 'passive'],
