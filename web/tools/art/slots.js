@@ -11,6 +11,7 @@ import { keywordIconKey, ruleIconKey, triggerIconKey, uiIconKey, TRIGGERS, UI_IC
 
 // Output size per slot kind. `ask` is the shape requested from the generator; the art tool crops it to `w`×`h`.
 // `fit` kinds are cut-outs on a transparent background: the art tool fits them whole instead of cropping.
+// `trim` kinds (9-slice borders) are cut to their drawn edge first and stretched to fill the slot.
 const CLEAR = 'with a fully transparent background, exported as a PNG';
 export const KINDS = {
   card: { w: 768, h: 480, ask: 'a wide landscape image (3:2)' },
@@ -22,6 +23,7 @@ export const KINDS = {
   frame: { w: 560, h: 784, ask: `a tall portrait image (5:7) ${CLEAR}`, fit: true },
   ornament: { w: 1536, h: 384, ask: `a very wide image (4:1) ${CLEAR}`, fit: true },
   icon: { w: 512, h: 512, ask: `a square image (1:1) ${CLEAR}`, fit: true },
+  border: { w: 512, h: 512, ask: `a square image (1:1) ${CLEAR}`, fit: true, trim: true },
 };
 
 // The house style, set by the title screen key art (ui/key-art.webp): every UI piece (logo, frames,
@@ -213,6 +215,35 @@ const EMBLEM_GLOW = {
   Platformer: 'sky-blue', Racing: 'red', RPG: 'amber', Sports: 'emerald-green', Strategy: 'royal-blue',
 };
 
+// Each deck's menu tile border (ui/tile-frame-<deck>) is drawn in that deck's own look, not the key art's silver and gold.
+// Attach the deck art (decks/<deck>.webp) as the style reference.
+const TILE_FRAME = {
+  FPS: 'Military tactical gear: matte gunmetal and olive-drab #7f9a3c steel plates with hex bolts, scuffed paint and worn edges. '
+    + 'Each corner is a heavy riveted L-bracket with a small glowing olive-green targeting reticle. Gritty, realistic metal under cold, hard light.',
+  Horror: 'Grimy found-footage horror: rusted, pitted iron bars bound with tangles of barbed wire, stained with grime and old flaking paint. '
+    + 'Each corner is a knot of rusty nails and barbed wire around a dim violet #7b3a8c glow, like a failing bulb. Desaturated grey, brown and rust.',
+  Platformer: 'Crisp 16-bit pixel art on a clean pixel grid (hard square pixels, no blur or smoothing): a rim of chunky sky-blue #3d9bd6 and white pixel bricks '
+    + 'with a dark one-pixel outline. Each corner is a pixel-art bouncy spring topped with a tiny yellow star. Bright, flat, limited palette with no gradients.',
+  RPG: 'Illuminated medieval manuscript: a deep lapis-blue band with fine ink outlines and a vine of gold-leaf #c08a2e leaves running along it. '
+    + 'Each corner is a gold-leaf knotwork rosette with a tiny painted red gem. Flat rich colours like a storybook page.',
+  Racing: 'Motorsport bodywork: glossy white and silver carbon-fibre panels with a racing-red #d4473a livery stripe along all four edges '
+    + 'and a thin black-and-white chequered line inside it. Each corner is a sleek aerodynamic winglet. Bright daylight reflections, clean and sporty.',
+  Fighting: 'Anime cel-shading with bold black line art and flat colours: sandy colosseum stone blocks wrapped in red-and-gold banner cloth. '
+    + 'Each corner is a cel-shaded burst of orange #e0782a impact sparks and speed lines.',
+  Sports: 'Stadium team kit: glossy green #2f9e5b and white jersey-trim stripes with a thin white pitch line inside. '
+    + 'Each corner is a small chrome stadium floodlight bracket with a bright white light. Clean, celebratory, photo-real materials.',
+  Strategy: 'Vintage war poster: flat navy, blue #4364a8 and cream printed bands with halftone dots, paper grain and a thin red pinstripe. '
+    + 'Each corner is a flat geometric star-and-chevron insignia like a rank badge. Flat screen-printed look.',
+  CityBuilder: 'Tilt-shift model city: a rim of smooth painted teal #3f8f8c and cream model-kit rails with a thin dashed road line along them. '
+    + 'Each corner is a tiny model skyscraper with warm glowing windows and a little round tree at its foot, like a painted miniature.',
+  CardGame: 'Collectible trading card: a glossy charcoal-black band with a crisp white edge and a prismatic rainbow holo-foil sheen. '
+    + 'Each corner is a small fan of three cards with violet #8c56c4 glints. Glossy painted fantasy finish.',
+};
+const TILE_FRAME_RULES = 'Only the border is drawn. Its four corners are identical (mirrored) and stay inside the square; the straight edges between them are '
+  + 'plain and even, with nothing in the middle of an edge, so the border can be stretched. The rim is thin (about 3% of the width), each corner '
+  + 'ornament about a fifth of the width. Inside and outside the rim everything is fully transparent: no glow, fog, smoke or background. '
+  + 'Not silver-and-gold fantasy filigree: only the materials and colours described.';
+
 const NEUTRAL_STYLE ='Digital painting with dramatic rim lighting, deep shadows and a vivid neon accent, painterly detail.';
 
 const FAMILY = [
@@ -399,7 +430,7 @@ const join = (...parts) => parts.filter(Boolean).join(' ');
 export function allSlots() {
   const slots = [];
   const add = (kind, key, group, name, parts, sub = '') =>
-    slots.push({ key, kind, group, name, sub, w: KINDS[kind].w, h: KINDS[kind].h, fit: !!KINDS[kind].fit, ...parts, redo: redoFlags(key, parts.style) });
+    slots.push({ key, kind, group, name, sub, w: KINDS[kind].w, h: KINDS[kind].h, fit: !!KINDS[kind].fit, trim: !!KINDS[kind].trim, ...parts, redo: redoFlags(key, parts.style) });
 
   for (const deck of DECKS) {
     const style = DECK_STYLE[deck.id];
@@ -464,6 +495,15 @@ export function allSlots() {
   ui('icon', 'panel-frame', 'Subject: an empty square ornamental border for a menu panel, seen straight on: a thin bevelled silver-and-gold rim '
     + 'with decorated corners (small gold spikes and a tiny blue gem in each corner) and plain straight edges between them, so it can be stretched.',
   'The whole inside of the square is empty and transparent; only the border is drawn.', ['Panel border (9-slice)', 'Transparent PNG · dialogs, tiles, deck lists']);
+  for (const deck of DECKS) {
+    const key = `ui/tile-frame-${deck.id}`;
+    const subject = `Subject: an empty square border for a ${words(deck.name)} deck tile in a card game menu, seen straight on. ${TILE_FRAME[deck.id]}`;
+    const extra = join(TILE_FRAME_RULES, redoNote(key, TILE_FRAME[deck.id]));
+    add('border', key, deck.id, `Deck tile border — ${deck.name}`, {
+      prompt: [subject, extra, 'Original design, not based on any existing game. No text, letters or numbers, no watermark.', `Make it ${KINDS.border.ask}.`].join('\n'),
+      style: TILE_FRAME[deck.id], subject, extra,
+    }, 'Transparent PNG · menu deck tiles and deck lists (9-slice) · attach decks/<deck>.webp');
+  }
   ui('ornament', 'divider', 'Subject: a horizontal ornamental divider: a thin gold line that thickens toward a small pointed gold crest with an electric-blue crystal star in the middle, '
     + 'fading to nothing at both ends.', 'Centered, perfectly symmetrical, thin: the ornament takes up only the middle third of the height.',
   ['Section divider', 'Transparent PNG · menu section headers']);

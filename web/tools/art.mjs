@@ -113,8 +113,10 @@ const FOCUS = ['centre', 'top', 'bottom', 'left', 'right', 'entropy', 'attention
 async function place(sharp, src, s, { region, focus = 'centre', out = IMG } = {}) {
   let img = sharp(src);
   if (region) img = img.extract(region);
+  // a 9-slice border is cut to its drawn rim and stretched to fill the slot, so its corners land on the slot edges
   const position = ['entropy', 'attention'].includes(focus) ? sharp.strategy[focus] : focus;
-  img = s.fit
+  if (s.trim) img = sharp(await img.trim({ threshold: 8 }).toBuffer()).resize(s.w, s.h, { fit: 'fill' });
+  else img = s.fit
     ? img.resize(s.w, s.h, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
     : img.resize(s.w, s.h, { fit: 'cover', position });
   const rel = `assets/img/${s.key}.webp`;

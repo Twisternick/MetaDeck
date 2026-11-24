@@ -256,73 +256,44 @@ body:has(.arena[data-arena]:not([data-arena="standard"]), .match-found, .pack-ov
   background: radial-gradient(300px circle at var(--mx) var(--my), color-mix(in srgb, var(--deck) 35%, transparent), transparent 60%);
 }
 .deck-tile:hover::before, .deck-tile.selected::before { opacity: 1; }
-.deck-tile:hover { border-color: color-mix(in srgb, var(--deck) 70%, transparent); box-shadow: 0 24px 50px -16px rgba(0,0,0,.7), 0 0 40px -12px var(--deck), inset 0 1px 0 rgba(255,255,255,.12); }
-.deck-tile.selected { border-color: var(--deck); box-shadow: 0 0 0 1px var(--deck), 0 0 48px -8px var(--deck), 0 24px 50px -16px rgba(0,0,0,.7); }
+.deck-tile:hover { box-shadow: 0 24px 50px -16px rgba(0,0,0,.7), 0 0 40px -12px var(--deck), inset 0 1px 0 rgba(255,255,255,.12); }
+.deck-tile.selected { box-shadow: 0 0 48px -8px var(--deck), 0 24px 50px -16px rgba(0,0,0,.7); }
 .deck-tile .art { height: 108px; border-radius: 0; }
 .deck-tile .art-ph { border-radius: 0; }
 .deck-tile .art-emblem { font-size: 46px; }
-.deck-tile-body { padding: 12px 14px 14px; position: relative; z-index: 2; }
+.deck-tile-body { padding: 12px 18px 24px; position: relative; z-index: 2; }
 .deck-name { display: block; font-family: var(--tech); font-weight: 700; font-size: 20px; letter-spacing: .5px; }
 .deck-tag { display: block; font-size: 12.5px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
 .deck-tile .pick {
-  position: absolute; top: 10px; right: 10px; z-index: 3; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+  position: absolute; top: 12px; right: 24px; z-index: 4; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
   background: var(--deck); color: #fff; font-weight: 900; font-size: 14px; box-shadow: 0 0 16px var(--deck);
   transform: scale(0); transition: transform .3s var(--ease-spring);
 }
 .deck-tile.selected .pick { transform: scale(1); }
-/* Each genre wears its own border: a deck-coloured rim at rest plus a treatment of its own drawn by ::after.
-   Anything that moves only runs on hover or when picked. */
-.deck-tile { border-color: color-mix(in srgb, var(--deck) 42%, var(--stroke)); }
-.deck-tile::after { content: ''; position: absolute; inset: 0; z-index: 3; border-radius: inherit; pointer-events: none; transition: opacity .3s, inset .3s, filter .3s; }
-/* gradient rims: a border drawn by masking out the middle of a background */
-.deck-tile:is([data-deck="Fighting"], [data-deck="CardGame"], [data-deck="Racing"])::after {
-  padding: 2px; -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
-  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); background-size: 300% 300%; opacity: .7;
+/* Each genre wears its own ornate border (ui/tile-frame-<deck>.webp, 9-sliced so the corners keep their shape),
+   on its menu tile and on every tile of its deck list.
+   A tile's border lights up in the deck colour on hover and when picked. */
+.deck-tile { border-color: transparent; border-radius: 6px; }
+.deck-tile::after {
+  content: ''; position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  border: 28px solid transparent; border-image: var(--tile-frame) 100 / 28px stretch;
+  filter: drop-shadow(0 0 0 transparent) brightness(1); transition: filter .3s var(--ease-out);
 }
-.deck-tile:is(:hover, .selected)::after { opacity: 1; }
-/* FPS: HUD corner brackets that close in when targeted */
-.deck-tile[data-deck="FPS"]::after {
-  inset: 6px; border-radius: 10px; opacity: .75;
-  --b: color-mix(in srgb, var(--deck) 60%, #fff);
-  background:
-    linear-gradient(var(--b) 0 0) top left / 18px 2px, linear-gradient(var(--b) 0 0) top left / 2px 18px,
-    linear-gradient(var(--b) 0 0) top right / 18px 2px, linear-gradient(var(--b) 0 0) top right / 2px 18px,
-    linear-gradient(var(--b) 0 0) bottom left / 18px 2px, linear-gradient(var(--b) 0 0) bottom left / 2px 18px,
-    linear-gradient(var(--b) 0 0) bottom right / 18px 2px, linear-gradient(var(--b) 0 0) bottom right / 2px 18px;
-  background-repeat: no-repeat;
-}
-.deck-tile[data-deck="FPS"]:is(:hover, .selected)::after { inset: 3px; filter: drop-shadow(0 0 4px var(--deck)); }
-/* Horror: a sickly inner glow that flickers */
-.deck-tile[data-deck="Horror"]::after { box-shadow: inset 0 0 18px -4px var(--deck), inset 0 0 0 1px color-mix(in srgb, var(--deck) 50%, transparent); opacity: .8; }
-.deck-tile[data-deck="Horror"]:is(:hover, .selected)::after { animation: tileFlicker 2.6s steps(1) infinite; box-shadow: inset 0 0 30px -2px var(--deck), inset 0 0 0 2px var(--deck); }
-@keyframes tileFlicker { 0%, 100% { opacity: 1; } 8% { opacity: .35; } 10% { opacity: 1; } 47% { opacity: .55; } 49% { opacity: 1; } 51% { opacity: .2; } 53% { opacity: 1; } }
-/* Platformer: chunky pixel-step rim */
-.deck-tile[data-deck="Platformer"]::after { inset: 4px; border-radius: 12px; border: 3px dashed color-mix(in srgb, var(--deck) 75%, #fff); opacity: .45; }
-.deck-tile[data-deck="Platformer"]:is(:hover, .selected)::after { animation: tileHop .5s steps(2) infinite alternate; }
-@keyframes tileHop { to { inset: 2px; } }
-/* RPG: an ornate double rim in gilded deck colour */
-.deck-tile[data-deck="RPG"]::after { inset: 3px; border-radius: 19px; border: 4px double color-mix(in srgb, var(--deck) 70%, #ffe08a); opacity: .6; }
-.deck-tile[data-deck="RPG"]:is(:hover, .selected)::after { filter: drop-shadow(0 0 6px #ffcf6a); }
-/* Racing: speed stripes streaming along the rim */
-.deck-tile[data-deck="Racing"]::after { background-image: repeating-linear-gradient(110deg, var(--deck) 0 14px, #fff 14px 18px, #15151d 18px 30px); background-size: 200% 100%; }
-.deck-tile[data-deck="Racing"]:is(:hover, .selected)::after { animation: tileRush .9s linear infinite; }
-@keyframes tileRush { to { background-position: -64px 0; } }
-/* Fighting: a fiery rim that surges */
-.deck-tile[data-deck="Fighting"]::after { background-image: linear-gradient(120deg, #ffd166, var(--deck), #c81d25, var(--deck), #ffd166); }
-.deck-tile[data-deck="Fighting"]:is(:hover, .selected)::after { animation: tileSurge 1.6s ease-in-out infinite alternate; filter: drop-shadow(0 0 6px var(--deck)); }
-@keyframes tileSurge { to { background-position: 100% 100%; } }
-/* Sports: a two-tone jersey stripe under the art */
-.deck-tile[data-deck="Sports"]::after { inset: 104px 0 auto; height: 8px; border-radius: 0; background: linear-gradient(var(--deck) 0 35%, #fff 35% 65%, var(--deck) 65%); opacity: .85; }
-.deck-tile[data-deck="Sports"]:is(:hover, .selected)::after { filter: drop-shadow(0 0 6px var(--deck)); }
-/* Strategy: a blueprint rule line set inside the rim */
-.deck-tile[data-deck="Strategy"]::after { inset: 5px; border-radius: 17px; border: 1.5px dashed color-mix(in srgb, var(--deck) 70%, #cfe0ff); opacity: .5; }
-.deck-tile[data-deck="Strategy"]:is(:hover, .selected)::after { inset: 7px; filter: drop-shadow(0 0 4px var(--deck)); }
-/* City Builder: lit windows dotted along the rim */
-.deck-tile[data-deck="CityBuilder"]::after { inset: 4px; border-radius: 18px; border: 3px dotted color-mix(in srgb, var(--deck) 55%, #ffe9a8); opacity: .45; }
-.deck-tile[data-deck="CityBuilder"]:is(:hover, .selected)::after { filter: drop-shadow(0 0 5px #ffe08a); }
-/* Card Game: a holo-foil rim */
-.deck-tile[data-deck="CardGame"]::after { background-image: linear-gradient(115deg, #ff4fa3, #ffd84f, #4fffd2, #5b8cff, var(--deck), #ff4fa3); }
-.deck-tile[data-deck="CardGame"]:is(:hover, .selected)::after { animation: tileSurge 2.4s linear infinite alternate; }
+.deck-tile:hover::after { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--deck) 70%, transparent)) brightness(1.05); }
+.deck-tile.selected::after { filter: drop-shadow(0 0 7px var(--deck)) drop-shadow(0 0 2px #fff6d8) brightness(1.15); }
+[data-deck="FPS"] { --tile-frame: url(assets/img/ui/tile-frame-FPS.webp); }
+[data-deck="Horror"] { --tile-frame: url(assets/img/ui/tile-frame-Horror.webp); }
+[data-deck="Platformer"] { --tile-frame: url(assets/img/ui/tile-frame-Platformer.webp); }
+[data-deck="RPG"] { --tile-frame: url(assets/img/ui/tile-frame-RPG.webp); }
+[data-deck="Racing"] { --tile-frame: url(assets/img/ui/tile-frame-Racing.webp); }
+[data-deck="Fighting"] { --tile-frame: url(assets/img/ui/tile-frame-Fighting.webp); }
+[data-deck="Sports"] { --tile-frame: url(assets/img/ui/tile-frame-Sports.webp); }
+[data-deck="Strategy"] { --tile-frame: url(assets/img/ui/tile-frame-Strategy.webp); }
+[data-deck="CityBuilder"] { --tile-frame: url(assets/img/ui/tile-frame-CityBuilder.webp); }
+[data-deck="CardGame"] { --tile-frame: url(assets/img/ui/tile-frame-CardGame.webp); }
+/* Horror: the picked border flickers like a failing bulb */
+.deck-tile[data-deck="Horror"].selected::after { animation: tileFlicker 2.6s steps(1) infinite; }
+@keyframes tileFlicker { 0%, 100% { opacity: 1; } 8% { opacity: .45; } 10% { opacity: 1; } 47% { opacity: .65; } 49% { opacity: 1; } 51% { opacity: .35; } 53% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .deck-tile::after { animation: none !important; } }
 .menu-actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 40px; }
 .vs-strip {
@@ -1078,13 +1049,14 @@ body:has(.arena[data-arena]:not([data-arena="standard"]), .match-found, .pack-ov
   .tagline { font-size: 15px; margin-top: 10px; }
   .menu h2, .gallery h2, .rules h2 { margin: 24px 0 12px; }
   .deck-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-  .deck-tile { border-radius: 16px; }
+  .deck-tile { border-radius: 5px; }
+  .deck-tile::after { border-width: 20px; border-image-width: 20px; }
   .deck-tile .art { height: 70px; }
   .deck-tile .art-emblem { font-size: 32px; }
-  .deck-tile-body { padding: 9px 10px 11px; }
+  .deck-tile-body { padding: 9px 13px 18px; }
   .deck-name { font-size: 17px; }
   .deck-tag { font-size: 11.5px; line-height: 1.35; }
-  .deck-tile .pick { top: 7px; right: 7px; width: 22px; height: 22px; font-size: 12px; }
+  .deck-tile .pick { top: 9px; right: 18px; width: 22px; height: 22px; font-size: 12px; }
   .chips { gap: 6px; }
   .chip { padding: 6px 12px 6px 9px; font-size: 13px; }
   .vs-strip { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; padding: 14px 10px; margin-top: 22px; }
@@ -2257,7 +2229,7 @@ body:has(.arena[data-arena]:not([data-arena="standard"]), .match-found, .pack-ov
 
 /* ---------- menu additions ---------- */
 .deck-level {
-  position: absolute; top: 8px; left: 8px; z-index: 3; padding: 2px 8px; border-radius: 999px; font: 700 12px/18px var(--tech); letter-spacing: 1px;
+  position: absolute; top: 12px; left: 24px; z-index: 4; padding: 2px 8px; border-radius: 999px; font: 700 12px/18px var(--tech); letter-spacing: 1px;
   background: rgba(4,5,11,.75); border: 1px solid color-mix(in srgb, var(--deck) 60%, transparent); color: #fff; box-shadow: 0 0 12px -4px var(--deck);
 }
 .list-tile.locked { border-style: dashed; background: repeating-linear-gradient(135deg, rgba(255,255,255,.025) 0 10px, transparent 10px 20px), var(--glass); cursor: default; }
@@ -2956,6 +2928,7 @@ body:has(#app > .menu, #app > .match, #app > .collection, #app > .builder, #app 
 .dialog, .list-tile, .vs-strip { border-style: solid; border-color: transparent; border-image: url(assets/img/ui/panel-frame.webp) 66 / 22px / 4px stretch; }
 .dialog { border-width: 22px; border-radius: 10px; }
 .list-tile, .vs-strip { border-image-width: 16px; border-image-outset: 3px; border-width: 1px; border-radius: 8px; }
+.list-grid .list-tile { border-image: var(--tile-frame) 100 / 22px stretch; border-radius: 5px; padding: 16px 20px 18px; }
 /* their glow follows the frame's jewelled corners instead of a box-shadow rectangle */
 .list-tile:hover, .list-tile.selected { box-shadow: none; }
 .list-tile:hover { filter: drop-shadow(0 12px 14px rgba(0,0,0,.55)) drop-shadow(0 0 8px color-mix(in srgb, var(--deck) 45%, transparent)); }

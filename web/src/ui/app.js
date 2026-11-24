@@ -303,7 +303,7 @@ function menu() {
           })))),
         h('section', null,
           h('h2', null, mine.name + ' deck list'),
-          h('div', { class: 'list-grid', style: { '--deck': mine.color } },
+          h('div', { class: 'list-grid', 'data-deck': mine.id, style: { '--deck': mine.color } },
             decksFor(mine.id).map((d, i) => listTile(d, dealLists ? i + 1 : 0, d.key === myList.key)),
             h('button', { class: 'list-tile new', onclick: () => build() },
               h('span', { class: 'list-plus', 'aria-hidden': 'true' }, '+'),
