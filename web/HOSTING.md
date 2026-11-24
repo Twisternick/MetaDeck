@@ -62,7 +62,7 @@ The tunnel is an outgoing connection from this PC to Cloudflare, so you don't fo
 
 Open `https://play.yourdomain.com` from your phone on mobile data (not your Wi-Fi) to check that it works from outside.
 
-Art and fonts are sent with a one-day cache lifetime, so Cloudflare serves most of the 400+ card images itself and they don't use this PC's upload bandwidth. The code is always revalidated, so an update reaches players right away.
+Art, sound and fonts are linked with a stamp of the file's size and date (`pack.webp?v=…`) and cached for good under it, so Cloudflare serves most of the 400+ card images itself and they don't use this PC's upload bandwidth. A redrawn image gets a new stamp, so a new address nobody has cached, and players see it on their next load; unchanged files stay cached. The code is always revalidated, so an update reaches players right away. There's nothing to purge in Cloudflare after an update.
 
 ## 4. Start at boot
 

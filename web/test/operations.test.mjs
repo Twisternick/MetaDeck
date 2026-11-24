@@ -167,7 +167,7 @@ test('health check and version', async () => {
   assert.equal((await request('/api/version')).json.version, h.json.version);
 });
 
-test('files have ETags; art is cacheable in public but not on localhost', async () => {
+test('files have ETags; art is cached for good only under its current stamp', async () => {
   const first = await request('/index.html');
   assert.equal(first.status, 200);
   assert.ok(first.headers.etag);
@@ -176,10 +176,21 @@ test('files have ETags; art is cacheable in public but not on localhost', async 
   assert.equal(again.status, 304);
   assert.equal(again.text, '');
 
-  const art = fs.readdirSync(new URL('../assets/img/cards/', import.meta.url)).find(f => f.endsWith('.webp'));
-  assert.equal((await request(`/assets/img/cards/${art}`)).headers['cache-control'], 'no-cache');
-  assert.match((await request(`/assets/img/cards/${art}`, { headers: { host: 'metadeck.example' } })).headers['cache-control'], /public, max-age=\d+/);
+  const stamps = (await request('/api/assets')).json;
+  const art = Object.keys(stamps).find(f => f.startsWith('assets/img/cards/'));
+  assert.ok(art && stamps['assets/img/ui/frame-common.webp'], 'art is listed');
+  assert.ok(!Object.keys(stamps).some(f => /^assets\/audio\/.+\//.test(f)), 'the sound libraries are not');
+  assert.equal((await request(`/${art}`)).headers['cache-control'], 'no-cache');
+  assert.equal((await request(`/${art}?v=old`)).headers['cache-control'], 'no-cache');
+  assert.match((await request(`/${art}?v=${stamps[art]}`)).headers['cache-control'], /max-age=31536000, immutable/);
   assert.equal((await request('/src/ui/app.js', { headers: { host: 'metadeck.example' } })).headers['cache-control'], 'no-cache');
+
+  // The stylesheets and pages point at the stamped URLs.
+  const css = (await request('/styles.css')).text;
+  assert.ok(css.includes(`url(assets/img/ui/tile-frame-FPS.webp?v=${stamps['assets/img/ui/tile-frame-FPS.webp']})`));
+  assert.doesNotMatch(css, /url\(['"]?assets\/[^)?]+['"]?\)/, 'every asset in styles.css is stamped');
+  assert.match((await request('/decks/horror')).text, /src="\/assets\/img\/decks\/Horror\.webp\?v=\w+"/);
+  assert.match(first.text, /href="assets\/fonts\/rajdhani-700-latin\.woff2\?v=\w+"/);
 });
 
 test("admin routes need the token, and a tunnel's headers make a local request count as outside", async () => {

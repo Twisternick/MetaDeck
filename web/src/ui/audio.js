@@ -11,6 +11,7 @@
 // first click or key press. Volumes (master, music, effects, mute) are saved per browser.
 
 import { storage } from './dom.js';
+import { assetUrl } from './assets.js';
 import { CARDS, DECKS } from '../data/index.js';
 
 // name -> { vol: relative loudness 0..1, vary: pitch variation (0.06 = ±6%) }
@@ -47,7 +48,7 @@ let wantedTrack = null;
 let track = null;
 const playingTracks = new Set(); // Includes the outgoing track during a crossfade.
 
-const url = name => `assets/audio/${name}.mp3`;
+const url = name => assetUrl(`assets/audio/${name}.mp3`);
 const effectsVolume = () => (settings.muted ? 0 : settings.master * settings.sfx);
 const musicVolume = () => (settings.muted ? 0 : settings.master * settings.music);
 

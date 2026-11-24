@@ -1,6 +1,7 @@
 // App shell: main menu (deck picker), card gallery, rules, and the match screen.
 
 import { h, storage } from './dom.js';
+import { assetUrl } from './assets.js';
 import { renderCard, renderPreview, glossaryFor } from './card-view.js';
 import { startMatch } from './match.js';
 import { deckBuilder } from './deck-builder.js';
@@ -534,7 +535,7 @@ function titleScreen() {
     }, 1800) : null;
     const stats = [[DECKS.length, 'genre decks'], [Object.keys(CARDS).length, 'cards'], ['Ranked', 'online play'], ['Free', 'to play']];
     const screen = h('main', { class: 'title-screen', onclick: start },
-      h('div', { class: 'title-art', 'aria-hidden': 'true' }, h('img', { src: 'assets/img/ui/key-art.webp', alt: '', decoding: 'async' })),
+      h('div', { class: 'title-art', 'aria-hidden': 'true' }, h('img', { src: assetUrl('assets/img/ui/key-art.webp'), alt: '', decoding: 'async' })),
       h('div', { class: 'title-embers', 'aria-hidden': 'true' }, embers),
       h('h1', { class: 'sr-only' }, 'MetaDeck'),
       h('div', { class: 'title-foot' },

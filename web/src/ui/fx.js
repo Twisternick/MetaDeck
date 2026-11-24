@@ -4,6 +4,7 @@
 
 import { h, rectOf, pt, viewW, viewH } from './dom.js';
 import { uiIconKey } from './icon-keys.js';
+import { assetUrl, assetMissing } from './assets.js';
 
 export const motionOK = () => !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -223,8 +224,8 @@ function loadArt(box, candidates, alt = '') {
   box.append(img);
 }
 
-// Each slot is tried as .webp (what tools/art.mjs saves), then .png.
-const imgUrls = key => [`assets/img/${key}.webp`, `assets/img/${key}.png`];
+// Each slot is tried as .webp (what tools/art.mjs saves), then .png, skipping files the server doesn't have.
+const imgUrls = key => [`assets/img/${key}.webp`, `assets/img/${key}.png`].filter(u => !assetMissing(u)).map(assetUrl);
 export const cardArtUrls = (def, ownerDeckId) =>
   [...imgUrls(`cards/${def.cardId}`), ...imgUrls(`decks/${def.deckId ?? ownerDeckId ?? 'token'}`)];
 export const deckArtUrls = deckId => imgUrls(`decks/${deckId}`);

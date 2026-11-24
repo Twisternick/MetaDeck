@@ -35,6 +35,7 @@ import { installLog } from './server/log.mjs';
 import { backup } from './server/db.mjs';
 import { createPages } from './server/pages.mjs';
 import { createLiveMeta } from './server/live-meta.mjs';
+import { createAssetStamps } from './server/asset-stamps.mjs';
 import { handleAccountApi, sessionToken } from './server/account-api.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -56,6 +57,9 @@ const types = {
 // their licences forbid handing out the original files.
 const PUBLIC = [/^\/index\.html$/, /^\/checkout\.html$/, /^\/styles\.css$/, /^\/pages\.css$/,/^\/src\//, /^\/assets\/(?!audio\/)/,
   /^\/assets\/audio\/[A-Za-z0-9-]+\.(mp3|ogg)$/, /^\/legal\/[a-z-]+\.(html|css)$/];
+
+const isPublic = urlPath => PUBLIC.some(re => re.test(urlPath));
+const assets = createAssetStamps(root, isPublic);
 
 const dataDir = path.resolve(process.env.DATA_DIR || path.join(root, 'data'));
 fs.mkdirSync(dataDir, { recursive: true });
@@ -266,21 +270,28 @@ const gameJsonLd = () => JSON.stringify({
 }).replaceAll('<', '\\u003c');
 
 // Static files. Each has an ETag, so a browser revalidating gets a tiny 304 instead of the file.
-// Art, sound and fonts may be cached for a day (and used stale for a week while refreshing), so a
-// proxy like Cloudflare can serve them; the code is always revalidated so updates show up at once.
-// On localhost everything is revalidated, so new art from tools/art.mjs appears on the next load.
+// Art, sound and fonts asked for with their current stamp (?v=, server/asset-stamps.mjs) are cached for
+// good, by browsers and by a proxy like Cloudflare: a changed file gets a new stamp, so a new URL.
+// Everything else, the code included, is revalidated on every load so updates show up at once.
+// The stylesheets and pages are stamped as they're sent, so their ETag covers the stamps too.
 function serveStatic(req, res) {
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405, { Allow: 'GET, HEAD' }).end(); return; }
-  let urlPath;
-  try { urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname); } catch { res.writeHead(400).end('Bad request'); return; }
+  let urlPath, v;
+  try {
+    const url = new URL(req.url, 'http://x');
+    urlPath = decodeURIComponent(url.pathname);
+    v = url.searchParams.get('v');
+  } catch { res.writeHead(400).end('Bad request'); return; }
   if (urlPath === '/robots.txt' || urlPath === '/sitemap.xml') { serveCrawlerFile(req, res, urlPath); return; }
   // The content pages (decks, cards, meta, how to play) are built from the card data, not read from disk.
   const page = pages.render(urlPath);
   if (page) {
-    const headers = { ...securityHeaders(req), ETag: page.etag, 'Cache-Control': 'no-cache' };
-    if (req.headers['if-none-match'] === page.etag) { res.writeHead(304, headers).end(); return; }
-    res.writeHead(200, { ...headers, 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': Buffer.byteLength(page.html) });
-    res.end(req.method === 'HEAD' ? undefined : page.html);
+    const etag = page.etag.replace(/"$/, `-${assets.tag()}"`);
+    const headers = { ...securityHeaders(req), ETag: etag, 'Cache-Control': 'no-cache' };
+    if (req.headers['if-none-match'] === etag) { res.writeHead(304, headers).end(); return; }
+    const html = assets.stamp(page.html);
+    res.writeHead(200, { ...headers, 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': Buffer.byteLength(html) });
+    res.end(req.method === 'HEAD' ? undefined : html);
     return;
   }
   if (urlPath === '/') urlPath = '/index.html';
@@ -293,16 +304,16 @@ function serveStatic(req, res) {
     // index.html and the legal pages are filled in from the settings as they're sent, so their ETag
     // covers those too.
     const filled = urlPath === '/index.html' || /^\/legal\/.+\.html$/.test(urlPath);
-    const etag = `W/"${stat.size.toString(36)}-${Math.floor(stat.mtimeMs).toString(36)}${filled ? `-${site.tag}` : ''}"`;
-    const media = urlPath.startsWith('/assets/') && !localHost(req.headers.host);
+    const stamped = filled || urlPath.endsWith('.css');
+    const etag = `W/"${stat.size.toString(36)}-${Math.floor(stat.mtimeMs).toString(36)}${filled ? `-${site.tag}` : ''}${stamped ? `-${assets.tag()}` : ''}"`;
     const headers = {
       ...securityHeaders(req, { checkout: urlPath === '/checkout.html' }),
       ETag: etag,
-      'Cache-Control': media ? 'public, max-age=86400, stale-while-revalidate=604800' : 'no-cache',
+      'Cache-Control': assets.isCurrent(urlPath, v) ? 'public, max-age=31536000, immutable' : 'no-cache',
     };
     if (req.headers['if-none-match'] === etag) { res.writeHead(304, headers).end(); return; }
     const type = types[path.extname(file)] ?? 'application/octet-stream';
-    if (filled) {
+    if (stamped) {
       let html = fs.readFileSync(file, 'utf8');
       if (urlPath === '/index.html') {
         if (publicUrl) {
@@ -312,10 +323,11 @@ function serveStatic(req, res) {
         }
         // The footer's Contact link reads this.
         if (site.contactEmail) html = html.replace('<meta name="theme-color"', `<meta name="contact" content="${site.contactEmail}">\n  <meta name="theme-color"`);
-      } else {
+      } else if (filled) {
         html = site.fill(html);
       }
-      const page = Buffer.from(html);
+      // Stylesheets only have their url(assets/…) stamped.
+      const page = Buffer.from(assets.stamp(html));
       res.writeHead(200, { ...headers, 'Content-Type': type, 'Content-Length': page.length });
       res.end(req.method === 'HEAD' ? undefined : page);
       return;
@@ -414,6 +426,16 @@ const server = http.createServer((req, res) => {
         return health(res);
       case '/api/version':
         return json(res, 200, { version });
+      case '/api/assets': {
+        // Every asset's stamp, for the game's code to build its URLs with (server/asset-stamps.mjs).
+        const etag = `W/"${assets.tag()}"`;
+        const headers = { ETag: etag, 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff' };
+        if (req.headers['if-none-match'] === etag) { res.writeHead(304, headers).end(); return; }
+        const body = assets.json();
+        res.writeHead(200, { ...headers, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) });
+        res.end(req.method === 'HEAD' ? undefined : body);
+        return;
+      }
       case '/api/live-meta': {
         const q = new URL(req.url, 'http://x').searchParams;
         return json(res, 200, liveMeta.get({ days: q.get('days'), source: q.get('source') }));

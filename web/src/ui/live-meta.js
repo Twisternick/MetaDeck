@@ -4,6 +4,7 @@
 // link to the page shows the same view.
 
 import { DECKS } from '../data/index.js';
+import { assetUrl } from './assets.js';
 
 const REFRESH_MS = 60_000;
 const SOURCES = [['pvp', 'Online'], ['ranked', 'Ranked'], ['ai', 'vs AI']];
@@ -69,7 +70,7 @@ function tile(r, i) {
   const deck = deckOf(r.deck);
   return `<li style="--deck:${esc(deck.color)};--i:${i}" data-deck="${esc(deck.id)}">
   <button type="button" class="live-tile" data-key="${esc(keyOf(r))}" aria-expanded="${state.open === keyOf(r)}">
-    <img src="/assets/img/ui/emblem-${esc(deck.id)}.webp" alt="" width="44" height="44">
+    <img src="${esc(assetUrl(`/assets/img/ui/emblem-${deck.id}.webp`))}" alt="" width="44" height="44">
     <span class="who"><b>${esc(deck.name)}</b>${r.style ? `<span class="style">${esc(r.style)}</span>` : ''}</span>
     <span class="nums"><span class="wr">${r.winRate == null ? '–' : pct(r.winRate)}</span>${trend(r.trend)}</span>
     <span class="meter" aria-hidden="true"><i style="--w:${r.winRate == null ? 0 : Math.max(0, Math.min(1, (r.winRate - 0.3) / 0.4))}"></i></span>

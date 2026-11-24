@@ -5,6 +5,7 @@
 // glossary entry shares the same icon, colour and tooltip.
 
 import { h } from './dom.js';
+import { assetUrl } from './assets.js';
 import { DECKS } from '../data/index.js';
 import { KEYWORDS, TERMS, LEVEL_UP_XP } from '../engine/constants.js';
 import { rulesLines } from '../engine/text.js';
@@ -89,7 +90,7 @@ function themeFrame(deck, rarity) {
   if (themedFrames.has(key)) return deck.id;
   themedFrames.add(key);
   const img = new Image();
-  img.src = `assets/img/ui/frame-${rarity}.webp`;
+  img.src = assetUrl(`assets/img/ui/frame-${rarity}.webp`);
   img.decode().then(() => {
     const c = document.createElement('canvas');
     c.width = img.naturalWidth; c.height = img.naturalHeight;
