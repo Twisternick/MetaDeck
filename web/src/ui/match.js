@@ -1163,7 +1163,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
     const isTarget = ui.mode !== 'idle' && ui.targets.includes(playerRef(pid));
     const active = state.active === pid && !state.over;
     const pct = Math.max(0, Math.min(100, (p.hp / START_HP) * 100));
-    return h('div', { class: `hero-panel ${pid === HUMAN ? 'mine' : 'theirs'}`, style: { '--deck': deck.color } },
+    return h('div', { class: `hero-panel ${pid === HUMAN ? 'mine' : 'theirs'}`, 'data-deck': deck.id, style: { '--deck': deck.color } },
       h('div', {
         class: `hero${isTarget ? ' targetable' : ''}${active ? ' active' : ''}${p.hp <= 10 ? ' low' : ''}`,
         'data-pid': pid,
@@ -1172,6 +1172,7 @@ export function startMatch(root, { myDeck, oppDeck, myCards, oppCards, spectate 
         'aria-label': `${p.name}: ${p.hp} HP`,
       },
         artSlot('hero-art', heroArtUrls(deck.id), deckEmblem(deck)),
+        h('span', { class: 'hero-frame', 'aria-hidden': 'true' }),
         h('div', { class: 'hero-hp', title: 'Health' }, p.hp),
       ),
       h('div', { class: 'hero-info' },

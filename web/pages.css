@@ -295,3 +295,24 @@ td.none { color: var(--muted); }
   .live-detail { grid-column: 1 / -1; }
 }
 @media (prefers-reduced-motion: reduce) { .live-meta *, .live-badge i, .health .pulse { animation: none !important; } }
+
+/* Each deck's own border (ui/tile-frame-<deck>.webp, 9-sliced), the one its tiles wear in the game: on the deck
+   grid, a deck's art and list guides, the tier list rows and the live tier list. */
+[data-deck="FPS"] { --tile-frame: url(assets/img/ui/tile-frame-FPS.webp); }
+[data-deck="Horror"] { --tile-frame: url(assets/img/ui/tile-frame-Horror.webp); }
+[data-deck="Platformer"] { --tile-frame: url(assets/img/ui/tile-frame-Platformer.webp); }
+[data-deck="RPG"] { --tile-frame: url(assets/img/ui/tile-frame-RPG.webp); }
+[data-deck="Racing"] { --tile-frame: url(assets/img/ui/tile-frame-Racing.webp); }
+[data-deck="Fighting"] { --tile-frame: url(assets/img/ui/tile-frame-Fighting.webp); }
+[data-deck="Sports"] { --tile-frame: url(assets/img/ui/tile-frame-Sports.webp); }
+[data-deck="Strategy"] { --tile-frame: url(assets/img/ui/tile-frame-Strategy.webp); }
+[data-deck="CityBuilder"] { --tile-frame: url(assets/img/ui/tile-frame-CityBuilder.webp); }
+[data-deck="CardGame"] { --tile-frame: url(assets/img/ui/tile-frame-CardGame.webp); }
+.deck-grid li a { position: relative; border-color: transparent; border-radius: 6px; }
+.deck-grid li a::after { content: ''; position: absolute; inset: 0; pointer-events: none; border: 24px solid transparent; border-image: var(--tile-frame) 100 / 24px round; }
+.deck-grid p { margin-bottom: 22px; }
+.deck-hero > img { border: clamp(16px, 2.4vw, 26px) solid transparent; border-radius: 6px; border-image: var(--tile-frame) 100 / 1 round; }
+.lists .list, .tier-row a, .live-tile, .live-detail { border: 1px solid transparent; border-radius: 6px; border-image: var(--tile-frame) 100 / 22px round; }
+.lists .list { padding: 26px 28px; }
+.tier-row a, .live-tile { border-image-width: 16px; padding-left: 14px; padding-right: 18px; }
+.live-tile[aria-expanded="true"] { box-shadow: 0 10px 30px color-mix(in srgb, var(--deck) 45%, transparent); }

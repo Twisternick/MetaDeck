@@ -276,7 +276,7 @@ body:has(.arena[data-arena]:not([data-arena="standard"]), .match-found, .pack-ov
 .deck-tile { border-color: transparent; border-radius: 6px; }
 .deck-tile::after {
   content: ''; position: absolute; inset: 0; z-index: 3; pointer-events: none;
-  border: 28px solid transparent; border-image: var(--tile-frame) 100 / 28px stretch;
+  border: 28px solid transparent; border-image: var(--tile-frame) 100 / 28px round;
   filter: drop-shadow(0 0 0 transparent) brightness(1); transition: filter .3s var(--ease-out);
 }
 .deck-tile:hover::after { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--deck) 70%, transparent)) brightness(1.05); }
@@ -2775,6 +2775,47 @@ body:has(.arena[data-arena]:not([data-arena="standard"]), .match-found, .pack-ov
 .card-frame.frame-rare { background-image: url(assets/img/ui/frame-rare.webp); }
 .card-frame.frame-epic { background-image: url(assets/img/ui/frame-epic.webp); }
 .card-frame.frame-legendary { background-image: url(assets/img/ui/frame-legendary.webp); }
+/* each deck's cards wear its own frames, restyled from these in the deck's materials (founder frames stay tinted) */
+.card[data-deck="FPS"] > .card-frame.frame-common { background-image: url(assets/img/ui/frame-FPS-common.webp); }
+.card[data-deck="FPS"] > .card-frame.frame-rare { background-image: url(assets/img/ui/frame-FPS-rare.webp); }
+.card[data-deck="FPS"] > .card-frame.frame-epic { background-image: url(assets/img/ui/frame-FPS-epic.webp); }
+.card[data-deck="FPS"] > .card-frame.frame-legendary { background-image: url(assets/img/ui/frame-FPS-legendary.webp); }
+.card[data-deck="Horror"] > .card-frame.frame-common { background-image: url(assets/img/ui/frame-Horror-common.webp); }
+.card[data-deck="Horror"] > .card-frame.frame-rare { background-image: url(assets/img/ui/frame-Horror-rare.webp); }
+.card[data-deck="Horror"] > .card-frame.frame-epic { background-image: url(assets/img/ui/frame-Horror-epic.webp); }
+.card[data-deck="Horror"] > .card-frame.frame-legendary { background-image: url(assets/img/ui/frame-Horror-legendary.webp); }
+.card[data-deck="Platformer"] > .card-frame.frame-common { background-image: url(assets/img/ui/frame-Platformer-common.webp); }
+.card[data-deck="Platformer"] > .card-frame.frame-rare { background-image: url(assets/img/ui/frame-Platformer-rare.webp); }
+.card[data-deck="Platformer"] > .card-frame.frame-epic { background-image: url(assets/img/ui/frame-Platformer-epic.webp); }
+.card[data-deck="Platformer"] > .card-frame.frame-legendary { background-image: url(assets/img/ui/frame-Platformer-legendary.webp); }
+.card[data-deck="RPG"] > .card-frame.frame-common { background-image: url(assets/img/ui/frame-RPG-common.webp); }
+.card[data-deck="RPG"] > .card-frame.frame-rare { background-image: url(assets/img/ui/frame-RPG-rare.webp); }
+.card[data-deck="RPG"] > .card-frame.frame-epic { background-image: url(assets/img/ui/frame-RPG-epic.webp); }
+.card[data-deck="RPG"] > .card-frame.frame-legendary { background-image: url(assets/img/ui/frame-RPG-legendary.webp); }
+.card[data-deck="Racing"] > .card-frame.frame-common { background-image: url(assets/img/ui/frame-Racing-common.webp); }
+.card[data-deck="Racing"] > .card-frame.frame-rare { background-image: url(assets/img/ui/frame-Racing-rare.webp); }
+.card[data-deck="Racing"] > .card-frame.frame-epic { background-image: url(assets/img/ui/frame-Racing-epic.webp); }
+.card[data-deck="Racing"] > .card-frame.frame-legendary { background-image: url(assets/img/ui/frame-Racing-legendary.webp); }
+.card[data-deck="Fighting"] > .card-frame.frame-common { background-image: url(assets/img/ui/frame-Fighting-common.webp); }
+.card[data-deck="Fighting"] > .card-frame.frame-rare { background-image: url(assets/img/ui/frame-Fighting-rare.webp); }
+.card[data-deck="Fighting"] > .card-frame.frame-epic { background-image: url(assets/img/ui/frame-Fighting-epic.webp); }
+.card[data-deck="Fighting"] > .card-frame.frame-legendary { background-image: url(assets/img/ui/frame-Fighting-legendary.webp); }
+.card[data-deck="Sports"] > .card-frame.frame-common { background-image: url(assets/img/ui/frame-Sports-common.webp); }
+.card[data-deck="Sports"] > .card-frame.frame-rare { background-image: url(assets/img/ui/frame-Sports-rare.webp); }
+.card[data-deck="Sports"] > .card-frame.frame-epic { background-image: url(assets/img/ui/frame-Sports-epic.webp); }
+.card[data-deck="Sports"] > .card-frame.frame-legendary { background-image: url(assets/img/ui/frame-Sports-legendary.webp); }
+.card[data-deck="Strategy"] > .card-frame.frame-common { background-image: url(assets/img/ui/frame-Strategy-common.webp); }
+.card[data-deck="Strategy"] > .card-frame.frame-rare { background-image: url(assets/img/ui/frame-Strategy-rare.webp); }
+.card[data-deck="Strategy"] > .card-frame.frame-epic { background-image: url(assets/img/ui/frame-Strategy-epic.webp); }
+.card[data-deck="Strategy"] > .card-frame.frame-legendary { background-image: url(assets/img/ui/frame-Strategy-legendary.webp); }
+.card[data-deck="CityBuilder"] > .card-frame.frame-common { background-image: url(assets/img/ui/frame-CityBuilder-common.webp); }
+.card[data-deck="CityBuilder"] > .card-frame.frame-rare { background-image: url(assets/img/ui/frame-CityBuilder-rare.webp); }
+.card[data-deck="CityBuilder"] > .card-frame.frame-epic { background-image: url(assets/img/ui/frame-CityBuilder-epic.webp); }
+.card[data-deck="CityBuilder"] > .card-frame.frame-legendary { background-image: url(assets/img/ui/frame-CityBuilder-legendary.webp); }
+.card[data-deck="CardGame"] > .card-frame.frame-common { background-image: url(assets/img/ui/frame-CardGame-common.webp); }
+.card[data-deck="CardGame"] > .card-frame.frame-rare { background-image: url(assets/img/ui/frame-CardGame-rare.webp); }
+.card[data-deck="CardGame"] > .card-frame.frame-epic { background-image: url(assets/img/ui/frame-CardGame-epic.webp); }
+.card[data-deck="CardGame"] > .card-frame.frame-legendary { background-image: url(assets/img/ui/frame-CardGame-legendary.webp); }
 .card > .card-gem { display: none; }
 .card .card-foil, .card .card-glare { inset: 2.5% 5.5% 2% 5.5%; border-radius: 1em; }
 
@@ -2896,13 +2937,25 @@ body:has(#app > .menu, #app > .match, #app > .collection, #app > .builder, #app 
 .minion .stat.up { color: #d9ffe8; } .minion .stat.down { color: #ffd0d0; filter: none; }
 
 /* booster pack: the painted pack, its name on a plate near the bottom */
+/* a deck's pack wears its own art (ui/pack-<deck>), a mixed pack the plain one */
+.pack { --pack-art: url(assets/img/ui/pack.webp); }
+.pack[data-deck="FPS"] { --pack-art: url(assets/img/ui/pack-FPS.webp); }
+.pack[data-deck="Horror"] { --pack-art: url(assets/img/ui/pack-Horror.webp); }
+.pack[data-deck="Platformer"] { --pack-art: url(assets/img/ui/pack-Platformer.webp); }
+.pack[data-deck="RPG"] { --pack-art: url(assets/img/ui/pack-RPG.webp); }
+.pack[data-deck="Racing"] { --pack-art: url(assets/img/ui/pack-Racing.webp); }
+.pack[data-deck="Fighting"] { --pack-art: url(assets/img/ui/pack-Fighting.webp); }
+.pack[data-deck="Sports"] { --pack-art: url(assets/img/ui/pack-Sports.webp); }
+.pack[data-deck="Strategy"] { --pack-art: url(assets/img/ui/pack-Strategy.webp); }
+.pack[data-deck="CityBuilder"] { --pack-art: url(assets/img/ui/pack-CityBuilder.webp); }
+.pack[data-deck="CardGame"] { --pack-art: url(assets/img/ui/pack-CardGame.webp); }
 .pack {
-  background: url(assets/img/ui/pack.webp) center / 100% 100% no-repeat; border: 0; border-radius: 0; overflow: visible;
+  background: var(--pack-art) center / 100% 100% no-repeat; border: 0; border-radius: 0; overflow: visible;
   box-shadow: none; filter: drop-shadow(0 18px 24px rgba(0,0,0,.6)) drop-shadow(0 0 18px color-mix(in srgb, var(--deck) 55%, transparent));
   justify-content: flex-end; padding-bottom: 0;
 }
 .pack::before, .pack-emblem, .pack-brand { display: none; }
-.pack-shine { -webkit-mask: url(assets/img/ui/pack.webp) center / 100% 100% no-repeat; mask: url(assets/img/ui/pack.webp) center / 100% 100% no-repeat; width: 100%; right: 0; background-size: 300% 100%; animation: packGleam 3.2s ease-in-out infinite; }
+.pack-shine { -webkit-mask: var(--pack-art) center / 100% 100% no-repeat; mask: var(--pack-art) center / 100% 100% no-repeat; width: 100%; right: 0; background-size: 300% 100%; animation: packGleam 3.2s ease-in-out infinite; }
 @keyframes packGleam { 0%, 40% { background-position: 100% 0; } 100% { background-position: 0% 0; } }
 .pack-name {
   position: absolute; left: 50%; bottom: 17%; transform: translateX(-50%); white-space: nowrap;
@@ -2928,7 +2981,7 @@ body:has(#app > .menu, #app > .match, #app > .collection, #app > .builder, #app 
 .dialog, .list-tile, .vs-strip { border-style: solid; border-color: transparent; border-image: url(assets/img/ui/panel-frame.webp) 66 / 22px / 4px stretch; }
 .dialog { border-width: 22px; border-radius: 10px; }
 .list-tile, .vs-strip { border-image-width: 16px; border-image-outset: 3px; border-width: 1px; border-radius: 8px; }
-.list-grid .list-tile { border-image: var(--tile-frame) 100 / 22px stretch; border-radius: 5px; padding: 16px 20px 18px; }
+.list-grid .list-tile { border-image: var(--tile-frame) 100 / 22px round; border-radius: 5px; padding: 16px 20px 18px; }
 /* their glow follows the frame's jewelled corners instead of a box-shadow rectangle */
 .list-tile:hover, .list-tile.selected { box-shadow: none; }
 .list-tile:hover { filter: drop-shadow(0 12px 14px rgba(0,0,0,.55)) drop-shadow(0 0 8px color-mix(in srgb, var(--deck) 45%, transparent)); }
@@ -3826,3 +3879,17 @@ body:has(#app > .match) .bg-grain { opacity: .045; }
 .seo-intro strong { color: var(--text); }
 .seo-intro a { color: var(--accent); }
 @keyframes seo-intro-in { to { opacity: 1; } }
+
+/* Every other surface that stands for one deck wears that deck's border too ([data-deck] sets --tile-frame):
+   the deck builder's list, the gallery summary and keywords, archetype level cards, a deck's pack in the shop, lobby rooms and
+   invites, the match-found portraits and the heroes in a match. Without a deck they keep the plain panel frame. */
+.builder .deck-panel { border-image: var(--tile-frame) 100 / 22px / 3px round; }
+.deck-summary, .deck-keywords, .level-card, .pack-offer, .lobby-deck, .room-tile, .invite-card {
+  border: 1px solid transparent; border-radius: 6px;
+  border-image: var(--tile-frame, url(assets/img/ui/panel-frame.webp)) 100 / 20px round;
+}
+.level-card, .room-tile, .invite-card { padding: 16px 20px; }
+.deck-summary { padding: 22px 26px; }
+.found-side .art { border: clamp(12px, calc(2vw / var(--zoom)), 20px) solid transparent; border-radius: 6px; border-image: var(--tile-frame) 100 / 1 round; }
+.hero-panel .hero, .hero-panel .hero .art { border-radius: 6px; }
+.hero-frame { position: absolute; inset: 0; z-index: 2; pointer-events: none; border: 1px solid transparent; border-image: var(--tile-frame) 100 / 18% round; }

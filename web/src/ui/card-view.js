@@ -75,15 +75,16 @@ export function renderCard(def, { cost = def.cost, printed = def.cost, atk = def
   );
 }
 
-// Deck-themed frames: the first time a card of a deck and rarity is drawn, that rarity's frame art is
-// recoloured on a canvas: the blue (or epic violet) enamel takes the deck's colour and the silver picks up
-// a hint of it, while the gold trim, and with it the rarity read, stays. The plain frame shows until it's ready.
+// Frame themes. A deck's cards use its own painted frames; only the Founder Gold frame is made here: the first
+// time a founder card of a rarity is drawn, that rarity's frame art is recoloured on a canvas: the blue (or epic
+// violet) enamel turns gold and the silver picks up a hint of it. The plain frame shows until it's ready.
 const themedFrames = new Set();
 // The Founder Gold frame (a Meta Founder's cosmetic, class frame-founder) tints the enamel gold instead.
 const FOUNDER_FRAME = { id: 'founder', color: '#e3a41c' };
 let frameSheet;
 function themeFrame(deck, rarity) {
   if (!deck.id) return null; // tokens keep the plain frame
+  if (deck !== FOUNDER_FRAME) return deck.id; // a deck's cards wear its own painted frames (ui/frame-<deck>-<rarity>, styles.css)
   const key = `${deck.id}|${rarity}`;
   if (themedFrames.has(key)) return deck.id;
   themedFrames.add(key);

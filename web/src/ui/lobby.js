@@ -190,7 +190,7 @@ export function lobby(root, { deck, onBack, matchExtras = () => ({}), challenge 
     const mine = getDeck(deck.archetype);
     const info = s.info;
     const ready = s.phase === 'idle';
-    root.replaceChildren(h('main', { class: 'lobby', style: { '--deck': mine.color } },
+    root.replaceChildren(h('main', { class: 'lobby', 'data-deck': mine.id, style: { '--deck': mine.color } },
       h('header', { class: 'page-head' },
         h('button', { class: 'btn ghost small', onclick: leave }, '← Menu'),
         h('h1', null, 'Play online'),
@@ -217,7 +217,7 @@ export function lobby(root, { deck, onBack, matchExtras = () => ({}), challenge 
           h('button', { class: 'btn ghost small', onclick: leave }, 'Change'))),
 
       s.error ? h('div', { class: 'lobby-error', role: 'alert' }, s.error) : null,
-      s.invites.length ? h('section', { class: 'invites' }, s.invites.map(inv => h('div', { class: 'invite-card rise', style: { '--deck': getDeck(inv.deckId)?.color } },
+      s.invites.length ? h('section', { class: 'invites' }, s.invites.map(inv => h('div', { class: 'invite-card rise', 'data-deck': getDeck(inv.deckId)?.id, style: { '--deck': getDeck(inv.deckId)?.color } },
         deckEmblem(getDeck(inv.deckId)),
         h('div', { class: 'invite-text' }, h('b', null, inv.from), ' challenges you to a friendly match', h('small', null, `They’re playing ${getDeck(inv.deckId)?.name ?? ''}`)),
         h('button', { class: 'btn primary small', disabled: !ready || null, onclick: () => { s.invites = s.invites.filter(i => i !== inv); join(inv.code); } }, 'Play'),
@@ -302,7 +302,7 @@ export function lobby(root, { deck, onBack, matchExtras = () => ({}), challenge 
     return h('div', { class: 'room-grid' }, rooms.map((r, i) => {
       const d = getDeck(r.deckId);
       const own = r.code === ownCode;
-      return h('div', { class: `room-tile rise${own ? ' own' : ''}`, style: { '--deck': d.color, '--i': Math.min(i, 12) } },
+      return h('div', { class: `room-tile rise${own ? ' own' : ''}`, 'data-deck': d.id, style: { '--deck': d.color, '--i': Math.min(i, 12) } },
         artSlot('', deckArtUrls(d.id), deckEmblem(d)),
         h('div', { class: 'room-info' },
           h('div', { class: 'room-host' }, r.host),
@@ -317,7 +317,7 @@ export function lobby(root, { deck, onBack, matchExtras = () => ({}), challenge 
   async function splash(msg) {
     const mineDeck = getDeck(msg.state.players[msg.seat].deckId);
     const theirDeck = getDeck(msg.state.players[1 - msg.seat].deckId);
-    const side = (d, name, cls) => h('div', { class: `found-side ${cls}`, style: { '--deck': d.color } },
+    const side = (d, name, cls) => h('div', { class: `found-side ${cls}`, 'data-deck': d.id, style: { '--deck': d.color } },
       artSlot('', deckArtUrls(d.id), deckEmblem(d)),
       h('div', { class: 'found-name' }, name),
       h('div', { class: 'found-deck' }, d.name));

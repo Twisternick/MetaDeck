@@ -244,6 +244,37 @@ const TILE_FRAME_RULES = 'Only the border is drawn. Its four corners are identic
   + 'ornament about a fifth of the width. Inside and outside the rim everything is fully transparent: no glow, fog, smoke or background. '
   + 'Not silver-and-gold fantasy filigree: only the materials and colours described.';
 
+// Each deck's card frames (ui/frame-<deck>-<rarity>) restyle the rarity's key art frame (ui/frame-<rarity>) in the
+// materials of the deck's tile border. They are drawn as edits of that frame (place it, then make --fix) so the
+// sockets, window, banner and text box stay exactly where the card layout expects them. Each rarity is clearly grander than
+// the one below, and the gem colours match the rarity's, so rarity still reads at a glance.
+const DECK_FRAME_TIER = {
+  common: 'Common: the plainest, thinnest version: bare material, no ornament beyond the corners, small dull grey #c9d1e8 gems, no glow.',
+  rare: 'Rare: a step up from common: a polished inlaid trim along the inner edges and bright glowing sky-blue #38bdf8 gems.',
+  epic: 'Epic: clearly grander than rare: a thicker rim, flared spiked corners, violet crystal inlays along the sides, '
+    + 'glowing violet #c084fc gems and violet energy crackling along the edges.',
+  legendary: 'Legendary: the grandest and most ornate by far: a much thicker rim, large corner ornaments and wing-like flourishes on the sides, '
+    + 'polished gold accents worked into the material, and a large blazing orange-gold #ffb020 gem at the top with sparks and a warm gold glow.',
+};
+const DECK_FRAME_RULES = 'Keep the exact outline, proportions and layout of the attached frame: the illustration window, the name banner, the text box '
+  + 'and the three round sockets (top left, bottom left, bottom right) stay exactly where they are and the same size. The window, the text box '
+  + 'and the inside of the sockets stay empty and transparent, '
+  + 'as does everything outside the frame. The name banner stays a plain, smooth band in a mid-light tone: the card name is written on it. '
+  + 'Only the materials, colours, surface detail and small ornaments change. Not silver-and-gold fantasy filigree unless described.';
+// Each deck's booster pack (ui/pack-<deck>), drawn in the deck's own look. Attach decks/<deck>.webp.
+const DECK_PACK = {
+  FPS: 'a rugged olive-drab #7f9a3c military supply pouch of cards with stencilled hazard stripes, riveted gunmetal clips at the top and bottom and a glowing green targeting reticle in the middle',
+  Horror: 'a grimy, stained paper evidence bag of cards, torn at the corners, wrapped in rusty barbed wire, with a dim violet #7b3a8c glow leaking from inside',
+  Platformer: 'a 16-bit pixel-art booster pack on a clean pixel grid: chunky sky-blue #3d9bd6 and white wrapper, a big pixel star in the middle and a pixel spring at the top',
+  RPG: 'a booster pack bound like a small illuminated spellbook: deep lapis-blue leather cover with gold-leaf #c08a2e vines, a red wax seal and gold clasps at the top and bottom',
+  Racing: 'a glossy white and silver carbon-fibre booster pack with a racing-red #d4473a livery stripe, a chequered band across the top and a sleek aerodynamic fin shape',
+  Fighting: 'a cel-shaded anime booster pack with bold black line art: sandy colosseum-stone texture, a red-and-gold banner wrapped around it and an orange #e0782a impact burst in the middle',
+  Sports: 'a glossy green #2f9e5b and white booster pack like a team jersey, with white trim stripes, a stitched panel and a bright stadium-light gleam',
+  Strategy: 'a vintage war-poster booster pack: flat navy, blue #4364a8 and cream screen-printed wrapper with halftone dots, a red pinstripe and a star-and-chevron insignia',
+  CityBuilder: 'a tilt-shift miniature booster pack like a model-kit box: teal #3f8f8c and cream, with tiny model skyscrapers with lit windows rising from its top edge',
+  CardGame: 'a glossy charcoal-black booster pack with a prismatic rainbow holo-foil sheen, crisp white edges and a fan of three cards with violet #8c56c4 glints in the middle',
+};
+
 const NEUTRAL_STYLE ='Digital painting with dramatic rim lighting, deep shadows and a vivid neon accent, painterly detail.';
 
 const FAMILY = [
@@ -503,6 +534,26 @@ export function allSlots() {
       prompt: [subject, extra, 'Original design, not based on any existing game. No text, letters or numbers, no watermark.', `Make it ${KINDS.border.ask}.`].join('\n'),
       style: TILE_FRAME[deck.id], subject, extra,
     }, 'Transparent PNG · menu deck tiles and deck lists (9-slice) · attach decks/<deck>.webp');
+  }
+  for (const deck of DECKS) {
+    for (const [rarity, tier] of Object.entries(DECK_FRAME_TIER)) {
+      const key = `ui/frame-${deck.id}-${rarity}`;
+      const subject = `Subject: restyle the attached empty trading card frame for the ${words(deck.name)} deck, seen straight on, perfectly symmetrical, `
+        + `in the materials of that deck: ${TILE_FRAME[deck.id]} ${tier}`;
+      const extra = join(DECK_FRAME_RULES, redoNote(key, TILE_FRAME[deck.id]));
+      add('frame', key, deck.id, `Card frame — ${deck.name} ${rarity}`, {
+        prompt: [subject, extra, 'Original design, not based on any existing game. No text, letters or numbers, no watermark.', `Make it ${KINDS.frame.ask}.`].join('\n'),
+        style: TILE_FRAME[deck.id], subject, extra,
+      }, `Transparent PNG · ${rarity} ${deck.name} cards · place ui/frame-${rarity}.webp first, then make --fix`);
+    }
+    const key = `ui/pack-${deck.id}`;
+    const subject = `Subject: a sealed booster pack of cards for the ${words(deck.name)} deck, seen straight on, standing upright and filling the height: ${DECK_PACK[deck.id]}.`;
+    const extra = join('Crimped or sealed at the top and bottom. Nothing written on it. Only the pack is drawn; everything around it is transparent: no glow or background.',
+      redoNote(key, DECK_PACK[deck.id]));
+    add('frame', key, deck.id, `Booster pack — ${deck.name}`, {
+      prompt: [subject, extra, 'Original design, not based on any existing game. No text, letters or numbers, no watermark.', `Make it ${KINDS.frame.ask}.`].join('\n'),
+      style: DECK_PACK[deck.id], subject, extra,
+    }, 'Transparent PNG · the deck\'s packs in the shop and pack opening · attach decks/<deck>.webp');
   }
   ui('ornament', 'divider', 'Subject: a horizontal ornamental divider: a thin gold line that thickens toward a small pointed gold crest with an electric-blue crystal star in the middle, '
     + 'fading to nothing at both ends.', 'Centered, perfectly symmetrical, thin: the ornament takes up only the middle third of the height.',

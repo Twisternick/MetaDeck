@@ -157,7 +157,7 @@ ${scripts.map(s => `<script type="module" src="${s}"></script>`).join('\n')}
       body: `<h1>The genre decks</h1>
 <p class="lede">Every deck in MetaDeck is a video game genre with its own keywords and its own way to win. Each has a pool of 40 cards and three complete decks with a guide on how to play them.</p>
 <ul class="deck-grid">${DECKS.map(d => `
-  <li style="--deck:${esc(d.color)}"><a href="${deckUrl(d)}">
+  <li style="--deck:${esc(d.color)}" data-deck="${esc(d.id)}"><a href="${deckUrl(d)}">
     <img src="/assets/img/decks/${esc(d.id)}.webp" alt="${esc(d.name)} deck art" loading="lazy" width="400" height="225">
     <h2>${esc(d.name)}</h2><p>${esc(d.tagline)}</p></a></li>`).join('')}
 </ul>`,
@@ -236,7 +236,7 @@ ${g ? `<p>${t(g.plan)}</p>
       description: `How to play every ${deck.name} deck in MetaDeck, the free genre card battler: ${starters.map(s => `${s.name} (${s.style})`).join(', ')}. Game plans turn by turn, key cards, tips, full lists and deck codes.`,
       image: `/assets/img/decks/${deck.id}.webp`,
       scripts: ['/src/ui/deck-page.js'],
-      body: `<section class="deck-hero" style="--deck:${esc(deck.color)}">
+      body: `<section class="deck-hero" style="--deck:${esc(deck.color)}" data-deck="${esc(deck.id)}">
   <img src="/assets/img/decks/${esc(deck.id)}.webp" alt="${esc(deck.name)} deck art" width="800" height="450">
   <div><p class="crumbs"><a href="/decks">Decks</a> ›</p>
   <h1><img class="emblem" src="/assets/img/ui/emblem-${esc(deck.id)}.webp" alt="" width="48" height="48"> ${esc(deck.name)}</h1>
@@ -245,7 +245,7 @@ ${g ? `<p>${t(g.plan)}</p>
   <a class="play-btn" href="/">Play ${esc(deck.name)} free</a></div>
 </section>
 ${genreSection(deck)}
-<section class="lists" style="--deck:${esc(deck.color)}"><h2>The ${esc(deck.name)} decks</h2>
+<section class="lists" style="--deck:${esc(deck.color)}" data-deck="${esc(deck.id)}"><h2>The ${esc(deck.name)} decks</h2>
 <p>Each is a complete 40-card list built around one play style. The first is free; the others unlock as you level ${esc(deck.name)} up. Paste a deck code into Import code on the game’s menu to open the list in the deck builder.</p>
 ${starters.map((s, i) => listSection(deck, s, i)).join('\n')}
 </section>
@@ -299,7 +299,7 @@ ${cardTable(all, { deckCol: true })}`,
     ? `: every starter deck against every deck from the other genres${data.perMatchup ? `, ${data.perMatchup.toLocaleString('en-US')} games per matchup` : ''}. A win rate counts only games against other genres`
     : ' with each deck’s full card pool'}. Real players win and lose differently: the <a href="/meta/live">live tier list</a> ranks the decks by players’ own games.</p>
 ${tiers.map(([t, rows]) => `<section class="tier tier-${t}"><h2>Tier ${t}</h2><ul class="tier-row">${rows.map(r => `
-  <li style="--deck:${esc(r.deck.color)}"><a href="${rowUrl(r)}"><img src="/assets/img/ui/emblem-${esc(r.deck.id)}.webp" alt="" width="40" height="40"><b>${esc(r.name)}</b><span>${r.starter ? `${esc(r.deck.name)} · ${esc(r.starter.style)} · ` : ''}${pct(r.overall)} win rate</span></a></li>`).join('')}</ul></section>`).join('')}
+  <li style="--deck:${esc(r.deck.color)}" data-deck="${esc(r.deck.id)}"><a href="${rowUrl(r)}"><img src="/assets/img/ui/emblem-${esc(r.deck.id)}.webp" alt="" width="40" height="40"><b>${esc(r.name)}</b><span>${r.starter ? `${esc(r.deck.name)} · ${esc(r.starter.style)} · ` : ''}${pct(r.overall)} win rate</span></a></li>`).join('')}</ul></section>`).join('')}
 ${data.variants ? `<section class="meta-summary"><div><h2>By genre</h2>
 <p>The average of each genre’s three starter decks.</p>
 <ol class="rank">${data.decks.map(r => `<li style="--deck:${esc(r.deck.color)}"><a href="${deckUrl(r.deck)}">${esc(r.deck.name)}</a><span>${pct(r.overall)}</span></li>`).join('')}</ol></div>

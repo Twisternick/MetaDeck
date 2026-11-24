@@ -138,7 +138,7 @@ export function season(root, { onBack, nav }) {
         const lv = archLevel(a.xp);
         const into = lv >= ARCH_MAX_LEVEL ? ARCH_LEVEL_XP : a.xp % ARCH_LEVEL_XP;
         const nextUnlock = Object.keys(STARTER_UNLOCKS).map(Number).find(l => l > lv);
-        return h('div', { class: 'level-card rise', style: { '--deck': d.color, '--i': i } },
+        return h('div', { class: 'level-card rise', 'data-deck': d.id, style: { '--deck': d.color, '--i': i } },
           h('div', { class: 'level-head' }, deckEmblem(d, 'chip-emblem'), h('b', null, d.name), h('span', { class: 'level-num' }, `Lv ${lv}`)),
           h('div', { class: 'meter' }, h('i', { style: { '--pct': `${(into / ARCH_LEVEL_XP) * 100}%` } })),
           h('div', { class: 'muted small' }, nextUnlock

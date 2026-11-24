@@ -79,7 +79,7 @@ export function shop(root, { onBack, nav }) {
     return h('section', { class: 'rise', style: { '--i': 1 } },
       h('h2', null, 'Card packs'),
       h('nav', { class: 'chips' }, DECKS.map(d => pick(d.id, d.name, d, d.color)), pick('any', 'Mixed', null, '#a78bfa')),
-      h('div', { class: 'pack-offer', style: { '--deck': deck?.color ?? '#a78bfa' } },
+      h('div', { class: 'pack-offer', 'data-deck': deck?.id, style: { '--deck': deck?.color ?? '#a78bfa' } },
         packArt(kind, 'idle'),
         h('div', { class: 'pack-offer-text' },
           h('h3', null, packName(kind)),

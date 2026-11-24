@@ -247,7 +247,7 @@ export function deckBuilder(root, { archetype, deck = null, onBack, onPlay }) {
     document.body.append(overlay);
   };
 
-  root.replaceChildren(h('main', { class: 'builder', style: { '--deck': arch.color } },
+  root.replaceChildren(h('main', { class: 'builder', 'data-deck': arch.id, style: { '--deck': arch.color } },
     h('header', { class: 'page-head' },
       h('button', { class: 'btn ghost small', onclick: leave }, '← Menu'),
       h('h1', null, 'Deck builder'),

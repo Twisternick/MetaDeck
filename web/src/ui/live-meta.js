@@ -67,7 +67,7 @@ const trend = t => {
 
 function tile(r, i) {
   const deck = deckOf(r.deck);
-  return `<li style="--deck:${esc(deck.color)};--i:${i}">
+  return `<li style="--deck:${esc(deck.color)};--i:${i}" data-deck="${esc(deck.id)}">
   <button type="button" class="live-tile" data-key="${esc(keyOf(r))}" aria-expanded="${state.open === keyOf(r)}">
     <img src="/assets/img/ui/emblem-${esc(deck.id)}.webp" alt="" width="44" height="44">
     <span class="who"><b>${esc(deck.name)}</b>${r.style ? `<span class="style">${esc(r.style)}</span>` : ''}</span>
@@ -84,7 +84,7 @@ function detail(deckId) {
     .map(([opp, c]) => ({ opp: deckOf(opp), ...c })).filter(c => c.opp).sort((a, b) => b.winRate - a.winRate);
   const list = rows => rows.map(c => `<li style="--deck:${esc(c.opp.color)}"><span>${esc(c.opp.name)}</span><span class="${c.winRate >= 0.55 ? 'good' : c.winRate <= 0.45 ? 'bad' : ''}">${pct(c.winRate, 0)}</span><span class="muted">${num(c.games)}</span></li>`).join('');
   const best = cols.slice(0, 3), worst = cols.slice(-3).reverse().filter(c => !best.includes(c));
-  return `<div class="live-detail" style="--deck:${esc(deck.color)}">
+  return `<div class="live-detail" style="--deck:${esc(deck.color)}" data-deck="${esc(deck.id)}">
   <h3>${esc(deck.name)} matchups</h3>
   ${cols.length ? `<div class="pair"><div><h4>Best against</h4><ol>${list(best)}</ol></div>${worst.length ? `<div><h4>Worst against</h4><ol>${list(worst)}</ol></div>` : ''}</div>`
     : '<p class="muted">Not enough games against other decks yet.</p>'}

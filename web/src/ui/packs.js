@@ -19,10 +19,10 @@ export const rarityColor = r => RARITY_COLORS[r];
 const packDeck = kind => DECKS.find(d => d.id === kind);
 export const packName = kind => (kind === 'any' ? 'Mixed pack' : `${packDeck(kind).name} pack`);
 
-// A pack, drawn in CSS: foil wrapper in the archetype's colour with its emblem.
+// A pack: the deck's own pack art (ui/pack-<deck>, styles.css), or the plain one for a mixed pack.
 export function packArt(kind, classes = '') {
   const deck = packDeck(kind);
-  return h('div', { class: `pack ${classes}`, style: { '--deck': deck?.color ?? '#a78bfa' } },
+  return h('div', { class: `pack ${classes}`, 'data-deck': deck?.id, style: { '--deck': deck?.color ?? '#a78bfa' } },
     h('div', { class: 'pack-shine', 'aria-hidden': 'true' }),
     h('div', { class: 'pack-emblem', 'aria-hidden': 'true' }, deckEmblem(deck)),
     h('div', { class: 'pack-name' }, deck ? deck.name : 'Mixed'),

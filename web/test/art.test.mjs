@@ -76,11 +76,12 @@ test('the key art style slots ask for transparent cut-outs where the art tool fi
   const ui = allSlots().filter(s => s.key.startsWith('ui/') && s.key !== 'ui/card-back' && s.group !== 'Cosmetics');
   assert.ok(ui.length >= 20, 'logo, frames, backgrounds, icons and effects');
   for (const s of ui) {
-    // Deck emblems and tile borders sit on their deck's tab; the rest of the UI art is under Extras.
-    // A tile border is drawn in its deck's own look, so it alone skips the key art.
-    const own = s.key.match(/^ui\/(?:emblem|tile-frame)-(\w+)$/);
+    // A deck's emblem, tile border, card frames and pack sit on its deck's tab; the rest of the UI art is under Extras.
+    // The border, frames and pack are drawn in the deck's own look, so they skip the key art.
+    const look = s.key.match(/^ui\/(?:tile-frame|pack)-(\w+)$/) ?? s.key.match(/^ui\/frame-(\w+)-(?:common|rare|epic|legendary)$/);
+    const own = look ?? s.key.match(/^ui\/emblem-(\w+)$/);
     assert.equal(s.group, own ? own[1] : 'Extras', s.key);
-    if (s.key.startsWith('ui/tile-frame-')) assert.doesNotMatch(s.prompt, /reference image|silver-and-gold rim/, s.key);
+    if (look) assert.doesNotMatch(s.prompt, /reference image|silver-and-gold rim/, s.key);
     else assert.match(s.prompt, /reference image/, `${s.key} points at the key art`);
     assert.equal(s.fit, /transparent background/.test(s.prompt), `${s.key}: fitted exactly when transparent`);
   }

@@ -424,7 +424,7 @@ function gallery(deckId, newOnly = false) {
   const deckKeywords = [...new Map(deck.cards.flatMap(c => glossaryFor(CARDS[c.cardId])).map(e => [e[0], e])).values()]
     .sort((a, b) => kwName(a[0]).localeCompare(kwName(b[0])));
 
-  root.replaceChildren(h('main', { class: 'gallery', style: { '--deck': deck.color } },
+  root.replaceChildren(h('main', { class: 'gallery', 'data-deck': deck.id, style: { '--deck': deck.color } },
     h('header', { class: 'page-head' },
       h('button', { class: 'btn ghost small', onclick: menu }, '← Menu'),
       h('h1', null, 'Card gallery')),
